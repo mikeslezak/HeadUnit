@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <rect width="256" height="256" fill="none"/>
+  <g fill="#ffffff" stroke="#ffffff" stroke-width="0">
+    
+<!-- cloud with rain -->
+<circle cx="108" cy="132" r="18"/>
+<circle cx="136" cy="128" r="22"/>
+<rect x="96" y="132" width="80" height="20"/>
+<rect x="108" y="160" width="8" height="20"/>
+<rect x="128" y="160" width="8" height="20"/>
+<rect x="148" y="160" width="8" height="20"/>
+
+  </g>
+</svg>

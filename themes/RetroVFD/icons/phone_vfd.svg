@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <rect width="256" height="256" fill="none"/>
+  <g fill="#ffffff" stroke="#ffffff" stroke-width="0">
+    
+<!-- classic handset with subtle curves -->
+<path d="M84 96 q28-24 36-16 l12 12 q6 6-4 18 l-8 10 q10 14 24 24 l10-8 q12-10 18-4 l12 12 q8 8-16 36 q-8 10-22 6 q-26-8-48-30t-30-48 q-4-14 6-22z"/>
+
+  </g>
+</svg>

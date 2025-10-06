@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" aria-label="Retro Chevy 1998 - Home Icon">
+  <!-- Chrome-like bezel as white stroke -->
+  <rect x="28" y="28" width="200" height="200" stroke="#ffffff" stroke-width="6" fill="none"/>
+  <!-- Home outline (bold, mechanical) -->
+  <path d="M64 140 L128 84 L192 140 V200 H64 Z" fill="none" stroke="#ffffff" stroke-width="10" stroke-linejoin="miter"/>
+  <!-- Door / garage -->
+  <rect x="112" y="156" width="32" height="44" fill="none" stroke="#ffffff" stroke-width="8"/>
+  <!-- Subtle chevron accent under roof -->
+  <path d="M96 108 L128 84 L160 108" stroke="#ffffff" stroke-width="4" fill="none"/>
+</svg>

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <defs>
+    <mask id="mask">
+      <rect width="256" height="256" fill="#fff"/>
+      <polygon points="200,0 256,0 256,56" fill="#000"/>
+      <rect x="30" y="30" width="26" height="26" rx="2" fill="#000"/>
+      <rect x="70" y="30" width="26" height="26" rx="2" fill="#000"/>
+      <rect x="30" y="70" width="26" height="26" rx="2" fill="#000"/>
+      
+<rect x="84" y="108" width="88" height="56" rx="6" fill="#000"/>
+<rect x="96" y="96" width="24" height="12" fill="#000"/>
+<circle cx="128" cy="136" r="16" fill="#000"/>
+
+    </mask>
+    <clipPath id="roundClip"><rect x="8" y="8" width="240" height="240" rx="22" ry="22"/></clipPath>
+  </defs>
+  <g clip-path="url(#roundClip)">
+    <rect x="8" y="8" width="240" height="240" rx="22" fill="#ffffff" mask="url(#mask)"/>
+    <rect x="56" y="208" width="144" height="10" fill="#ffffff"/>
+  </g>
+</svg>

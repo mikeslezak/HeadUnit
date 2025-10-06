@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Tidal Web Player</title>
+    <script type="text/javascript" src="qrc:///qtwebchannel/qwebchannel.js"></script>
+    <style>
+        body { margin: 0; padding: 0; background: transparent; }
+    </style>
+</head>
+<body>
+    <!-- Simple audio element for playback -->
+    <audio id="tidalAudio" preload="auto"></audio>
+
+    <!-- Unlock button -->
+    <div id="unlockOverlay" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 9999; align-items: center; justify-content: center;">
+        <button id="unlockButton" style="padding: 20px 40px; font-size: 18px; background: #4a2a2a; color: #ddd; border: 2px solid #8a4a4a; border-radius: 6px; cursor: pointer;">
+            Unlock Audio
+        </button>
+    </div>
+
+    <script type="module">
+        let qmlBridge = null;
+        let audioUnlocked = false;
+        let sdkInitialized = false;
+        let modulesLoaded = false;
+        let TidalAuth = null;
+        let currentTrackId = null;
+
+        new QWebChannel(qt.webChannelTransport, function(channel) {
+            qmlBridge = channel.objects.qmlBridge;
+            console.log('WebChannel connected');
+            sendToQml('channelReady', {});
+        });
+
+        function sendToQml(cmd, payload) {
+            if (qmlBridge) {
+                qmlBridge.sendToQml(cmd, JSON.stringify(payload || {}));
+            } else {
+                console.warn('QML bridge not ready');
+            }
+        }
+
+        async function loadTidalModules() {
+            if (modulesLoaded) return true;
+
+            try {
+                console.log('Loading Tidal auth module...');
+                const authModule = await import('https://unpkg.com/@tidal-music/auth/dist/index.js');
+
+                TidalAuth = authModule;
+                window.TidalAuth = TidalAuth;
+
+                modulesLoaded = true;
+                console.log('Tidal auth module loaded');
+                sendToQml('modulesLoaded', { success: true });
+                return true;
+            } catch (err) {
+                console.error('Failed to load Tidal modules:', err);
+                sendToQml('error', { msg: 'Failed to load SDK: ' + err.toString() });
+                return false;
+            }
+        }
+
+        async function initSDK() {
+            if (!modulesLoaded) {
+                const loaded = await loadTidalModules();
+                if (!loaded) {
+                    sendToQml('error', { msg: 'Modules not loaded' });
+                    return false;
+                }
+            }
+
+            if (sdkInitialized) {
+                sendToQml('toast', { text: 'SDK already initialized' });
+                return true;
+            }
+
+            try {
+                const clientId = "qT8PpO14honTEEgO";
+                const clientSecret = "Q4hJ2NTXrXuOIOgWXfumrqMmoKfyDwBaHQe055pFbiw=";
+
+                console.log('Initializing Tidal auth...');
+
+                await TidalAuth.init({
+                    clientId,
+                    clientSecret,
+                    credentialsStorageKey: 'tidal_auth_key',
+                    scopes: ['playback', 'playlists.read']
+                });
+
+                console.log('Auth initialized');
+                sdkInitialized = true;
+                sendToQml('sdkReady', { initialized: true });
+                return true;
+            } catch (err) {
+                console.error("SDK init failed:", err);
+                sendToQml('error', { msg: err.toString() });
+                return false;
+            }
+        }
+
+        function unlockPlayback() {
+            console.log('Unlock button clicked');
+
+            if (!audioUnlocked) {
+                try {
+                    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+                    if (audioContext.state === 'suspended') {
+                        audioContext.resume().then(() => {
+                            audioUnlocked = true;
+                            sendToQml('toast', { text: 'Audio unlocked' });
+                            document.getElementById('unlockOverlay').style.display = 'none';
+                        }).catch(err => {
+                            sendToQml('error', { msg: 'Unlock failed: ' + err });
+                        });
+                    } else {
+                        audioUnlocked = true;
+                        sendToQml('toast', { text: 'Audio unlocked' });
+                        document.getElementById('unlockOverlay').style.display = 'none';
+                    }
+                } catch (err) {
+                    sendToQml('error', { msg: 'Unlock failed: ' + err });
+                }
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const unlockBtn = document.getElementById('unlockButton');
+            if (unlockBtn) {
+                unlockBtn.addEventListener('click', unlockPlayback);
+            }
+
+            const audio = document.getElementById('tidalAudio');
+
+            audio.addEventListener('play', () => {
+                console.log('Audio playing');
+                sendToQml('playbackEvent', { event: 'playing', trackId: currentTrackId });
+            });
+
+            audio.addEventListener('pause', () => {
+                console.log('Audio paused');
+                sendToQml('playbackEvent', { event: 'paused' });
+            });
+
+            audio.addEventListener('ended', () => {
+                console.log('Audio ended');
+                sendToQml('playbackEvent', { event: 'ended' });
+            });
+
+            audio.addEventListener('error', (e) => {
+                console.error('Audio error:', e);
+                sendToQml('error', { msg: 'Audio error: ' + (audio.error ? audio.error.message : 'Unknown') });
+            });
+        });
+
+        async function playTrack(trackId) {
+            if (!sdkInitialized) {
+                sendToQml('error', { msg: 'SDK not initialized' });
+                return;
+            }
+            if (!audioUnlocked) {
+                sendToQml('error', { msg: 'Audio not unlocked' });
+                return;
+            }
+
+            try {
+                console.log('Getting playback for track:', trackId);
+                currentTrackId = trackId;
+
+                const credentials = await TidalAuth.credentialsProvider.getCredentials();
+
+                if (!credentials || !credentials.token) {
+                    throw new Error('No valid credentials');
+                }
+
+                console.log('Requesting playback info...');
+
+                // Request with LOW quality to ensure it works with WEB preset
+                const response = await fetch(`https://api.tidal.com/v1/tracks/${trackId}/playbackinfo?audioquality=LOW&playbackmode=STREAM&assetpresentation=FULL`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${credentials.token}`,
+                        'Accept': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`API error ${response.status}: ${errorText}`);
+                }
+
+                const playbackInfo = await response.json();
+                console.log('Playback info received, type:', playbackInfo.manifestMimeType);
+
+                const manifest = playbackInfo.manifest;
+                let streamUrl = null;
+
+                if (playbackInfo.manifestMimeType === 'application/vnd.tidal.bts') {
+                    const manifestData = JSON.parse(atob(manifest));
+                    streamUrl = manifestData.urls && manifestData.urls[0];
+                } else if (playbackInfo.manifestMimeType === 'application/vnd.apple.mpegurl') {
+                    streamUrl = manifest;
+                } else {
+                    streamUrl = manifest;
+                }
+
+                if (!streamUrl) {
+                    throw new Error('No stream URL in manifest');
+                }
+
+                console.log('Loading stream...');
+
+                const audioElement = document.getElementById('tidalAudio');
+                audioElement.src = streamUrl;
+
+                await audioElement.play();
+
+                console.log('Playback started');
+                sendToQml('playStatus', { status: 'Playing track ' + trackId });
+
+            } catch (err) {
+                console.error('Play error:', err);
+                sendToQml('error', { msg: 'Playback failed: ' + err.toString() });
+            }
+        }
+
+        async function pausePlayback() {
+            try {
+                document.getElementById('tidalAudio').pause();
+                sendToQml('pauseStatus', { status: 'Paused' });
+            } catch (err) {
+                sendToQml('error', { msg: err.toString() });
+            }
+        }
+
+        async function loadPlaylists(limit = 10) {
+            if (!sdkInitialized) {
+                sendToQml('error', { msg: 'SDK not initialized' });
+                return;
+            }
+
+            try {
+                const credentials = await TidalAuth.credentialsProvider.getCredentials();
+
+                if (!credentials || !credentials.token) {
+                    throw new Error('No credentials');
+                }
+
+                const response = await fetch(`https://api.tidal.com/v1/users/${credentials.userId}/playlists?limit=${limit}`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${credentials.token}`,
+                        'Accept': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`API error: ${response.status}`);
+                }
+
+                const data = await response.json();
+                const playlists = data.items || [];
+
+                sendToQml('playlists', {
+                    items: playlists.map(p => ({
+                        title: p.title || 'Unknown',
+                        id: p.uuid
+                    }))
+                });
+            } catch (err) {
+                console.error('Playlist error:', err);
+                sendToQml('error', { msg: err.toString() });
+            }
+        }
+
+        window.tidalHandler = {
+            handleCommand: async function(cmd, payload) {
+                console.log('Command:', cmd);
+
+                switch(cmd) {
+                    case 'loadModules':
+                        await loadTidalModules();
+                        break;
+                    case 'init':
+                        await initSDK();
+                        break;
+                    case 'showUnlock':
+                        document.getElementById('unlockOverlay').style.display = 'flex';
+                        break;
+                    case 'play':
+                        await playTrack(payload.trackId || '251380837');
+                        break;
+                    case 'pause':
+                        await pausePlayback();
+                        break;
+                    case 'loadPlaylists':
+                        await loadPlaylists(payload.limit || 10);
+                        break;
+                    case 'ping':
+                        sendToQml('pong', { from: 'HTML' });
+                        break;
+                    default:
+                        console.warn('Unknown command:', cmd);
+                }
+            }
+        };
+
+        console.log('Handler ready');
+    </script>
+</body>
+</html>

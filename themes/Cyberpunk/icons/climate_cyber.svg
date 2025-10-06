@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <defs>
+    <mask id="mask">
+      <rect width="256" height="256" fill="#fff"/>
+      <polygon points="200,0 256,0 256,56" fill="#000"/>
+      <rect x="30" y="30" width="26" height="26" rx="2" fill="#000"/>
+      <rect x="70" y="30" width="26" height="26" rx="2" fill="#000"/>
+      <rect x="30" y="70" width="26" height="26" rx="2" fill="#000"/>
+      
+<circle cx="112" cy="136" r="22" fill="none" stroke="#000" stroke-width="10"/>
+<line x1="88" y1="136" x2="72" y2="136" stroke="#000" stroke-width="8"/>
+<line x1="96" y1="116" x2="84" y2="104" stroke="#000" stroke-width="8"/>
+<line x1="96" y1="156" x2="84" y2="168" stroke="#000" stroke-width="8"/>
+<line x1="144" y1="116" x2="184" y2="156" stroke="#000" stroke-width="8"/>
+<line x1="144" y1="156" x2="184" y2="116" stroke="#000" stroke-width="8"/>
+<line x1="164" y1="110" x2="164" y2="162" stroke="#000" stroke-width="8"/>
+
+    </mask>
+    <clipPath id="roundClip"><rect x="8" y="8" width="240" height="240" rx="22" ry="22"/></clipPath>
+  </defs>
+  <g clip-path="url(#roundClip)">
+    <rect x="8" y="8" width="240" height="240" rx="22" fill="#ffffff" mask="url(#mask)"/>
+    <rect x="56" y="208" width="144" height="10" fill="#ffffff"/>
+  </g>
+</svg>

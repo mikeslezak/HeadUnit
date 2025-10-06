@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" aria-label="Retro Chevy 1998 - Tidal Music Icon">
+  <!-- Chrome-like bezel as white stroke -->
+  <rect x="28" y="28" width="200" height="200" stroke="#ffffff" stroke-width="6" fill="none"/>
+  <!-- Tidal diamond grid (accurate to brand) -->
+  <polygon fill="#ffffff" points="128,96 144,112 128,128 112,112"/>
+  <polygon fill="#ffffff" points="160,128 176,144 160,160 144,144"/>
+  <polygon fill="#ffffff" points="96,128 112,144 96,160 80,144"/>
+  <polygon fill="#ffffff" points="128,160 144,176 128,192 112,176"/>
+  <!-- connecting mid diamonds -->
+  <polygon fill="#ffffff" points="144,112 160,128 144,144 128,128"/>
+  <polygon fill="#ffffff" points="112,112 128,128 112,144 96,128"/>
+  <polygon fill="#ffffff" points="128,128 144,144 128,160 112,144"/>
+</svg>

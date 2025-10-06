@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" aria-label="Retro Chevy 1998 - Maps Icon">
+  <!-- Chrome-like bezel as white stroke -->
+  <rect x="28" y="28" width="200" height="200" stroke="#ffffff" stroke-width="6" fill="none"/>
+  <!-- Outer compass ring (industrial, simple) -->
+  <circle cx="128" cy="144" r="48" fill="none" stroke="#ffffff" stroke-width="10"/>
+  <!-- Cardinal ticks -->
+  <line x1="128" y1="86" x2="128" y2="100" stroke="#ffffff" stroke-width="6"/>
+  <line x1="128" y1="188" x2="128" y2="202" stroke="#ffffff" stroke-width="6"/>
+  <line x1="80" y1="144" x2="66" y2="144" stroke="#ffffff" stroke-width="6"/>
+  <line x1="190" y1="144" x2="176" y2="144" stroke="#ffffff" stroke-width="6"/>
+  <!-- Navigation arrow (bold triangle), slightly offset upward -->
+  <path d="M128 96 L150 164 L128 150 L106 164 Z" fill="#ffffff"/>
+</svg>

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <rect width="256" height="256" fill="none"/>
+  <g fill="#ffffff" stroke="#ffffff" stroke-width="0">
+    
+<!-- eighth note -->
+<rect x="140" y="84" width="12" height="64"/>
+<circle cx="120" cy="160" r="16"/>
+<circle cx="160" cy="156" r="16"/>
+<rect x="120" y="148" width="52" height="12"/>
+
+  </g>
+</svg>
