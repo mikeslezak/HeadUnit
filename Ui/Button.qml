@@ -1,5 +1,5 @@
 import QtQuick 2.15
-import QtQuick.Effects
+import Qt5Compat.GraphicalEffects
 
 Rectangle {
     id: root
@@ -58,13 +58,11 @@ Rectangle {
 
     // Glow effect when pressed
     layer.enabled: isPressed
-    layer.effect: MultiEffect {
-        shadowEnabled: true
-        shadowColor: theme?.palette?.primary ?? "#00f0ff"
-        shadowBlur: 1.0
-        shadowOpacity: 0.9
-        shadowHorizontalOffset: 0
-        shadowVerticalOffset: 0
+    layer.effect: Glow {
+        color: theme?.palette?.primary ?? "#00f0ff"
+        spread: 0.5
+        radius: 8
+        samples: 17
     }
 
     // Subtle brightness pulse when pressed

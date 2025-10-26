@@ -1,5 +1,5 @@
 import QtQuick 2.15
-import QtQuick.Effects
+import Qt5Compat.GraphicalEffects
 
 // Centralized button component with glow effect
 Rectangle {
@@ -26,13 +26,11 @@ Rectangle {
 
     // Glow effect when pressed
     layer.enabled: isPressed
-    layer.effect: MultiEffect {
-        shadowEnabled: true
-        shadowColor: root.glowColor
-        shadowBlur: 1.0
-        shadowOpacity: 0.9
-        shadowHorizontalOffset: 0
-        shadowVerticalOffset: 0
+    layer.effect: Glow {
+        color: root.glowColor
+        spread: 0.5
+        radius: 8
+        samples: 17
     }
 
     // Brightness feedback
@@ -57,9 +55,8 @@ Rectangle {
         visible: source !== ""
 
         layer.enabled: true
-        layer.effect: MultiEffect {
-            colorization: 1.0
-            colorizationColor: root.iconColor
+        layer.effect: ColorOverlay {
+            color: root.iconColor
         }
     }
 

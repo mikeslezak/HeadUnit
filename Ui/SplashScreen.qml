@@ -1,5 +1,5 @@
 import QtQuick 2.15
-import QtQuick.Effects
+import Qt5Compat.GraphicalEffects
 
 Rectangle {
     id: root
@@ -225,17 +225,8 @@ Rectangle {
 
                 layer.enabled: root.logoColorMode === "colorize"
                 layer.smooth: false
-                layer.effect: MultiEffect {
-                    colorization: 1.0
-                    colorizationColor: root.splashColor
-
-                    shadowEnabled: root.useGlow
-                    shadowBlur: root.glowIntensity / 30.0
-                    shadowOpacity: root.logoAnim === "glow" ? logoContainer.animValue : 0.6
-                    shadowColor: root.splashColor
-                    shadowHorizontalOffset: 0
-                    shadowVerticalOffset: 0
-                    shadowScale: 1.02
+                layer.effect: ColorOverlay {
+                    color: root.splashColor
                 }
             }
         }
@@ -278,13 +269,11 @@ Rectangle {
                 opacity: primaryTextContainer.breatheAmount
 
                 layer.enabled: root.useGlow
-                layer.effect: MultiEffect {
-                    shadowEnabled: true
-                    shadowBlur: root.glowIntensity / 30.0
-                    shadowOpacity: 0.8
-                    shadowColor: root.splashGlow
-                    shadowHorizontalOffset: 0
-                    shadowVerticalOffset: 0
+                layer.effect: Glow {
+                    color: root.splashGlow
+                    spread: 0.5
+                    radius: root.glowIntensity
+                    samples: 17
                 }
             }
         }
@@ -343,13 +332,11 @@ Rectangle {
                 opacity: secondaryTextContainer.breatheAmount
 
                 layer.enabled: root.useGlow
-                layer.effect: MultiEffect {
-                    shadowEnabled: true
-                    shadowBlur: root.glowIntensity / 40.0
-                    shadowOpacity: 0.6
-                    shadowColor: root.splashGlow
-                    shadowHorizontalOffset: 0
-                    shadowVerticalOffset: 0
+                layer.effect: Glow {
+                    color: root.splashGlow
+                    spread: 0.5
+                    radius: root.glowIntensity
+                    samples: 17
                 }
             }
         }

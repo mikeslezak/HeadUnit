@@ -1,6 +1,7 @@
 import QtQuick 2.15
 import QtQml 2.15
 import QtCore
+import Qt.labs.settings
 
 QtObject {
     id: root

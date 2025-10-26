@@ -1,5 +1,5 @@
 import QtQuick 2.15
-import QtQuick.Effects
+import Qt5Compat.GraphicalEffects
 
 Rectangle {
   id: root
@@ -121,11 +121,11 @@ Rectangle {
 
           // Glow effect when pressed
           layer.enabled: isPressed
-          layer.effect: MultiEffect {
-            shadowEnabled: true
-            shadowColor: root._accent
-            shadowBlur: 1.0
-            shadowOpacity: 0.8
+          layer.effect: Glow {
+            color: root._accent
+            spread: 0.5
+            radius: 8
+            samples: 17
           }
 
           // Brightness feedback
@@ -158,9 +158,8 @@ Rectangle {
             }
 
             layer.enabled: true
-            layer.effect: MultiEffect {
-              colorization: 1.0
-              colorizationColor: parent.parent.parent.isActive ? root._accent : root._iconCol
+            layer.effect: ColorOverlay {
+              color: parent.parent.parent.isActive ? root._accent : root._iconCol
             }
           }
 
@@ -207,11 +206,11 @@ Rectangle {
 
       // Glow effect when pressing or long pressing
       layer.enabled: isPressed || isLongPressing
-      layer.effect: MultiEffect {
-        shadowEnabled: true
-        shadowColor: root._accent
-        shadowBlur: 1.0
-        shadowOpacity: 0.8
+      layer.effect: Glow {
+        color: root._accent
+        spread: 0.5
+        radius: 8
+        samples: 17
       }
 
       // Pulsing animation during long press
@@ -246,9 +245,8 @@ Rectangle {
         }
 
         layer.enabled: true
-        layer.effect: MultiEffect {
-          colorization: 1.0
-          colorizationColor: parent.parent.parent.isActive ? root._accent : root._iconCol
+        layer.effect: ColorOverlay {
+          color: parent.parent.parent.isActive ? root._accent : root._iconCol
         }
       }
 
