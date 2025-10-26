@@ -167,7 +167,7 @@ private:
     void removeNotification(const QString &notificationId);
     bool isAppAllowed(const QString &appId) const;
     bool shouldShowNotification(NotificationPriority priority) const;
-    void parseAncsNotification(const QByteArray &data);
+    QVariantMap parseAncsNotification(const QByteArray &data);
     void sendAncsCommand(quint8 commandId, const QString &notificationId);
     void loadSettings();
     void saveSettings();

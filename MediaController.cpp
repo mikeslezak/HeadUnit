@@ -138,7 +138,7 @@ void MediaController::connectToDevice(const QString &deviceAddress)
     setStatusMessage("Connecting to AVRCP service...");
 
     // AVRCP service UUID: 0x110E (AV Remote Control)
-    static const QBluetoothUuid avrcpUuid(QBluetoothUuid::ServiceClassUuid::AudioVideoRemoteControl);
+    static const QBluetoothUuid avrcpUuid(QBluetoothUuid::ServiceClassUuid::AV_RemoteControl);
 
     m_bluetoothAddress = QBluetoothAddress(deviceAddress);
 
@@ -459,7 +459,7 @@ void MediaController::setRepeatMode(RepeatMode mode)
 /**
  * CYCLE REPEAT MODE
  *
- * Cycles through: Off → All → One → Off
+ * Cycles through: Off â†’ All â†’ One â†’ Off
  */
 void MediaController::cycleRepeatMode()
 {

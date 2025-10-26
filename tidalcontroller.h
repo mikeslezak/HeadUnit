@@ -163,9 +163,7 @@ private:
     static const QString TIDAL_PACKAGE;
     static const QString TIDAL_ACTIVITY;
 
-#ifdef Q_OS_WIN
     bool m_mockMode;
-#endif
 };
 
 #endif // TIDALCONTROLLER_H
