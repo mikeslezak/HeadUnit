@@ -59,6 +59,9 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("voiceAssistant", &voiceAssistant);
     engine.rootContext()->setContextProperty("notificationManager", &notificationManager);
 
+    // Load QML - version compatible approach
+#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
+    // Qt 6.5+ (including 6.9) - use loadFromModule
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed,
                      &app, []() {
                          qCritical() << "QML Engine Creation Failed";
@@ -67,6 +70,10 @@ int main(int argc, char *argv[])
                      Qt::QueuedConnection);
 
     engine.loadFromModule("HeadUnit", "Main");
+#else
+    // Qt 6.2-6.4 - use direct load
+    engine.load(QUrl(QStringLiteral("qrc:/qt/qml/HeadUnit/Main.qml")));
+#endif
 
     if (engine.rootObjects().isEmpty()) {
         qCritical() << "No root objects created";
