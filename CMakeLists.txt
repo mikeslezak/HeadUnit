@@ -4,8 +4,7 @@ project(HeadUnit VERSION 0.1 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Qt 6.2 compatible (Jetson Orin Nano)
-find_package(Qt6 6.2 REQUIRED COMPONENTS
+find_package(Qt6 6.9 REQUIRED COMPONENTS
     Quick
     Svg
     WebEngineQuick
@@ -16,21 +15,18 @@ find_package(Qt6 6.2 REQUIRED COMPONENTS
 # TextToSpeech is optional - only use if available
 find_package(Qt6 COMPONENTS TextToSpeech QUIET)
 
-# Qt 6.2 compatible setup (no REQUIRES parameter)
-set(CMAKE_AUTOMOC ON)
-set(CMAKE_AUTORCC ON)
-set(CMAKE_AUTOUIC ON)
+qt_standard_project_setup(REQUIRES 6.9)
 
 qt_add_executable(appHeadUnit
     main.cpp
-    TidalController.cpp
+    tidalcontroller.cpp
     MediaController.cpp
     VoiceAssistant.cpp
     NotificationManager.cpp
 )
 
 target_sources(appHeadUnit PRIVATE
-    TidalController.h
+    tidalcontroller.h
     MediaController.h
     VoiceAssistant.h
     NotificationManager.h
@@ -52,7 +48,6 @@ qt_add_qml_module(appHeadUnit
         Ui/StatusBar.qml
         Ui/WebTest.qml
         Ui/NotificationPanel.qml
-        Ui/NotificationBanner.qml
         Ui/VoiceControl.qml
         Ui/screens/Home.qml
         Ui/screens/Music.qml
@@ -121,6 +116,7 @@ qt_add_qml_module(appHeadUnit
         themes/RetroVFD/icons/vehicle_vfd.svg
         themes/RetroVFD/icons/camera_vfd.svg
         themes/RetroVFD/icons/weather_vfd.svg
+        QML_FILES Ui/NotificationBanner.qml
 )
 
 target_link_libraries(appHeadUnit PRIVATE
