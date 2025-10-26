@@ -15,7 +15,9 @@ find_package(Qt6 6.9 REQUIRED COMPONENTS
 # TextToSpeech is optional - only use if available
 find_package(Qt6 COMPONENTS TextToSpeech QUIET)
 
-qt_standard_project_setup(REQUIRES 6.9)
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTORCC ON)
+set(CMAKE_AUTOUIC ON)
 
 qt_add_executable(appHeadUnit
     main.cpp
