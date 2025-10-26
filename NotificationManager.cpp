@@ -1,4 +1,5 @@
 #include "NotificationManager.h"
+#include <QtEndian>
 #include <QDebug>
 #include <QSettings>
 #include <QRandomGenerator>
@@ -149,14 +150,10 @@ void NotificationManager::connectToDevice(const QString &deviceAddress, const QS
             m_bleController->deleteLater();
         }
 
-        // Qt 6.2 compatibility: BLE API changed, needs QBluetoothDeviceInfo
-        // TODO: Implement device discovery first, then connect
-        qWarning() << "BLE notifications require Qt 6.3+ or device discovery implementation";
-        m_bleController = nullptr;
-        // m_bleController = QLowEnergyController::createCentral(address, this);
+        m_bleController = QLowEnergyController::createCentral(address, this);
 
         connect(m_bleController, &QLowEnergyController::serviceDiscovered,
-                this, &NotificationManager::onRemoteServiceDiscovered);
+                this, &NotificationManager::onServiceDiscovered);
         connect(m_bleController, &QLowEnergyController::connected,
                 this, [this]() {
                     qDebug() << "BLE connected, discovering services...";
@@ -833,7 +830,7 @@ void NotificationManager::generateMockNotifications()
 // BLUETOOTH LE / ANCS (iOS) - Real Mode Only
 // ========================================================================
 
-void NotificationManager::onRemoteServiceDiscovered(const QBluetoothUuid &uuid)
+void NotificationManager::onServiceDiscovered(const QBluetoothUuid &uuid)
 {
     if (uuid == ANCS_SERVICE_UUID) {
         qDebug() << "ANCS service discovered!";
@@ -858,7 +855,7 @@ void NotificationManager::onRemoteServiceDiscovered(const QBluetoothUuid &uuid)
 
 void NotificationManager::onServiceStateChanged(QLowEnergyService::ServiceState state)
 {
-    if (state == QLowEnergyService::RemoteServiceDiscovered) {
+    if (state == QLowEnergyService::ServiceDiscovered) {
         qDebug() << "ANCS service details discovered";
 
         // Get characteristics
