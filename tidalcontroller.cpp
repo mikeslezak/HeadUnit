@@ -1,4 +1,4 @@
-#include "TidalController.h"
+#include "tidalcontroller.h"
 #include <QStandardPaths>
 #include <QRegularExpression>
 #include <QRandomGenerator>
@@ -54,14 +54,14 @@ TidalController::TidalController(QObject *parent)
             this, &TidalController::onAdbError);
 
     // Poll MediaSession every 2 seconds for state
-    connect(m_pollTimer, &QTimer::timeout, this, &TidalController::pollMediaSession);
-    m_pollTimer->start(2000);
+    // connect(m_pollTimer, &QTimer::timeout, this, &TidalController::pollMediaSession);
+    // m_pollTimer->start(2000);
 
     connect(m_progressTimer, &QTimer::timeout, this, &TidalController::updateTrackPosition);
     m_progressTimer->setInterval(1000);
 
-    QTimer::singleShot(500, this, &TidalController::checkConnection);
-    QTimer::singleShot(3000, this, &TidalController::syncWithAndroidApp);
+    // QTimer::singleShot(500, this, &TidalController::checkConnection);
+    // QTimer::singleShot(3000, this, &TidalController::syncWithAndroidApp);
 #endif
 }
 
@@ -513,7 +513,7 @@ void TidalController::startTidalApp()
 #else
     setStatusMessage("Starting TIDAL Android app...");
     sendAdbCommand("shell", {"am", "start", "-n", TIDAL_ACTIVITY});
-    QTimer::singleShot(3000, this, &TidalController::checkConnection);
+    // QTimer::singleShot(3000, this, &TidalController::checkConnection);  // DISABLED
 #endif
 }
 

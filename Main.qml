@@ -13,6 +13,8 @@ Window {
     maximumHeight: 430
     visible: true
     title: "HeadUnit"
+    visibility: Window.FullScreen
+    color:"#000000"
 
     Theme { id: theme }
 
@@ -140,7 +142,7 @@ Window {
     Timer {
         id: inactivityTimer
         interval: inactivityTimeout
-        running: true
+        running: false
         repeat: false
         onTriggered: {
             console.log("Inactivity timeout - marking apps inactive")
@@ -340,14 +342,17 @@ Window {
             }
 
             Item {
-                id: screenContainer
-                anchors {
-                    left: navBar.right
-                    right: parent.right
-                    top: parent.top
-                    topMargin: mainWindow.topBufferHeight
-                    bottom: parent.bottom
-                }
+    id: screenContainer
+    anchors {
+        left: navBar.right
+        leftMargin: 0     // ← Reset to 0
+        right: parent.right
+        rightMargin: 0    // ← Reset to 0
+        top: statusBar.bottom
+        topMargin: 0      // ← Reset to 0, statusBar.bottom already positions it correctly
+        bottom: parent.bottom
+        bottomMargin: 0   // ← Reset to 0
+    }
 
                 Loader {
                     id: homeLoader
@@ -431,9 +436,10 @@ Window {
                     onLoaded: { item.theme = theme }
                 }
 
-                Loader {
+                 Loader {
                     id: mapsLoader
                     anchors.fill: parent
+                    // No margin adjustments - use natural 12px from Page.qml
                     visible: mainWindow.currentScreen === "maps"
                     active: false
                     asynchronous: true

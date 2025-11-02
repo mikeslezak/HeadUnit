@@ -198,14 +198,15 @@ Item {
                     source: theme && theme.iconPath ? theme.iconPath(iconKey) : ""
                     width: root.iconSize
                     height: root.iconSize
+                    sourceSize.width: root.iconSize
+                    sourceSize.height: root.iconSize
                     fillMode: Image.PreserveAspectFit
                     smooth: true
+                    antialiasing: true
+                    visible: true
+                    cache: true
+                    asynchronous: false
 
-                    layer.enabled: true
-                    layer.effect: MultiEffect {
-                        colorization: 1.0
-                        colorizationColor: root.primaryCol
-                    }
                 }
             }
 

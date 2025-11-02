@@ -97,11 +97,14 @@ Item {
     WebEngineView {
         id: web
         anchors.fill: parent
-        url: Qt.resolvedUrl("qrc:/qt/qml/HeadUnit/assets/html/map_view.html")
+        url: "qrc:/HeadUnit/assets/html/map_view.html"
         webChannel: channel
 
         settings.localContentCanAccessRemoteUrls: true
         settings.javascriptEnabled: true
+        settings.accelerated2dCanvasEnabled: false
+        settings.webGLEnabled: false
+        settings.pluginsEnabled: false
 
         onJavaScriptConsoleMessage: (level, msg, line, source) => {
             console.log(`Map JS [${level}]: ${msg} (line ${line})`)

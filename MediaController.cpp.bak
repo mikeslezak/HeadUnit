@@ -251,22 +251,6 @@ void MediaController::connectToDevice(const QString &deviceAddress)
     // Setup property monitoring
     setupPropertyMonitoring(m_mediaPlayerPath);
     
-    // Monitor for new MediaPlayer objects (player switching)
-    bool omConnected = QDBusConnection::systemBus().connect(
-        "org.bluez",
-        "/",
-        "org.freedesktop.DBus.ObjectManager",
-        "InterfacesAdded",
-        this,
-        SLOT(onInterfacesAdded(QDBusObjectPath,QVariantMap))
-    );
-    
-    if (omConnected) {
-        qDebug() << "MediaController: Monitoring for player switches";
-    } else {
-        qWarning() << "MediaController: Failed to monitor player switches";
-    }
-    
     // Setup audio routing
     setupAudioRouting();
     
@@ -303,54 +287,14 @@ void MediaController::connectToDevice(const QString &deviceAddress)
     emit connectionChanged();
     
     // Try to determine which app is playing
-    QVariant nameVar = m_mediaPlayerInterface->property("Name");
-    QString name = nameVar.toString();
-    qDebug() << "MediaController: MediaPlayer Name property:" << name << "(variant valid:" << nameVar.isValid() << ")";
-    
+    QString name = m_mediaPlayerInterface->property("Name").toString();
     if (!name.isEmpty()) {
         m_activeApp = name;
         emit activeAppChanged();
-    } else {
-        // Fallback: try reading from device properties
-        QDBusInterface deviceIface("org.bluez", devicePath, "org.freedesktop.DBus.Properties", QDBusConnection::systemBus());
-        QDBusReply<QVariant> aliasReply = deviceIface.call("Get", "org.bluez.Device1", "Alias");
-        if (aliasReply.isValid()) {
-            m_activeApp = aliasReply.value().toString();
-            emit activeAppChanged();
-            qDebug() << "MediaController: Using device alias as app name:" << m_activeApp;
-        }
     }
     
     setStatusMessage("Connected to " + m_activeApp);
     qDebug() << "MediaController: Successfully connected to" << m_activeApp;
-    
-    // Query all available MediaPlayer properties to find album art
-    QDBusMessage getAllProps = m_mediaPlayerInterface->call("GetAll", "org.bluez.MediaPlayer1");
-    if (getAllProps.type() != QDBusMessage::ErrorMessage && !getAllProps.arguments().isEmpty()) {
-        QDBusArgument arg = getAllProps.arguments().at(0).value<QDBusArgument>();
-        QVariantMap allProps;
-        arg >> allProps;
-        
-        qDebug() << "MediaController: ALL MediaPlayer properties:" << allProps.keys();
-        
-        // Check each property's value
-        for (const QString &key : allProps.keys()) {
-            if (key == "Track") {
-                QVariant trackVar = allProps.value(key);
-                if (trackVar.canConvert<QDBusArgument>()) {
-                    QDBusArgument trackArg = trackVar.value<QDBusArgument>();
-                    QVariantMap trackMap;
-                    trackArg >> trackMap;
-                    qDebug() << "MediaController: Detailed Track keys:" << trackMap.keys();
-                    
-                    // Print each track property
-                    for (const QString &tkey : trackMap.keys()) {
-                        qDebug() << "  " << tkey << ":" << trackMap.value(tkey);
-                    }
-                }
-            }
-        }
-    }
 #endif
 }
 
@@ -967,34 +911,6 @@ void MediaController::onAlbumArtDownloaded()
         if (!m_albumArtImage.isNull()) {
             qDebug() << "Album art downloaded successfully";
             emit albumArtChanged();
-        } else {
-            qWarning() << "Failed to decode album art image";
-        }
-    } else {
-        qWarning() << "Album art download failed:" << reply->errorString();
-    }
-
-    reply->deleteLater();
-}
-
-// ========================================================================
-// DBUS COMMUNICATION (Real Mode Only)
-// ========================================================================
-
-#ifndef Q_OS_WIN
-
-/**
- * ADDRESS TO PATH
- *
- * Converts Bluetooth address format for DBus object paths
- * XX:XX:XX:XX:XX:XX → dev_XX_XX_XX_XX_XX_XX
- */
-QString MediaController::addressToPath(const QString &address)
-{
-    QString path = "dev_" + address;
-    path.replace(":", "_");
-    return path;
-}
 
 /**
  * FIND MEDIA PLAYER PATH
@@ -1006,38 +922,83 @@ QString MediaController::findMediaPlayerPath(const QString &devicePath)
 {
     qDebug() << "MediaController: Searching for MediaPlayer under" << devicePath;
     
-    // Try the most common player path first
-    QString playerPath = devicePath + "/player0";
-    
-    QDBusInterface testPlayer(
+    QDBusInterface objectManager(
         "org.bluez",
-        playerPath,
-        "org.bluez.MediaPlayer1",
+        "/",
+        "org.freedesktop.DBus.ObjectManager",
         QDBusConnection::systemBus()
     );
     
-    if (testPlayer.isValid()) {
-        qDebug() << "MediaController: Found MediaPlayer at" << playerPath;
-        return playerPath;
+    // GetManagedObjects returns a{oa{sa{sv}}} - complex nested structure
+    QDBusMessage reply = objectManager.call("GetManagedObjects");
+    
+    if (reply.type() == QDBusMessage::ErrorMessage) {
+        qWarning() << "MediaController: GetManagedObjects failed:" << reply.errorMessage();
+        return QString();
     }
     
-    // If player0 doesn't exist, try player1
-    playerPath = devicePath + "/player1";
-    QDBusInterface testPlayer2(
-        "org.bluez",
-        playerPath,
-        "org.bluez.MediaPlayer1",
-        QDBusConnection::systemBus()
-    );
+    if (reply.arguments().isEmpty()) {
+        qWarning() << "MediaController: GetManagedObjects returned no data";
+        return QString();
+    }
     
-    if (testPlayer2.isValid()) {
-        qDebug() << "MediaController: Found MediaPlayer at" << playerPath;
-        return playerPath;
+    // Parse the complex return value: a{oa{sa{sv}}}
+    const QDBusArgument arg = reply.arguments().at(0).value<QDBusArgument>();
+    
+    arg.beginMap();
+    while (!arg.atEnd()) {
+        QString objPath;
+        arg.beginMapEntry();
+        arg >> objPath;
+        
+        if (objPath.startsWith(devicePath) && objPath.contains("player")) {
+            // Found a player under our device
+            QDBusArgument interfaces;
+            arg >> interfaces;
+            
+            interfaces.beginMap();
+            while (!interfaces.atEnd()) {
+                QString interface;
+                interfaces.beginMapEntry();
+                interfaces >> interface;
+                
+                if (interface == "org.bluez.MediaPlayer1") {
+                    // Found it! Clean up parsing and return
+                    interfaces.endMapEntry();
+                    interfaces.endMap();
+                    arg.endMapEntry();
+                    arg.endMap();
+                    
+                    qDebug() << "MediaController: Found MediaPlayer at" << objPath;
+                    return objPath;
+                }
+                
+                // Skip the properties dictionary
+                QDBusArgument props;
+                interfaces >> props;
+                interfaces.endMapEntry();
+            }
+            interfaces.endMap();
+        } else {
+            // Skip this object's interfaces
+            QDBusArgument interfaces;
+            arg >> interfaces;
+        }
+        
+        arg.endMapEntry();
+    }
+    arg.endMap();
+    
+    qWarning() << "MediaController: No MediaPlayer found under" << devicePath;
+    return QString();
+}
+        }
     }
     
     qWarning() << "MediaController: No MediaPlayer found under" << devicePath;
     return QString();
 }
+
 /**
  * SETUP PROPERTY MONITORING
  *
@@ -1083,107 +1044,49 @@ void MediaController::onPropertiesChanged(const QString &interface,
     
     // Handle track metadata changes
     if (changedProperties.contains("Track")) {
-    // Track property is a complex DBus type a{sv}
-    QVariant trackVariant = changedProperties.value("Track");
-    QVariantMap track;
-    
-    // Try to extract the map from the variant
-    if (trackVariant.canConvert<QDBusArgument>()) {
-        const QDBusArgument arg = trackVariant.value<QDBusArgument>();
-        arg >> track;
-    } else {
-        track = trackVariant.toMap();
-    }
-    
-    // Debug: Show all available keys
-    qDebug() << "MediaController: Track metadata keys:" << track.keys();
-    
-    bool trackMetadataChanged = false;
-    
-    // Title
-    if (track.contains("Title")) {
-        QString newTitle = track.value("Title").toString();
-        if (m_trackTitle != newTitle) {
-            m_trackTitle = newTitle;
-            trackMetadataChanged = true;
-        }
-    }
-    
-    // Artist
-    if (track.contains("Artist")) {
-        QString newArtist = track.value("Artist").toString();
-        if (m_artist != newArtist) {
-            m_artist = newArtist;
-            trackMetadataChanged = true;
-        }
-    }
-    
-    // Album
-    if (track.contains("Album")) {
-        QString newAlbum = track.value("Album").toString();
-        if (m_album != newAlbum) {
-            m_album = newAlbum;
-            trackMetadataChanged = true;
-        }
-    }
-    
-    // Genre
-    if (track.contains("Genre")) {
-        QString newGenre = track.value("Genre").toString();
-        if (m_genre != newGenre) {
-            m_genre = newGenre;
-            trackMetadataChanged = true;
-        }
-    }
-    
-    // Duration
-    if (track.contains("Duration")) {
-        qint64 newDuration = track.value("Duration").toLongLong();
-        if (m_trackDuration != newDuration) {
-            m_trackDuration = newDuration;
-            emit durationChanged();
-        }
-    }
-    
-    // Track Number
-    if (track.contains("TrackNumber")) {
-        int trackNum = track.value("TrackNumber").toInt();
-        qDebug() << "MediaController: Track number:" << trackNum;
-    }
-    
-    // Album Art - Check multiple possible keys
-    QUrl artUrl;
-    if (track.contains("xesam:artUrl")) {
-        artUrl = QUrl(track.value("xesam:artUrl").toString());
-    } else if (track.contains("artUrl")) {
-        artUrl = QUrl(track.value("artUrl").toString());
-    } else if (track.contains("mpris:artUrl")) {
-        artUrl = QUrl(track.value("mpris:artUrl").toString());
-    }
-    
-    if (!artUrl.isEmpty() && artUrl.isValid()) {
-        qDebug() << "MediaController: Found album art URL:" << artUrl.toString();
-        if (m_albumArtUrl != artUrl) {
-            m_albumArtUrl = artUrl;
-            
-            // Download the artwork if it's a URL
-            if (artUrl.scheme() == "http" || artUrl.scheme() == "https") {
-                downloadAlbumArt(artUrl);
+        QVariantMap track = changedProperties.value("Track").toMap();
+        
+        bool trackMetadataChanged = false;
+        
+        if (track.contains("Title")) {
+            QString newTitle = track.value("Title").toString();
+            if (m_trackTitle != newTitle) {
+                m_trackTitle = newTitle;
+                trackMetadataChanged = true;
             }
-            
-            emit albumArtChanged();
         }
-    } else {
-        qDebug() << "MediaController: No album art URL found in track metadata";
+        
+        if (track.contains("Artist")) {
+            QString newArtist = track.value("Artist").toString();
+            if (m_artist != newArtist) {
+                m_artist = newArtist;
+                trackMetadataChanged = true;
+            }
+        }
+        
+        if (track.contains("Album")) {
+            QString newAlbum = track.value("Album").toString();
+            if (m_album != newAlbum) {
+                m_album = newAlbum;
+                trackMetadataChanged = true;
+            }
+        }
+        
+        if (track.contains("Duration")) {
+            qint64 newDuration = track.value("Duration").toLongLong();
+            if (m_trackDuration != newDuration) {
+                m_trackDuration = newDuration;
+                emit durationChanged();
+            }
+        }
+        
+        if (trackMetadataChanged) {
+            emit trackChanged();
+            setStatusMessage("Now playing: " + m_trackTitle);
+            qDebug() << "MediaController: Track changed to:" << m_trackTitle << "by" << m_artist;
+        }
     }
     
-    // Emit changes
-    if (trackMetadataChanged) {
-        emit trackChanged();
-        setStatusMessage("Now playing: " + m_trackTitle);
-        qDebug() << "MediaController: Track changed to:" << m_trackTitle << "by" << m_artist;
-    }
-}
     // Handle playback status changes
     if (changedProperties.contains("Status")) {
         QString status = changedProperties.value("Status").toString();
@@ -1204,101 +1107,10 @@ void MediaController::onPropertiesChanged(const QString &interface,
         qDebug() << "MediaController: Playback status:" << status;
     }
     
-    // Handle app switching via Name property change
-    if (changedProperties.contains("Name")) {
-        QString newAppName = changedProperties.value("Name").toString();
-        if (!newAppName.isEmpty() && newAppName != m_activeApp) {
-            qDebug() << "MediaController: App switched from" << m_activeApp << "to" << newAppName;
-            m_activeApp = newAppName;
-            emit activeAppChanged();
-            setStatusMessage("Switched to " + m_activeApp);
-            
-            // Force a metadata refresh when app switches
-            m_trackTitle = "";
-            m_artist = "";
-            m_album = "";
-            emit trackChanged();
-        }
-    }
-    
     // Handle position changes
     if (changedProperties.contains("Position")) {
         m_trackPosition = changedProperties.value("Position").toLongLong();
         emit positionChanged();
-    }
-}
-
-/**
- * ON INTERFACES ADDED
- *
- * Detects when a new MediaPlayer appears (e.g., switching from Tidal to Apple Music)
- */
-void MediaController::onInterfacesAdded(const QDBusObjectPath &path,
-                                       const QVariantMap &interfaces)
-{
-    QString pathStr = path.path();
-    
-    // Check if this is a MediaPlayer under our connected device
-    if (!m_deviceAddress.isEmpty()) {
-        QString devicePath = addressToPath(m_deviceAddress);
-        
-        if (pathStr.startsWith(devicePath) && 
-            pathStr.contains("player") && 
-            interfaces.contains("org.bluez.MediaPlayer1")) {
-            
-            qDebug() << "MediaController: New MediaPlayer detected:" << pathStr;
-            
-            // Only switch if it's a different player
-            if (pathStr != m_mediaPlayerPath) {
-                qDebug() << "MediaController: Switching from" << m_mediaPlayerPath << "to" << pathStr;
-                
-                // Update to new player
-                m_mediaPlayerPath = pathStr;
-                
-                // Recreate MediaPlayer interface
-                if (m_mediaPlayerInterface) {
-                    delete m_mediaPlayerInterface;
-                }
-                
-                m_mediaPlayerInterface = new QDBusInterface(
-                    "org.bluez",
-                    m_mediaPlayerPath,
-                    "org.bluez.MediaPlayer1",
-                    QDBusConnection::systemBus(),
-                    this
-                );
-                
-                if (!m_mediaPlayerInterface->isValid()) {
-                    qWarning() << "MediaController: Failed to switch to new player";
-                    return;
-                }
-                
-                // Setup monitoring for new player
-                setupPropertyMonitoring(m_mediaPlayerPath);
-                
-                // Read new player's metadata
-                QVariant nameVar = m_mediaPlayerInterface->property("Name");
-                QString newAppName = nameVar.toString();
-                
-                if (!newAppName.isEmpty() && newAppName != m_activeApp) {
-                    m_activeApp = newAppName;
-                    emit activeAppChanged();
-                    setStatusMessage("Switched to " + m_activeApp);
-                    qDebug() << "MediaController: Now playing from" << m_activeApp;
-                }
-                
-                // Trigger immediate metadata update
-                QVariantMap track = m_mediaPlayerInterface->property("Track").toMap();
-                if (!track.isEmpty()) {
-                    m_trackTitle = track.value("Title", "Unknown Track").toString();
-                    m_artist = track.value("Artist", "Unknown Artist").toString();
-                    m_album = track.value("Album", "Unknown Album").toString();
-                    
-                    emit trackChanged();
-                    qDebug() << "MediaController: Switched to track:" << m_trackTitle;
-                }
-            }
-        }
     }
 }
 

@@ -11,6 +11,7 @@ find_package(Qt6 6.2 REQUIRED COMPONENTS
     WebEngineQuick
     WebChannel
     Bluetooth
+    DBus
 )
 
 # TextToSpeech is optional - only use if available
@@ -81,25 +82,25 @@ qt_add_qml_module(appHeadUnit
         themes/RetroVFD/tokens.json
         themes/RetroVFD/fonts/DSEG14Classic-Regular.ttf
         themes/RetroVFD/logo.svg
-        themes/Cyberpunk/icons/home_cyber.svg
-        themes/Cyberpunk/icons/music_cyber.svg
-        themes/Cyberpunk/icons/maps_cyber.svg
-        themes/Cyberpunk/icons/settings_cyber.svg
+        themes/Cyberpunk/icons/home_cyber.png
+        themes/Cyberpunk/icons/music_cyber.png
+        themes/Cyberpunk/icons/maps_cyber.png
+        themes/Cyberpunk/icons/settings_cyber.png
         themes/Cyberpunk/icons/play_cyber.svg
         themes/Cyberpunk/icons/pause_cyber.svg
         themes/Cyberpunk/icons/next_cyber.svg
         themes/Cyberpunk/icons/previous_cyber.svg
         themes/Cyberpunk/icons/search_cyber.svg
-        themes/Cyberpunk/icons/phone_cyber.svg
-        themes/Cyberpunk/icons/messages_cyber.svg
-        themes/Cyberpunk/icons/contacts_cyber.svg
+        themes/Cyberpunk/icons/phone_cyber.png
+        themes/Cyberpunk/icons/messages_cyber.png
+        themes/Cyberpunk/icons/contacts_cyber.png
         themes/Cyberpunk/icons/tidal_cyber.svg
         themes/Cyberpunk/icons/spotify_cyber.svg
-        themes/Cyberpunk/icons/radio_cyber.svg
-        themes/Cyberpunk/icons/podcasts_cyber.svg
-        themes/Cyberpunk/icons/climate_cyber.svg
+        themes/Cyberpunk/icons/radio_cyber.png
+        themes/Cyberpunk/icons/podcast_cyber.png
+        themes/Cyberpunk/icons/climate_cyber.png
         themes/Cyberpunk/icons/vehicle_cyber.svg
-        themes/Cyberpunk/icons/camera_cyber.svg
+        themes/Cyberpunk/icons/camera_cyber.png
         themes/Cyberpunk/icons/weather_cyber.svg
         themes/RetroVFD/icons/home_vfd.svg
         themes/RetroVFD/icons/music_vfd.svg
@@ -129,6 +130,7 @@ target_link_libraries(appHeadUnit PRIVATE
     Qt6::WebEngineQuick
     Qt6::WebChannel
     Qt6::Bluetooth
+    Qt6::DBus
 )
 
 # Link TextToSpeech only if available

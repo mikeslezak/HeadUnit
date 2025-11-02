@@ -156,7 +156,7 @@ void NotificationManager::connectToDevice(const QString &deviceAddress, const QS
         return;
 
         connect(m_bleController, &QLowEnergyController::serviceDiscovered,
-                this, &NotificationManager::onRemoteServiceDiscovered);
+                this, &NotificationManager::onServiceDiscovered);
         connect(m_bleController, &QLowEnergyController::connected,
                 this, [this]() {
                     qDebug() << "BLE connected, discovering services...";
@@ -833,7 +833,7 @@ void NotificationManager::generateMockNotifications()
 // BLUETOOTH LE / ANCS (iOS) - Real Mode Only
 // ========================================================================
 
-void NotificationManager::onRemoteServiceDiscovered(const QBluetoothUuid &uuid)
+void NotificationManager::onServiceDiscovered(const QBluetoothUuid &uuid)
 {
     if (uuid == ANCS_SERVICE_UUID) {
         qDebug() << "ANCS service discovered!";

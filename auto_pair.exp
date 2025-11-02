@@ -1,0 +1,52 @@
+#!/usr/bin/expect -f
+
+set timeout 30
+set mac "80:96:98:C8:69:17"
+
+spawn bluetoothctl
+
+expect "bluetooth"
+send "power on\r"
+
+expect "bluetooth"
+send "agent NoInputNoOutput\r"
+
+expect "bluetooth"
+send "default-agent\r"
+
+expect "bluetooth"
+send "discoverable on\r"
+
+expect "bluetooth"
+send "pairable on\r"
+
+expect "bluetooth"
+send "scan on\r"
+
+# Wait for iPhone to appear
+expect "iPhone"
+send "scan off\r"
+
+expect "bluetooth"
+send "trust $mac\r"
+
+# Watch for passkey confirmation and auto-accept
+expect {
+    "Confirm passkey" {
+        send "yes\r"
+        exp_continue
+    }
+    "Pairing successful" {
+        send "connect $mac\r"
+    }
+    timeout {
+        send "pair $mac\r"
+        exp_continue
+    }
+}
+
+expect "bluetooth"
+send "info $mac\r"
+
+expect "bluetooth"
+send "quit\r"

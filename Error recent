@@ -1,0 +1,2124 @@
+mike@mike-HeadUnit:~/HeadUnit/build$ cd ~/HeadUnit/build
+cmake ..
+make -j$(nproc)
+CMake Warning (dev) at /usr/local/Qt-6.5.3/lib/cmake/Qt6Core/Qt6CoreMacros.cmake:2702 (message):
+  Qt policy QTP0001 is not set: ':/qt/qml/' is the default resource prefix
+  for QML modules.  Check https://doc.qt.io/qt-6/qt-cmake-policy-qtp0001.html
+  for policy details.  Use the qt_policy command to set the policy and
+  suppress this warning.
+
+Call Stack (most recent call first):
+  /usr/local/Qt-6.5.3/lib/cmake/Qt6Qml/Qt6QmlMacros.cmake:445 (__qt_internal_setup_policy)
+  /usr/local/Qt-6.5.3/lib/cmake/Qt6Qml/Qt6QmlMacros.cmake:686 (qt6_add_qml_module)
+  CMakeLists.txt:40 (qt_add_qml_module)
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+-- TextToSpeech module found - TTS enabled
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /home/mike/HeadUnit/build
+[ 14%] Built target appHeadUnit_qmlimportscan
+[ 50%] Built target appHeadUnit_tooling
+[ 51%] Automatic MOC and UIC for target appHeadUnit
+[ 52%] Built target appHeadUnit_autogen
+[ 52%] Running AUTOMOC file extraction for target appHeadUnit
+[ 52%] Built target appHeadUnit_automoc_json_extraction
+[ 52%] Running moc --collect-json for target appHeadUnit
+[ 53%] Generating meta_types/qt6appheadunit_release_metatypes.json
+Consolidate compiler generated dependencies of target appHeadUnit
+[ 53%] Building CXX object CMakeFiles/appHeadUnit.dir/appHeadUnit_autogen/mocs_compilation.cpp.o
+[ 54%] Building CXX object CMakeFiles/appHeadUnit.dir/main.cpp.o
+[ 55%] Building CXX object CMakeFiles/appHeadUnit.dir/MediaController.cpp.o
+[ 55%] Generating meta_types/qt6appheadunit_release_metatypes.json
+/home/mike/HeadUnit/MediaController.cpp: In member function ‘QString MediaController::findMediaPlayerPath(const QString&)’:
+/home/mike/HeadUnit/MediaController.cpp:985:17: error: no match for ‘operator>>’ (operand types are ‘const QDBusArgument’ and ‘QDBusArgument’)
+  985 |             arg >> interfaces;
+      |             ~~~ ^~ ~~~~~~~~~~
+      |             |      |
+      |             |      QDBusArgument
+      |             const QDBusArgument
+In file included from /usr/local/Qt-6.5.3/include/QtDBus/qdbuspendingreply.h:8,
+                 from /usr/local/Qt-6.5.3/include/QtDBus/qdbusreply.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtDBus/QDBusReply:1,
+                 from /home/mike/HeadUnit/MediaController.h:16,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:87:26: note: candidate: ‘const QDBusArgument& QDBusArgument::operator>>(uchar&) const’
+   87 |     const QDBusArgument &operator>>(uchar &arg) const;
+      |                          ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:87:44: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘uchar&’ {aka ‘unsigned char&’}
+   87 |     const QDBusArgument &operator>>(uchar &arg) const;
+      |                                     ~~~~~~~^~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:88:26: note: candidate: ‘const QDBusArgument& QDBusArgument::operator>>(bool&) const’
+   88 |     const QDBusArgument &operator>>(bool &arg) const;
+      |                          ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:88:43: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘bool&’
+   88 |     const QDBusArgument &operator>>(bool &arg) const;
+      |                                     ~~~~~~^~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:89:26: note: candidate: ‘const QDBusArgument& QDBusArgument::operator>>(short int&) const’
+   89 |     const QDBusArgument &operator>>(short &arg) const;
+      |                          ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:89:44: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘short int&’
+   89 |     const QDBusArgument &operator>>(short &arg) const;
+      |                                     ~~~~~~~^~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:90:26: note: candidate: ‘const QDBusArgument& QDBusArgument::operator>>(ushort&) const’
+   90 |     const QDBusArgument &operator>>(ushort &arg) const;
+      |                          ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:90:45: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘ushort&’ {aka ‘short unsigned int&’}
+   90 |     const QDBusArgument &operator>>(ushort &arg) const;
+      |                                     ~~~~~~~~^~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:91:26: note: candidate: ‘const QDBusArgument& QDBusArgument::operator>>(int&) const’
+   91 |     const QDBusArgument &operator>>(int &arg) const;
+      |                          ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:91:42: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘int&’
+   91 |     const QDBusArgument &operator>>(int &arg) const;
+      |                                     ~~~~~^~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:92:26: note: candidate: ‘const QDBusArgument& QDBusArgument::operator>>(uint&) const’
+   92 |     const QDBusArgument &operator>>(uint &arg) const;
+      |                          ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:92:43: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘uint&’ {aka ‘unsigned int&’}
+   92 |     const QDBusArgument &operator>>(uint &arg) const;
+      |                                     ~~~~~~^~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:93:26: note: candidate: ‘const QDBusArgument& QDBusArgument::operator>>(qlonglong&) const’
+   93 |     const QDBusArgument &operator>>(qlonglong &arg) const;
+      |                          ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:93:48: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘qlonglong&’ {aka ‘long long int&’}
+   93 |     const QDBusArgument &operator>>(qlonglong &arg) const;
+      |                                     ~~~~~~~~~~~^~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:94:26: note: candidate: ‘const QDBusArgument& QDBusArgument::operator>>(qulonglong&) const’
+   94 |     const QDBusArgument &operator>>(qulonglong &arg) const;
+      |                          ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:94:49: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘qulonglong&’ {aka ‘long long unsigned int&’}
+   94 |     const QDBusArgument &operator>>(qulonglong &arg) const;
+      |                                     ~~~~~~~~~~~~^~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:95:26: note: candidate: ‘const QDBusArgument& QDBusArgument::operator>>(double&) const’
+   95 |     const QDBusArgument &operator>>(double &arg) const;
+      |                          ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:95:45: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘double&’
+   95 |     const QDBusArgument &operator>>(double &arg) const;
+      |                                     ~~~~~~~~^~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:96:26: note: candidate: ‘const QDBusArgument& QDBusArgument::operator>>(QString&) const’
+   96 |     const QDBusArgument &operator>>(QString &arg) const;
+      |                          ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:96:46: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QString&’
+   96 |     const QDBusArgument &operator>>(QString &arg) const;
+      |                                     ~~~~~~~~~^~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:97:26: note: candidate: ‘const QDBusArgument& QDBusArgument::operator>>(QDBusVariant&) const’
+   97 |     const QDBusArgument &operator>>(QDBusVariant &arg) const;
+      |                          ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:97:51: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QDBusVariant&’
+   97 |     const QDBusArgument &operator>>(QDBusVariant &arg) const;
+      |                                     ~~~~~~~~~~~~~~^~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:98:26: note: candidate: ‘const QDBusArgument& QDBusArgument::operator>>(QDBusObjectPath&) const’
+   98 |     const QDBusArgument &operator>>(QDBusObjectPath &arg) const;
+      |                          ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:98:54: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QDBusObjectPath&’
+   98 |     const QDBusArgument &operator>>(QDBusObjectPath &arg) const;
+      |                                     ~~~~~~~~~~~~~~~~~^~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:99:26: note: candidate: ‘const QDBusArgument& QDBusArgument::operator>>(QDBusSignature&) const’
+   99 |     const QDBusArgument &operator>>(QDBusSignature &arg) const;
+      |                          ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:99:53: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QDBusSignature&’
+   99 |     const QDBusArgument &operator>>(QDBusSignature &arg) const;
+      |                                     ~~~~~~~~~~~~~~~~^~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:100:26: note: candidate: ‘const QDBusArgument& QDBusArgument::operator>>(QDBusUnixFileDescriptor&) const’
+  100 |     const QDBusArgument &operator>>(QDBusUnixFileDescriptor &arg) const;
+      |                          ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:100:62: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QDBusUnixFileDescriptor&’
+  100 |     const QDBusArgument &operator>>(QDBusUnixFileDescriptor &arg) const;
+      |                                     ~~~~~~~~~~~~~~~~~~~~~~~~~^~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:101:26: note: candidate: ‘const QDBusArgument& QDBusArgument::operator>>(QStringList&) const’
+  101 |     const QDBusArgument &operator>>(QStringList &arg) const;
+      |                          ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:101:50: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QStringList&’ {aka ‘QList<QString>&’}
+  101 |     const QDBusArgument &operator>>(QStringList &arg) const;
+      |                                     ~~~~~~~~~~~~~^~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:102:26: note: candidate: ‘const QDBusArgument& QDBusArgument::operator>>(QByteArray&) const’
+  102 |     const QDBusArgument &operator>>(QByteArray &arg) const;
+      |                          ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:102:49: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QByteArray&’
+  102 |     const QDBusArgument &operator>>(QByteArray &arg) const;
+      |                                     ~~~~~~~~~~~~^~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qmetatype.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qobject.h:18,
+                 from /usr/local/Qt-6.5.3/include/QtCore/QObject:1,
+                 from /home/mike/HeadUnit/MediaController.h:4,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:389:21: note: candidate: ‘template<class Enum> QDataStream& operator>>(QDataStream&, QFlags<T>&)’
+  389 | inline QDataStream &operator>>(QDataStream &s, QFlags<Enum> &e)
+      |                     ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:389:21: note:   template argument deduction/substitution failed:
+/home/mike/HeadUnit/MediaController.cpp:985:20: note:   ‘QDBusArgument’ is not derived from ‘QFlags<T>’
+  985 |             arg >> interfaces;
+      |                    ^~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qmetatype.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qobject.h:18,
+                 from /usr/local/Qt-6.5.3/include/QtCore/QObject:1,
+                 from /home/mike/HeadUnit/MediaController.h:4,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:404:1: note: candidate: ‘template<class T> std::enable_if_t<std::is_enum<_Tp>::value, QDataStream&> operator>>(QDataStream&, T&)’
+  404 | operator>>(QDataStream &s, T &t)
+      | ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:404:1: note:   template argument deduction/substitution failed:
+/home/mike/HeadUnit/MediaController.cpp:985:13: note:   cannot convert ‘arg’ (type ‘const QDBusArgument’) to type ‘QDataStream&’
+  985 |             arg >> interfaces;
+      |             ^~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qmetatype.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qobject.h:18,
+                 from /usr/local/Qt-6.5.3/include/QtCore/QObject:1,
+                 from /home/mike/HeadUnit/MediaController.h:4,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:410:63: note: candidate: ‘template<class T> QDataStreamIfHasIStreamOperatorsContainer<QList<T>, T> operator>>(QDataStream&, QList<T>&)’
+  410 | inline QDataStreamIfHasIStreamOperatorsContainer<QList<T>, T> operator>>(QDataStream &s, QList<T> &v)
+      |                                                               ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:410:63: note:   template argument deduction/substitution failed:
+/home/mike/HeadUnit/MediaController.cpp:985:20: note:   ‘QDBusArgument’ is not derived from ‘QList<T>’
+  985 |             arg >> interfaces;
+      |                    ^~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qmetatype.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qobject.h:18,
+                 from /usr/local/Qt-6.5.3/include/QtCore/QObject:1,
+                 from /home/mike/HeadUnit/MediaController.h:4,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:422:62: note: candidate: ‘template<class T> QDataStreamIfHasIStreamOperatorsContainer<QSet<T>, T> operator>>(QDataStream&, QSet<T>&)’
+  422 | inline QDataStreamIfHasIStreamOperatorsContainer<QSet<T>, T> operator>>(QDataStream &s, QSet<T> &set)
+      |                                                              ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:422:62: note:   template argument deduction/substitution failed:
+/home/mike/HeadUnit/MediaController.cpp:985:20: note:   ‘QDBusArgument’ is not derived from ‘QSet<T>’
+  985 |             arg >> interfaces;
+      |                    ^~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qmetatype.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qobject.h:18,
+                 from /usr/local/Qt-6.5.3/include/QtCore/QObject:1,
+                 from /home/mike/HeadUnit/MediaController.h:4,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:434:73: note: candidate: ‘template<class Key, class T> QDataStreamIfHasIStreamOperatorsContainer<QHash<Key, T>, Key, T> operator>>(QDataStream&, QHash<Key, T>&)’
+  434 | inline QDataStreamIfHasIStreamOperatorsContainer<QHash<Key, T>, Key, T> operator>>(QDataStream &s, QHash<Key, T> &hash)
+      |                                                                         ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:434:73: note:   template argument deduction/substitution failed:
+/home/mike/HeadUnit/MediaController.cpp:985:20: note:   ‘QDBusArgument’ is not derived from ‘QHash<Key, T>’
+  985 |             arg >> interfaces;
+      |                    ^~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qmetatype.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qobject.h:18,
+                 from /usr/local/Qt-6.5.3/include/QtCore/QObject:1,
+                 from /home/mike/HeadUnit/MediaController.h:4,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:447:78: note: candidate: ‘template<class Key, class T> QDataStreamIfHasIStreamOperatorsContainer<QMultiHash<Key, T>, Key, T> operator>>(QDataStream&, QMultiHash<Key, T>&)’
+  447 | inline QDataStreamIfHasIStreamOperatorsContainer<QMultiHash<Key, T>, Key, T> operator>>(QDataStream &s, QMultiHash<Key, T> &hash)
+      |                                                                              ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:447:78: note:   template argument deduction/substitution failed:
+/home/mike/HeadUnit/MediaController.cpp:985:20: note:   ‘QDBusArgument’ is not derived from ‘QMultiHash<Key, T>’
+  985 |             arg >> interfaces;
+      |                    ^~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qmetatype.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qobject.h:18,
+                 from /usr/local/Qt-6.5.3/include/QtCore/QObject:1,
+                 from /home/mike/HeadUnit/MediaController.h:4,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:459:72: note: candidate: ‘template<class Key, class T> QDataStreamIfHasIStreamOperatorsContainer<QMap<Key, T>, Key, T> operator>>(QDataStream&, QMap<Key, T>&)’
+  459 | inline QDataStreamIfHasIStreamOperatorsContainer<QMap<Key, T>, Key, T> operator>>(QDataStream &s, QMap<Key, T> &map)
+      |                                                                        ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:459:72: note:   template argument deduction/substitution failed:
+/home/mike/HeadUnit/MediaController.cpp:985:20: note:   ‘QDBusArgument’ is not derived from ‘QMap<Key, T>’
+  985 |             arg >> interfaces;
+      |                    ^~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qmetatype.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qobject.h:18,
+                 from /usr/local/Qt-6.5.3/include/QtCore/QObject:1,
+                 from /home/mike/HeadUnit/MediaController.h:4,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:471:77: note: candidate: ‘template<class Key, class T> QDataStreamIfHasIStreamOperatorsContainer<QMultiMap<Key, T>, Key, T> operator>>(QDataStream&, QMultiMap<Key, T>&)’
+  471 | inline QDataStreamIfHasIStreamOperatorsContainer<QMultiMap<Key, T>, Key, T> operator>>(QDataStream &s, QMultiMap<Key, T> &map)
+      |                                                                             ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:471:77: note:   template argument deduction/substitution failed:
+/home/mike/HeadUnit/MediaController.cpp:985:20: note:   ‘QDBusArgument’ is not derived from ‘QMultiMap<Key, T>’
+  985 |             arg >> interfaces;
+      |                    ^~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qmetatype.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qobject.h:18,
+                 from /usr/local/Qt-6.5.3/include/QtCore/QObject:1,
+                 from /home/mike/HeadUnit/MediaController.h:4,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:483:49: note: candidate: ‘template<class T1, class T2> QDataStreamIfHasIStreamOperators<T1, T2> operator>>(QDataStream&, std::pair<_T1, _T2>&)’
+  483 | inline QDataStreamIfHasIStreamOperators<T1, T2> operator>>(QDataStream& s, std::pair<T1, T2> &p)
+      |                                                 ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:483:49: note:   template argument deduction/substitution failed:
+/home/mike/HeadUnit/MediaController.cpp:985:20: note:   ‘QDBusArgument’ is not derived from ‘std::pair<_T1, _T2>’
+  985 |             arg >> interfaces;
+      |                    ^~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtDBus/qdbuspendingreply.h:8,
+                 from /usr/local/Qt-6.5.3/include/QtDBus/qdbusreply.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtDBus/QDBusReply:1,
+                 from /home/mike/HeadUnit/MediaController.h:16,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:208:29: note: candidate: ‘template<template<class> class Container, class T, class> const QDBusArgument& operator>>(const QDBusArgument&, Container<T>&)’
+  208 | inline const QDBusArgument &operator>>(const QDBusArgument &arg, Container<T> &list)
+      |                             ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:208:29: note:   template argument deduction/substitution failed:
+/home/mike/HeadUnit/MediaController.cpp:985:20: note:   ‘QDBusArgument’ is not derived from ‘Container<T>’
+  985 |             arg >> interfaces;
+      |                    ^~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtDBus/qdbuspendingreply.h:8,
+                 from /usr/local/Qt-6.5.3/include/QtDBus/qdbusreply.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtDBus/QDBusReply:1,
+                 from /home/mike/HeadUnit/MediaController.h:16,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:268:29: note: candidate: ‘template<template<class, class> class Container, class Key, class T, typename std::enable_if<is_detected_v<QtPrivate::KeyAndValueTest, typename Container<Key, T>::iterator>, bool>::type <anonymous> > const QDBusArgument& operator>>(const QDBusArgument&, Container<Key, T>&)’
+  268 | inline const QDBusArgument &operator>>(const QDBusArgument &arg, Container<Key, T> &map)
+      |                             ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:268:29: note:   template argument deduction/substitution failed:
+/home/mike/HeadUnit/MediaController.cpp:985:20: note:   ‘QDBusArgument’ is not derived from ‘Container<Key, T>’
+  985 |             arg >> interfaces;
+      |                    ^~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtDBus/qdbuspendingreply.h:8,
+                 from /usr/local/Qt-6.5.3/include/QtDBus/qdbusreply.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtDBus/QDBusReply:1,
+                 from /home/mike/HeadUnit/MediaController.h:16,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:322:29: note: candidate: ‘template<class T1, class T2> const QDBusArgument& operator>>(const QDBusArgument&, QPair<T1, T2>&)’
+  322 | inline const QDBusArgument &operator>>(const QDBusArgument &arg, QPair<T1, T2> &pair)
+      |                             ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:322:29: note:   template argument deduction/substitution failed:
+/home/mike/HeadUnit/MediaController.cpp:985:20: note:   ‘QDBusArgument’ is not derived from ‘QPair<T1, T2>’
+  985 |             arg >> interfaces;
+      |                    ^~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qstring.h:14,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qobject.h:11,
+                 from /usr/local/Qt-6.5.3/include/QtCore/QObject:1,
+                 from /home/mike/HeadUnit/MediaController.h:4,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qchar.h:623:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QChar&)’
+  623 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QChar &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qchar.h:623:39: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  623 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QChar &);
+      |                                       ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qstringview.h:8,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qchar.h:656,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qstring.h:14,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qobject.h:11,
+                 from /usr/local/Qt-6.5.3/include/QtCore/QObject:1,
+                 from /home/mike/HeadUnit/MediaController.h:4,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qbytearray.h:603:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QByteArray&)’
+  603 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QByteArray &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qbytearray.h:603:39: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  603 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QByteArray &);
+      |                                       ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qobject.h:11,
+                 from /usr/local/Qt-6.5.3/include/QtCore/QObject:1,
+                 from /home/mike/HeadUnit/MediaController.h:4,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qstring.h:1585:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QString&)’
+ 1585 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QString &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qstring.h:1585:39: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+ 1585 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QString &);
+      |                                       ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qmetatype.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qobject.h:18,
+                 from /usr/local/Qt-6.5.3/include/QtCore/QObject:1,
+                 from /home/mike/HeadUnit/MediaController.h:4,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:542:21: note: candidate: ‘QDataStream& operator>>(QDataStream&, QKeyCombination&)’
+  542 | inline QDataStream &operator>>(QDataStream &s, QKeyCombination &combination)
+      |                     ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:542:45: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  542 | inline QDataStream &operator>>(QDataStream &s, QKeyCombination &combination)
+      |                                ~~~~~~~~~~~~~^
+In file included from /usr/local/Qt-6.5.3/include/QtCore/QUrl:1,
+                 from /home/mike/HeadUnit/MediaController.h:6,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qurl.h:314:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QUrl&)’
+  314 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QUrl &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qurl.h:314:39: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  314 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QUrl &);
+      |                                       ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtGui/qimage.h:8,
+                 from /usr/local/Qt-6.5.3/include/QtGui/QImage:1,
+                 from /home/mike/HeadUnit/MediaController.h:7,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtGui/qcolor.h:262:38: note: candidate: ‘QDataStream& operator>>(QDataStream&, QColor&)’
+  262 |     friend Q_GUI_EXPORT QDataStream &operator>>(QDataStream &, QColor &);
+      |                                      ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtGui/qcolor.h:27:38: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+   27 | Q_GUI_EXPORT QDataStream &operator>>(QDataStream &, QColor &);
+      |                                      ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qrect.h:8,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qpaintdevice.h:9,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimage.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtGui/QImage:1,
+                 from /home/mike/HeadUnit/MediaController.h:7,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qmargins.h:90:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QMargins&)’
+   90 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QMargins &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qmargins.h:90:39: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+   90 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QMargins &);
+      |                                       ^~~~~~~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qmargins.h:340:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QMarginsF&)’
+  340 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QMarginsF &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qmargins.h:340:39: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  340 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QMarginsF &);
+      |                                       ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qrect.h:9,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qpaintdevice.h:9,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimage.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtGui/QImage:1,
+                 from /home/mike/HeadUnit/MediaController.h:7,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qsize.h:103:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QSize&)’
+  103 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QSize &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qsize.h:103:39: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  103 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QSize &);
+      |                                       ^~~~~~~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qsize.h:293:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QSizeF&)’
+  293 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QSizeF &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qsize.h:293:39: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  293 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QSizeF &);
+      |                                       ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qrect.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qpaintdevice.h:9,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimage.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtGui/QImage:1,
+                 from /home/mike/HeadUnit/MediaController.h:7,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qpoint.h:106:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QPoint&)’
+  106 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QPoint &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qpoint.h:106:39: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  106 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QPoint &);
+      |                                       ^~~~~~~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qpoint.h:305:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QPointF&)’
+  305 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QPointF &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qpoint.h:305:39: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  305 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QPointF &);
+      |                                       ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtGui/qpaintdevice.h:9,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimage.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtGui/QImage:1,
+                 from /home/mike/HeadUnit/MediaController.h:7,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qrect.h:147:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QRect&)’
+  147 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QRect &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qrect.h:147:39: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  147 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QRect &);
+      |                                       ^~~~~~~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qrect.h:613:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QRectF&)’
+  613 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QRectF &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qrect.h:613:39: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  613 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QRectF &);
+      |                                       ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtGui/qtransform.h:7,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimage.h:12,
+                 from /usr/local/Qt-6.5.3/include/QtGui/QImage:1,
+                 from /home/mike/HeadUnit/MediaController.h:7,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtGui/qpolygon.h:74:27: note: candidate: ‘QDataStream& operator>>(QDataStream&, QPolygon&)’
+   74 | Q_GUI_EXPORT QDataStream &operator>>(QDataStream &stream, QPolygon &polygon);
+      |                           ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtGui/qpolygon.h:74:51: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+   74 | Q_GUI_EXPORT QDataStream &operator>>(QDataStream &stream, QPolygon &polygon);
+      |                                      ~~~~~~~~~~~~~^~~~~~
+/usr/local/Qt-6.5.3/include/QtGui/qpolygon.h:141:27: note: candidate: ‘QDataStream& operator>>(QDataStream&, QPolygonF&)’
+  141 | Q_GUI_EXPORT QDataStream &operator>>(QDataStream &stream, QPolygonF &array);
+      |                           ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtGui/qpolygon.h:141:51: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  141 | Q_GUI_EXPORT QDataStream &operator>>(QDataStream &stream, QPolygonF &array);
+      |                                      ~~~~~~~~~~~~~^~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtGui/qtransform.h:8,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimage.h:12,
+                 from /usr/local/Qt-6.5.3/include/QtGui/QImage:1,
+                 from /home/mike/HeadUnit/MediaController.h:7,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtGui/qregion.h:137:27: note: candidate: ‘QDataStream& operator>>(QDataStream&, QRegion&)’
+  137 | Q_GUI_EXPORT QDataStream &operator>>(QDataStream &, QRegion &);
+      |                           ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtGui/qregion.h:108:49: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  108 |     friend Q_GUI_EXPORT QDataStream &operator>>(QDataStream &, QRegion &);
+      |                                                 ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtGui/qtransform.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimage.h:12,
+                 from /usr/local/Qt-6.5.3/include/QtGui/QImage:1,
+                 from /home/mike/HeadUnit/MediaController.h:7,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qline.h:175:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QLine&)’
+  175 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QLine &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qline.h:175:39: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  175 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QLine &);
+      |                                       ^~~~~~~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qline.h:400:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QLineF&)’
+  400 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QLineF &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qline.h:400:39: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  400 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QLineF &);
+      |                                       ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtGui/qimage.h:12,
+                 from /usr/local/Qt-6.5.3/include/QtGui/QImage:1,
+                 from /home/mike/HeadUnit/MediaController.h:7,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtGui/qtransform.h:323:27: note: candidate: ‘QDataStream& operator>>(QDataStream&, QTransform&)’
+  323 | Q_GUI_EXPORT QDataStream &operator>>(QDataStream &, QTransform &);
+      |                           ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtGui/qtransform.h:323:38: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  323 | Q_GUI_EXPORT QDataStream &operator>>(QDataStream &, QTransform &);
+      |                                      ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtGui/QImage:1,
+                 from /home/mike/HeadUnit/MediaController.h:7,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtGui/qimage.h:327:27: note: candidate: ‘QDataStream& operator>>(QDataStream&, QImage&)’
+  327 | Q_GUI_EXPORT QDataStream &operator>>(QDataStream &, QImage &);
+      |                           ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtGui/qimage.h:327:38: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  327 | Q_GUI_EXPORT QDataStream &operator>>(QDataStream &, QImage &);
+      |                                      ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qdebug.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qvariant.h:11,
+                 from /usr/local/Qt-6.5.3/include/QtCore/QVariant:1,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/qnetworkrequest.h:11,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/qnetworkaccessmanager.h:8,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/QNetworkAccessManager:1,
+                 from /home/mike/HeadUnit/MediaController.h:9,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qtextstream.h:189:21: note: candidate: ‘QTextStream& operator>>(QTextStream&, QTextStreamFunction)’
+  189 | inline QTextStream &operator>>(QTextStream &s, QTextStreamFunction f)
+      |                     ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qtextstream.h:189:45: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QTextStream&’
+  189 | inline QTextStream &operator>>(QTextStream &s, QTextStreamFunction f)
+      |                                ~~~~~~~~~~~~~^
+In file included from /usr/local/Qt-6.5.3/include/QtCore/QVariant:1,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/qnetworkrequest.h:11,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/qnetworkaccessmanager.h:8,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/QNetworkAccessManager:1,
+                 from /home/mike/HeadUnit/MediaController.h:9,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qvariant.h:536:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QVariant&)’
+  536 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &s, QVariant &p);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qvariant.h:536:52: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  536 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &s, QVariant &p);
+      |                                       ~~~~~~~~~~~~~^
+/usr/local/Qt-6.5.3/include/QtCore/qvariant.h:543:21: note: candidate: ‘QDataStream& operator>>(QDataStream&, QVariant::Type&)’
+  543 | inline QDataStream &operator>>(QDataStream &s, QVariant::Type &p)
+      |                     ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qvariant.h:543:45: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  543 | inline QDataStream &operator>>(QDataStream &s, QVariant::Type &p)
+      |                                ~~~~~~~~~~~~~^
+In file included from /usr/local/Qt-6.5.3/include/QtNetwork/qtcpsocket.h:9,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/qsslsocket.h:11,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/qsslconfiguration.h:26,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/QSslConfiguration:1,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/qnetworkaccessmanager.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/QNetworkAccessManager:1,
+                 from /home/mike/HeadUnit/MediaController.h:9,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtNetwork/qhostaddress.h:153:31: note: candidate: ‘QDataStream& operator>>(QDataStream&, QHostAddress&)’
+  153 | Q_NETWORK_EXPORT QDataStream &operator>>(QDataStream &, QHostAddress &);
+      |                               ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtNetwork/qhostaddress.h:153:42: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  153 | Q_NETWORK_EXPORT QDataStream &operator>>(QDataStream &, QHostAddress &);
+      |                                          ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qcalendar.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qdatetime.h:8,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/qsslcertificate.h:16,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/qsslerror.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/qsslsocket.h:12,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/qsslconfiguration.h:26,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/QSslConfiguration:1,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/qnetworkaccessmanager.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/QNetworkAccessManager:1,
+                 from /home/mike/HeadUnit/MediaController.h:9,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qlocale.h:1155:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QLocale&)’
+ 1155 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QLocale &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qlocale.h:1155:39: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+ 1155 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QLocale &);
+      |                                       ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtNetwork/qsslcertificate.h:16,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/qsslerror.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/qsslsocket.h:12,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/qsslconfiguration.h:26,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/QSslConfiguration:1,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/qnetworkaccessmanager.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/QNetworkAccessManager:1,
+                 from /home/mike/HeadUnit/MediaController.h:9,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qdatetime.h:548:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QDate&)’
+  548 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QDate &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qdatetime.h:183:50: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  183 |     friend Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QDate &);
+      |                                                  ^~~~~~~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qdatetime.h:550:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QTime&)’
+  550 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QTime &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qdatetime.h:249:50: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  249 |     friend Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QTime &);
+      |                                                  ^~~~~~~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qdatetime.h:552:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QDateTime&)’
+  552 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QDateTime &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qdatetime.h:537:50: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  537 |     friend Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QDateTime &);
+      |                                                  ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtDBus/qdbuspendingreply.h:8,
+                 from /usr/local/Qt-6.5.3/include/QtDBus/qdbusreply.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtDBus/QDBusReply:1,
+                 from /home/mike/HeadUnit/MediaController.h:16,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:154:36: note: candidate: ‘const QDBusArgument& operator>>(const QDBusArgument&, QVariant&)’
+  154 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QVariant &v);
+      |                                    ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:154:81: note:   no known conversion for argument 2 from ‘QDBusArgument’ to ‘QVariant&’
+  154 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QVariant &v);
+      |                                                                       ~~~~~~~~~~^
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:159:36: note: candidate: ‘const QDBusArgument& operator>>(const QDBusArgument&, QDate&)’
+  159 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QDate &date);
+      |                                    ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:159:78: note:   no known conversion for argument 2 from ‘QDBusArgument’ to ‘QDate&’
+  159 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QDate &date);
+      |                                                                       ~~~~~~~^~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:162:36: note: candidate: ‘const QDBusArgument& operator>>(const QDBusArgument&, QTime&)’
+  162 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QTime &time);
+      |                                    ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:162:78: note:   no known conversion for argument 2 from ‘QDBusArgument’ to ‘QTime&’
+  162 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QTime &time);
+      |                                                                       ~~~~~~~^~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:165:36: note: candidate: ‘const QDBusArgument& operator>>(const QDBusArgument&, QDateTime&)’
+  165 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QDateTime &dt);
+      |                                    ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:165:82: note:   no known conversion for argument 2 from ‘QDBusArgument’ to ‘QDateTime&’
+  165 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QDateTime &dt);
+      |                                                                       ~~~~~~~~~~~^~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:168:36: note: candidate: ‘const QDBusArgument& operator>>(const QDBusArgument&, QRect&)’
+  168 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QRect &rect);
+      |                                    ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:168:78: note:   no known conversion for argument 2 from ‘QDBusArgument’ to ‘QRect&’
+  168 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QRect &rect);
+      |                                                                       ~~~~~~~^~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:171:36: note: candidate: ‘const QDBusArgument& operator>>(const QDBusArgument&, QRectF&)’
+  171 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QRectF &rect);
+      |                                    ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:171:79: note:   no known conversion for argument 2 from ‘QDBusArgument’ to ‘QRectF&’
+  171 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QRectF &rect);
+      |                                                                       ~~~~~~~~^~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:174:36: note: candidate: ‘const QDBusArgument& operator>>(const QDBusArgument&, QSize&)’
+  174 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QSize &size);
+      |                                    ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:174:78: note:   no known conversion for argument 2 from ‘QDBusArgument’ to ‘QSize&’
+  174 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QSize &size);
+      |                                                                       ~~~~~~~^~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:177:36: note: candidate: ‘const QDBusArgument& operator>>(const QDBusArgument&, QSizeF&)’
+  177 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QSizeF &size);
+      |                                    ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:177:79: note:   no known conversion for argument 2 from ‘QDBusArgument’ to ‘QSizeF&’
+  177 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QSizeF &size);
+      |                                                                       ~~~~~~~~^~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:180:36: note: candidate: ‘const QDBusArgument& operator>>(const QDBusArgument&, QPoint&)’
+  180 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QPoint &pt);
+      |                                    ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:180:79: note:   no known conversion for argument 2 from ‘QDBusArgument’ to ‘QPoint&’
+  180 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QPoint &pt);
+      |                                                                       ~~~~~~~~^~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:183:36: note: candidate: ‘const QDBusArgument& operator>>(const QDBusArgument&, QPointF&)’
+  183 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QPointF &pt);
+      |                                    ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:183:80: note:   no known conversion for argument 2 from ‘QDBusArgument’ to ‘QPointF&’
+  183 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QPointF &pt);
+      |                                                                       ~~~~~~~~~^~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:186:36: note: candidate: ‘const QDBusArgument& operator>>(const QDBusArgument&, QLine&)’
+  186 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QLine &line);
+      |                                    ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:186:78: note:   no known conversion for argument 2 from ‘QDBusArgument’ to ‘QLine&’
+  186 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QLine &line);
+      |                                                                       ~~~~~~~^~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:189:36: note: candidate: ‘const QDBusArgument& operator>>(const QDBusArgument&, QLineF&)’
+  189 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QLineF &line);
+      |                                    ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:189:79: note:   no known conversion for argument 2 from ‘QDBusArgument’ to ‘QLineF&’
+  189 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QLineF &line);
+      |                                                                       ~~~~~~~~^~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qcborvalue.h:9,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qjsonvalue.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qjsonobject.h:7,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qplugin.h:14,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimageiohandler.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimagereader.h:11,
+                 from /usr/local/Qt-6.5.3/include/QtGui/QImageReader:1,
+                 from /home/mike/HeadUnit/MediaController.cpp:6:
+/usr/local/Qt-6.5.3/include/QtCore/qcborcommon.h:101:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QCborSimpleType&)’
+  101 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &ds, QCborSimpleType &st);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qcborcommon.h:101:52: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  101 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &ds, QCborSimpleType &st);
+      |                                       ~~~~~~~~~~~~~^~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qcborvalue.h:11,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qjsonvalue.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qjsonobject.h:7,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qplugin.h:14,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimageiohandler.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimagereader.h:11,
+                 from /usr/local/Qt-6.5.3/include/QtGui/QImageReader:1,
+                 from /home/mike/HeadUnit/MediaController.cpp:6:
+/usr/local/Qt-6.5.3/include/QtCore/qregularexpression.h:180:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QRegularExpression&)’
+  180 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &in, QRegularExpression &re);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qregularexpression.h:180:52: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  180 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &in, QRegularExpression &re);
+      |                                       ~~~~~~~~~~~~~^~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qcborvalue.h:16,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qjsonvalue.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qjsonobject.h:7,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qplugin.h:14,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimageiohandler.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimagereader.h:11,
+                 from /usr/local/Qt-6.5.3/include/QtGui/QImageReader:1,
+                 from /home/mike/HeadUnit/MediaController.cpp:6:
+/usr/local/Qt-6.5.3/include/QtCore/quuid.h:171:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QUuid&)’
+  171 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QUuid &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/quuid.h:171:39: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  171 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QUuid &);
+      |                                       ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qjsonvalue.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qjsonobject.h:7,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qplugin.h:14,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimageiohandler.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimagereader.h:11,
+                 from /usr/local/Qt-6.5.3/include/QtGui/QImageReader:1,
+                 from /home/mike/HeadUnit/MediaController.cpp:6:
+/usr/local/Qt-6.5.3/include/QtCore/qcborvalue.h:601:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QCborValue&)’
+  601 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QCborValue &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qcborvalue.h:601:39: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  601 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QCborValue &);
+      |                                       ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qjsonobject.h:7,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qplugin.h:14,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimageiohandler.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimagereader.h:11,
+                 from /usr/local/Qt-6.5.3/include/QtGui/QImageReader:1,
+                 from /home/mike/HeadUnit/MediaController.cpp:6:
+/usr/local/Qt-6.5.3/include/QtCore/qjsonvalue.h:308:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QJsonValue&)’
+  308 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QJsonValue &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qjsonvalue.h:308:39: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  308 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QJsonValue &);
+      |                                       ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qplugin.h:14,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimageiohandler.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimagereader.h:11,
+                 from /usr/local/Qt-6.5.3/include/QtGui/QImageReader:1,
+                 from /home/mike/HeadUnit/MediaController.cpp:6:
+/usr/local/Qt-6.5.3/include/QtCore/qjsonobject.h:286:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QJsonObject&)’
+  286 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QJsonObject &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qjsonobject.h:286:39: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  286 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QJsonObject &);
+      |                                       ^~~~~~~~~~~~~
+/home/mike/HeadUnit/MediaController.cpp:1006:28: error: no match for ‘operator>>’ (operand types are ‘QDBusArgument’ and ‘QDBusArgument’)
+ 1006 |                 interfaces >> props;
+      |                 ~~~~~~~~~~ ^~ ~~~~~
+      |                 |             |
+      |                 QDBusArgument QDBusArgument
+In file included from /usr/local/Qt-6.5.3/include/QtDBus/qdbuspendingreply.h:8,
+                 from /usr/local/Qt-6.5.3/include/QtDBus/qdbusreply.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtDBus/QDBusReply:1,
+                 from /home/mike/HeadUnit/MediaController.h:16,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:87:26: note: candidate: ‘const QDBusArgument& QDBusArgument::operator>>(uchar&) const’
+   87 |     const QDBusArgument &operator>>(uchar &arg) const;
+      |                          ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:87:44: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘uchar&’ {aka ‘unsigned char&’}
+   87 |     const QDBusArgument &operator>>(uchar &arg) const;
+      |                                     ~~~~~~~^~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:88:26: note: candidate: ‘const QDBusArgument& QDBusArgument::operator>>(bool&) const’
+   88 |     const QDBusArgument &operator>>(bool &arg) const;
+      |                          ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:88:43: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘bool&’
+   88 |     const QDBusArgument &operator>>(bool &arg) const;
+      |                                     ~~~~~~^~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:89:26: note: candidate: ‘const QDBusArgument& QDBusArgument::operator>>(short int&) const’
+   89 |     const QDBusArgument &operator>>(short &arg) const;
+      |                          ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:89:44: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘short int&’
+   89 |     const QDBusArgument &operator>>(short &arg) const;
+      |                                     ~~~~~~~^~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:90:26: note: candidate: ‘const QDBusArgument& QDBusArgument::operator>>(ushort&) const’
+   90 |     const QDBusArgument &operator>>(ushort &arg) const;
+      |                          ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:90:45: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘ushort&’ {aka ‘short unsigned int&’}
+   90 |     const QDBusArgument &operator>>(ushort &arg) const;
+      |                                     ~~~~~~~~^~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:91:26: note: candidate: ‘const QDBusArgument& QDBusArgument::operator>>(int&) const’
+   91 |     const QDBusArgument &operator>>(int &arg) const;
+      |                          ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:91:42: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘int&’
+   91 |     const QDBusArgument &operator>>(int &arg) const;
+      |                                     ~~~~~^~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:92:26: note: candidate: ‘const QDBusArgument& QDBusArgument::operator>>(uint&) const’
+   92 |     const QDBusArgument &operator>>(uint &arg) const;
+      |                          ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:92:43: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘uint&’ {aka ‘unsigned int&’}
+   92 |     const QDBusArgument &operator>>(uint &arg) const;
+      |                                     ~~~~~~^~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:93:26: note: candidate: ‘const QDBusArgument& QDBusArgument::operator>>(qlonglong&) const’
+   93 |     const QDBusArgument &operator>>(qlonglong &arg) const;
+      |                          ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:93:48: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘qlonglong&’ {aka ‘long long int&’}
+   93 |     const QDBusArgument &operator>>(qlonglong &arg) const;
+      |                                     ~~~~~~~~~~~^~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:94:26: note: candidate: ‘const QDBusArgument& QDBusArgument::operator>>(qulonglong&) const’
+   94 |     const QDBusArgument &operator>>(qulonglong &arg) const;
+      |                          ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:94:49: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘qulonglong&’ {aka ‘long long unsigned int&’}
+   94 |     const QDBusArgument &operator>>(qulonglong &arg) const;
+      |                                     ~~~~~~~~~~~~^~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:95:26: note: candidate: ‘const QDBusArgument& QDBusArgument::operator>>(double&) const’
+   95 |     const QDBusArgument &operator>>(double &arg) const;
+      |                          ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:95:45: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘double&’
+   95 |     const QDBusArgument &operator>>(double &arg) const;
+      |                                     ~~~~~~~~^~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:96:26: note: candidate: ‘const QDBusArgument& QDBusArgument::operator>>(QString&) const’
+   96 |     const QDBusArgument &operator>>(QString &arg) const;
+      |                          ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:96:46: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QString&’
+   96 |     const QDBusArgument &operator>>(QString &arg) const;
+      |                                     ~~~~~~~~~^~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:97:26: note: candidate: ‘const QDBusArgument& QDBusArgument::operator>>(QDBusVariant&) const’
+   97 |     const QDBusArgument &operator>>(QDBusVariant &arg) const;
+      |                          ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:97:51: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QDBusVariant&’
+   97 |     const QDBusArgument &operator>>(QDBusVariant &arg) const;
+      |                                     ~~~~~~~~~~~~~~^~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:98:26: note: candidate: ‘const QDBusArgument& QDBusArgument::operator>>(QDBusObjectPath&) const’
+   98 |     const QDBusArgument &operator>>(QDBusObjectPath &arg) const;
+      |                          ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:98:54: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QDBusObjectPath&’
+   98 |     const QDBusArgument &operator>>(QDBusObjectPath &arg) const;
+      |                                     ~~~~~~~~~~~~~~~~~^~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:99:26: note: candidate: ‘const QDBusArgument& QDBusArgument::operator>>(QDBusSignature&) const’
+   99 |     const QDBusArgument &operator>>(QDBusSignature &arg) const;
+      |                          ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:99:53: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QDBusSignature&’
+   99 |     const QDBusArgument &operator>>(QDBusSignature &arg) const;
+      |                                     ~~~~~~~~~~~~~~~~^~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:100:26: note: candidate: ‘const QDBusArgument& QDBusArgument::operator>>(QDBusUnixFileDescriptor&) const’
+  100 |     const QDBusArgument &operator>>(QDBusUnixFileDescriptor &arg) const;
+      |                          ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:100:62: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QDBusUnixFileDescriptor&’
+  100 |     const QDBusArgument &operator>>(QDBusUnixFileDescriptor &arg) const;
+      |                                     ~~~~~~~~~~~~~~~~~~~~~~~~~^~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:101:26: note: candidate: ‘const QDBusArgument& QDBusArgument::operator>>(QStringList&) const’
+  101 |     const QDBusArgument &operator>>(QStringList &arg) const;
+      |                          ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:101:50: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QStringList&’ {aka ‘QList<QString>&’}
+  101 |     const QDBusArgument &operator>>(QStringList &arg) const;
+      |                                     ~~~~~~~~~~~~~^~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:102:26: note: candidate: ‘const QDBusArgument& QDBusArgument::operator>>(QByteArray&) const’
+  102 |     const QDBusArgument &operator>>(QByteArray &arg) const;
+      |                          ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:102:49: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QByteArray&’
+  102 |     const QDBusArgument &operator>>(QByteArray &arg) const;
+      |                                     ~~~~~~~~~~~~^~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qmetatype.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qobject.h:18,
+                 from /usr/local/Qt-6.5.3/include/QtCore/QObject:1,
+                 from /home/mike/HeadUnit/MediaController.h:4,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:389:21: note: candidate: ‘template<class Enum> QDataStream& operator>>(QDataStream&, QFlags<T>&)’
+  389 | inline QDataStream &operator>>(QDataStream &s, QFlags<Enum> &e)
+      |                     ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:389:21: note:   template argument deduction/substitution failed:
+/home/mike/HeadUnit/MediaController.cpp:1006:31: note:   ‘QDBusArgument’ is not derived from ‘QFlags<T>’
+ 1006 |                 interfaces >> props;
+      |                               ^~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qmetatype.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qobject.h:18,
+                 from /usr/local/Qt-6.5.3/include/QtCore/QObject:1,
+                 from /home/mike/HeadUnit/MediaController.h:4,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:404:1: note: candidate: ‘template<class T> std::enable_if_t<std::is_enum<_Tp>::value, QDataStream&> operator>>(QDataStream&, T&)’
+  404 | operator>>(QDataStream &s, T &t)
+      | ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:404:1: note:   template argument deduction/substitution failed:
+/home/mike/HeadUnit/MediaController.cpp:1006:17: note:   cannot convert ‘interfaces’ (type ‘QDBusArgument’) to type ‘QDataStream&’
+ 1006 |                 interfaces >> props;
+      |                 ^~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qmetatype.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qobject.h:18,
+                 from /usr/local/Qt-6.5.3/include/QtCore/QObject:1,
+                 from /home/mike/HeadUnit/MediaController.h:4,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:410:63: note: candidate: ‘template<class T> QDataStreamIfHasIStreamOperatorsContainer<QList<T>, T> operator>>(QDataStream&, QList<T>&)’
+  410 | inline QDataStreamIfHasIStreamOperatorsContainer<QList<T>, T> operator>>(QDataStream &s, QList<T> &v)
+      |                                                               ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:410:63: note:   template argument deduction/substitution failed:
+/home/mike/HeadUnit/MediaController.cpp:1006:31: note:   ‘QDBusArgument’ is not derived from ‘QList<T>’
+ 1006 |                 interfaces >> props;
+      |                               ^~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qmetatype.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qobject.h:18,
+                 from /usr/local/Qt-6.5.3/include/QtCore/QObject:1,
+                 from /home/mike/HeadUnit/MediaController.h:4,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:422:62: note: candidate: ‘template<class T> QDataStreamIfHasIStreamOperatorsContainer<QSet<T>, T> operator>>(QDataStream&, QSet<T>&)’
+  422 | inline QDataStreamIfHasIStreamOperatorsContainer<QSet<T>, T> operator>>(QDataStream &s, QSet<T> &set)
+      |                                                              ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:422:62: note:   template argument deduction/substitution failed:
+/home/mike/HeadUnit/MediaController.cpp:1006:31: note:   ‘QDBusArgument’ is not derived from ‘QSet<T>’
+ 1006 |                 interfaces >> props;
+      |                               ^~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qmetatype.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qobject.h:18,
+                 from /usr/local/Qt-6.5.3/include/QtCore/QObject:1,
+                 from /home/mike/HeadUnit/MediaController.h:4,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:434:73: note: candidate: ‘template<class Key, class T> QDataStreamIfHasIStreamOperatorsContainer<QHash<Key, T>, Key, T> operator>>(QDataStream&, QHash<Key, T>&)’
+  434 | inline QDataStreamIfHasIStreamOperatorsContainer<QHash<Key, T>, Key, T> operator>>(QDataStream &s, QHash<Key, T> &hash)
+      |                                                                         ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:434:73: note:   template argument deduction/substitution failed:
+/home/mike/HeadUnit/MediaController.cpp:1006:31: note:   ‘QDBusArgument’ is not derived from ‘QHash<Key, T>’
+ 1006 |                 interfaces >> props;
+      |                               ^~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qmetatype.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qobject.h:18,
+                 from /usr/local/Qt-6.5.3/include/QtCore/QObject:1,
+                 from /home/mike/HeadUnit/MediaController.h:4,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:447:78: note: candidate: ‘template<class Key, class T> QDataStreamIfHasIStreamOperatorsContainer<QMultiHash<Key, T>, Key, T> operator>>(QDataStream&, QMultiHash<Key, T>&)’
+  447 | inline QDataStreamIfHasIStreamOperatorsContainer<QMultiHash<Key, T>, Key, T> operator>>(QDataStream &s, QMultiHash<Key, T> &hash)
+      |                                                                              ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:447:78: note:   template argument deduction/substitution failed:
+/home/mike/HeadUnit/MediaController.cpp:1006:31: note:   ‘QDBusArgument’ is not derived from ‘QMultiHash<Key, T>’
+ 1006 |                 interfaces >> props;
+      |                               ^~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qmetatype.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qobject.h:18,
+                 from /usr/local/Qt-6.5.3/include/QtCore/QObject:1,
+                 from /home/mike/HeadUnit/MediaController.h:4,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:459:72: note: candidate: ‘template<class Key, class T> QDataStreamIfHasIStreamOperatorsContainer<QMap<Key, T>, Key, T> operator>>(QDataStream&, QMap<Key, T>&)’
+  459 | inline QDataStreamIfHasIStreamOperatorsContainer<QMap<Key, T>, Key, T> operator>>(QDataStream &s, QMap<Key, T> &map)
+      |                                                                        ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:459:72: note:   template argument deduction/substitution failed:
+/home/mike/HeadUnit/MediaController.cpp:1006:31: note:   ‘QDBusArgument’ is not derived from ‘QMap<Key, T>’
+ 1006 |                 interfaces >> props;
+      |                               ^~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qmetatype.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qobject.h:18,
+                 from /usr/local/Qt-6.5.3/include/QtCore/QObject:1,
+                 from /home/mike/HeadUnit/MediaController.h:4,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:471:77: note: candidate: ‘template<class Key, class T> QDataStreamIfHasIStreamOperatorsContainer<QMultiMap<Key, T>, Key, T> operator>>(QDataStream&, QMultiMap<Key, T>&)’
+  471 | inline QDataStreamIfHasIStreamOperatorsContainer<QMultiMap<Key, T>, Key, T> operator>>(QDataStream &s, QMultiMap<Key, T> &map)
+      |                                                                             ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:471:77: note:   template argument deduction/substitution failed:
+/home/mike/HeadUnit/MediaController.cpp:1006:31: note:   ‘QDBusArgument’ is not derived from ‘QMultiMap<Key, T>’
+ 1006 |                 interfaces >> props;
+      |                               ^~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qmetatype.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qobject.h:18,
+                 from /usr/local/Qt-6.5.3/include/QtCore/QObject:1,
+                 from /home/mike/HeadUnit/MediaController.h:4,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:483:49: note: candidate: ‘template<class T1, class T2> QDataStreamIfHasIStreamOperators<T1, T2> operator>>(QDataStream&, std::pair<_T1, _T2>&)’
+  483 | inline QDataStreamIfHasIStreamOperators<T1, T2> operator>>(QDataStream& s, std::pair<T1, T2> &p)
+      |                                                 ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:483:49: note:   template argument deduction/substitution failed:
+/home/mike/HeadUnit/MediaController.cpp:1006:31: note:   ‘QDBusArgument’ is not derived from ‘std::pair<_T1, _T2>’
+ 1006 |                 interfaces >> props;
+      |                               ^~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtDBus/qdbuspendingreply.h:8,
+                 from /usr/local/Qt-6.5.3/include/QtDBus/qdbusreply.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtDBus/QDBusReply:1,
+                 from /home/mike/HeadUnit/MediaController.h:16,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:208:29: note: candidate: ‘template<template<class> class Container, class T, class> const QDBusArgument& operator>>(const QDBusArgument&, Container<T>&)’
+  208 | inline const QDBusArgument &operator>>(const QDBusArgument &arg, Container<T> &list)
+      |                             ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:208:29: note:   template argument deduction/substitution failed:
+/home/mike/HeadUnit/MediaController.cpp:1006:31: note:   ‘QDBusArgument’ is not derived from ‘Container<T>’
+ 1006 |                 interfaces >> props;
+      |                               ^~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtDBus/qdbuspendingreply.h:8,
+                 from /usr/local/Qt-6.5.3/include/QtDBus/qdbusreply.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtDBus/QDBusReply:1,
+                 from /home/mike/HeadUnit/MediaController.h:16,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:268:29: note: candidate: ‘template<template<class, class> class Container, class Key, class T, typename std::enable_if<is_detected_v<QtPrivate::KeyAndValueTest, typename Container<Key, T>::iterator>, bool>::type <anonymous> > const QDBusArgument& operator>>(const QDBusArgument&, Container<Key, T>&)’
+  268 | inline const QDBusArgument &operator>>(const QDBusArgument &arg, Container<Key, T> &map)
+      |                             ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:268:29: note:   template argument deduction/substitution failed:
+/home/mike/HeadUnit/MediaController.cpp:1006:31: note:   ‘QDBusArgument’ is not derived from ‘Container<Key, T>’
+ 1006 |                 interfaces >> props;
+      |                               ^~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtDBus/qdbuspendingreply.h:8,
+                 from /usr/local/Qt-6.5.3/include/QtDBus/qdbusreply.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtDBus/QDBusReply:1,
+                 from /home/mike/HeadUnit/MediaController.h:16,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:322:29: note: candidate: ‘template<class T1, class T2> const QDBusArgument& operator>>(const QDBusArgument&, QPair<T1, T2>&)’
+  322 | inline const QDBusArgument &operator>>(const QDBusArgument &arg, QPair<T1, T2> &pair)
+      |                             ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:322:29: note:   template argument deduction/substitution failed:
+/home/mike/HeadUnit/MediaController.cpp:1006:31: note:   ‘QDBusArgument’ is not derived from ‘QPair<T1, T2>’
+ 1006 |                 interfaces >> props;
+      |                               ^~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qstring.h:14,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qobject.h:11,
+                 from /usr/local/Qt-6.5.3/include/QtCore/QObject:1,
+                 from /home/mike/HeadUnit/MediaController.h:4,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qchar.h:623:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QChar&)’
+  623 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QChar &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qchar.h:623:39: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QDataStream&’
+  623 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QChar &);
+      |                                       ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qstringview.h:8,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qchar.h:656,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qstring.h:14,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qobject.h:11,
+                 from /usr/local/Qt-6.5.3/include/QtCore/QObject:1,
+                 from /home/mike/HeadUnit/MediaController.h:4,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qbytearray.h:603:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QByteArray&)’
+  603 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QByteArray &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qbytearray.h:603:39: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QDataStream&’
+  603 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QByteArray &);
+      |                                       ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qobject.h:11,
+                 from /usr/local/Qt-6.5.3/include/QtCore/QObject:1,
+                 from /home/mike/HeadUnit/MediaController.h:4,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qstring.h:1585:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QString&)’
+ 1585 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QString &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qstring.h:1585:39: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QDataStream&’
+ 1585 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QString &);
+      |                                       ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qmetatype.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qobject.h:18,
+                 from /usr/local/Qt-6.5.3/include/QtCore/QObject:1,
+                 from /home/mike/HeadUnit/MediaController.h:4,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:542:21: note: candidate: ‘QDataStream& operator>>(QDataStream&, QKeyCombination&)’
+  542 | inline QDataStream &operator>>(QDataStream &s, QKeyCombination &combination)
+      |                     ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:542:45: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QDataStream&’
+  542 | inline QDataStream &operator>>(QDataStream &s, QKeyCombination &combination)
+      |                                ~~~~~~~~~~~~~^
+In file included from /usr/local/Qt-6.5.3/include/QtCore/QUrl:1,
+                 from /home/mike/HeadUnit/MediaController.h:6,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qurl.h:314:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QUrl&)’
+  314 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QUrl &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qurl.h:314:39: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QDataStream&’
+  314 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QUrl &);
+      |                                       ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtGui/qimage.h:8,
+                 from /usr/local/Qt-6.5.3/include/QtGui/QImage:1,
+                 from /home/mike/HeadUnit/MediaController.h:7,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtGui/qcolor.h:262:38: note: candidate: ‘QDataStream& operator>>(QDataStream&, QColor&)’
+  262 |     friend Q_GUI_EXPORT QDataStream &operator>>(QDataStream &, QColor &);
+      |                                      ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtGui/qcolor.h:27:38: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QDataStream&’
+   27 | Q_GUI_EXPORT QDataStream &operator>>(QDataStream &, QColor &);
+      |                                      ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qrect.h:8,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qpaintdevice.h:9,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimage.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtGui/QImage:1,
+                 from /home/mike/HeadUnit/MediaController.h:7,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qmargins.h:90:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QMargins&)’
+   90 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QMargins &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qmargins.h:90:39: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QDataStream&’
+   90 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QMargins &);
+      |                                       ^~~~~~~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qmargins.h:340:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QMarginsF&)’
+  340 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QMarginsF &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qmargins.h:340:39: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QDataStream&’
+  340 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QMarginsF &);
+      |                                       ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qrect.h:9,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qpaintdevice.h:9,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimage.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtGui/QImage:1,
+                 from /home/mike/HeadUnit/MediaController.h:7,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qsize.h:103:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QSize&)’
+  103 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QSize &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qsize.h:103:39: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QDataStream&’
+  103 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QSize &);
+      |                                       ^~~~~~~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qsize.h:293:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QSizeF&)’
+  293 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QSizeF &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qsize.h:293:39: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QDataStream&’
+  293 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QSizeF &);
+      |                                       ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qrect.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qpaintdevice.h:9,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimage.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtGui/QImage:1,
+                 from /home/mike/HeadUnit/MediaController.h:7,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qpoint.h:106:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QPoint&)’
+  106 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QPoint &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qpoint.h:106:39: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QDataStream&’
+  106 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QPoint &);
+      |                                       ^~~~~~~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qpoint.h:305:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QPointF&)’
+  305 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QPointF &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qpoint.h:305:39: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QDataStream&’
+  305 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QPointF &);
+      |                                       ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtGui/qpaintdevice.h:9,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimage.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtGui/QImage:1,
+                 from /home/mike/HeadUnit/MediaController.h:7,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qrect.h:147:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QRect&)’
+  147 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QRect &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qrect.h:147:39: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QDataStream&’
+  147 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QRect &);
+      |                                       ^~~~~~~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qrect.h:613:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QRectF&)’
+  613 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QRectF &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qrect.h:613:39: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QDataStream&’
+  613 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QRectF &);
+      |                                       ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtGui/qtransform.h:7,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimage.h:12,
+                 from /usr/local/Qt-6.5.3/include/QtGui/QImage:1,
+                 from /home/mike/HeadUnit/MediaController.h:7,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtGui/qpolygon.h:74:27: note: candidate: ‘QDataStream& operator>>(QDataStream&, QPolygon&)’
+   74 | Q_GUI_EXPORT QDataStream &operator>>(QDataStream &stream, QPolygon &polygon);
+      |                           ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtGui/qpolygon.h:74:51: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QDataStream&’
+   74 | Q_GUI_EXPORT QDataStream &operator>>(QDataStream &stream, QPolygon &polygon);
+      |                                      ~~~~~~~~~~~~~^~~~~~
+/usr/local/Qt-6.5.3/include/QtGui/qpolygon.h:141:27: note: candidate: ‘QDataStream& operator>>(QDataStream&, QPolygonF&)’
+  141 | Q_GUI_EXPORT QDataStream &operator>>(QDataStream &stream, QPolygonF &array);
+      |                           ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtGui/qpolygon.h:141:51: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QDataStream&’
+  141 | Q_GUI_EXPORT QDataStream &operator>>(QDataStream &stream, QPolygonF &array);
+      |                                      ~~~~~~~~~~~~~^~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtGui/qtransform.h:8,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimage.h:12,
+                 from /usr/local/Qt-6.5.3/include/QtGui/QImage:1,
+                 from /home/mike/HeadUnit/MediaController.h:7,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtGui/qregion.h:137:27: note: candidate: ‘QDataStream& operator>>(QDataStream&, QRegion&)’
+  137 | Q_GUI_EXPORT QDataStream &operator>>(QDataStream &, QRegion &);
+      |                           ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtGui/qregion.h:108:49: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QDataStream&’
+  108 |     friend Q_GUI_EXPORT QDataStream &operator>>(QDataStream &, QRegion &);
+      |                                                 ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtGui/qtransform.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimage.h:12,
+                 from /usr/local/Qt-6.5.3/include/QtGui/QImage:1,
+                 from /home/mike/HeadUnit/MediaController.h:7,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qline.h:175:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QLine&)’
+  175 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QLine &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qline.h:175:39: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QDataStream&’
+  175 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QLine &);
+      |                                       ^~~~~~~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qline.h:400:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QLineF&)’
+  400 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QLineF &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qline.h:400:39: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QDataStream&’
+  400 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QLineF &);
+      |                                       ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtGui/qimage.h:12,
+                 from /usr/local/Qt-6.5.3/include/QtGui/QImage:1,
+                 from /home/mike/HeadUnit/MediaController.h:7,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtGui/qtransform.h:323:27: note: candidate: ‘QDataStream& operator>>(QDataStream&, QTransform&)’
+  323 | Q_GUI_EXPORT QDataStream &operator>>(QDataStream &, QTransform &);
+      |                           ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtGui/qtransform.h:323:38: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QDataStream&’
+  323 | Q_GUI_EXPORT QDataStream &operator>>(QDataStream &, QTransform &);
+      |                                      ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtGui/QImage:1,
+                 from /home/mike/HeadUnit/MediaController.h:7,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtGui/qimage.h:327:27: note: candidate: ‘QDataStream& operator>>(QDataStream&, QImage&)’
+  327 | Q_GUI_EXPORT QDataStream &operator>>(QDataStream &, QImage &);
+      |                           ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtGui/qimage.h:327:38: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QDataStream&’
+  327 | Q_GUI_EXPORT QDataStream &operator>>(QDataStream &, QImage &);
+      |                                      ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qdebug.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qvariant.h:11,
+                 from /usr/local/Qt-6.5.3/include/QtCore/QVariant:1,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/qnetworkrequest.h:11,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/qnetworkaccessmanager.h:8,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/QNetworkAccessManager:1,
+                 from /home/mike/HeadUnit/MediaController.h:9,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qtextstream.h:189:21: note: candidate: ‘QTextStream& operator>>(QTextStream&, QTextStreamFunction)’
+  189 | inline QTextStream &operator>>(QTextStream &s, QTextStreamFunction f)
+      |                     ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qtextstream.h:189:45: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QTextStream&’
+  189 | inline QTextStream &operator>>(QTextStream &s, QTextStreamFunction f)
+      |                                ~~~~~~~~~~~~~^
+In file included from /usr/local/Qt-6.5.3/include/QtCore/QVariant:1,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/qnetworkrequest.h:11,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/qnetworkaccessmanager.h:8,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/QNetworkAccessManager:1,
+                 from /home/mike/HeadUnit/MediaController.h:9,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qvariant.h:536:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QVariant&)’
+  536 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &s, QVariant &p);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qvariant.h:536:52: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QDataStream&’
+  536 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &s, QVariant &p);
+      |                                       ~~~~~~~~~~~~~^
+/usr/local/Qt-6.5.3/include/QtCore/qvariant.h:543:21: note: candidate: ‘QDataStream& operator>>(QDataStream&, QVariant::Type&)’
+  543 | inline QDataStream &operator>>(QDataStream &s, QVariant::Type &p)
+      |                     ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qvariant.h:543:45: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QDataStream&’
+  543 | inline QDataStream &operator>>(QDataStream &s, QVariant::Type &p)
+      |                                ~~~~~~~~~~~~~^
+In file included from /usr/local/Qt-6.5.3/include/QtNetwork/qtcpsocket.h:9,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/qsslsocket.h:11,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/qsslconfiguration.h:26,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/QSslConfiguration:1,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/qnetworkaccessmanager.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/QNetworkAccessManager:1,
+                 from /home/mike/HeadUnit/MediaController.h:9,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtNetwork/qhostaddress.h:153:31: note: candidate: ‘QDataStream& operator>>(QDataStream&, QHostAddress&)’
+  153 | Q_NETWORK_EXPORT QDataStream &operator>>(QDataStream &, QHostAddress &);
+      |                               ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtNetwork/qhostaddress.h:153:42: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QDataStream&’
+  153 | Q_NETWORK_EXPORT QDataStream &operator>>(QDataStream &, QHostAddress &);
+      |                                          ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qcalendar.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qdatetime.h:8,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/qsslcertificate.h:16,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/qsslerror.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/qsslsocket.h:12,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/qsslconfiguration.h:26,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/QSslConfiguration:1,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/qnetworkaccessmanager.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/QNetworkAccessManager:1,
+                 from /home/mike/HeadUnit/MediaController.h:9,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qlocale.h:1155:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QLocale&)’
+ 1155 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QLocale &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qlocale.h:1155:39: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QDataStream&’
+ 1155 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QLocale &);
+      |                                       ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtNetwork/qsslcertificate.h:16,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/qsslerror.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/qsslsocket.h:12,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/qsslconfiguration.h:26,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/QSslConfiguration:1,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/qnetworkaccessmanager.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/QNetworkAccessManager:1,
+                 from /home/mike/HeadUnit/MediaController.h:9,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qdatetime.h:548:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QDate&)’
+  548 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QDate &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qdatetime.h:183:50: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QDataStream&’
+  183 |     friend Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QDate &);
+      |                                                  ^~~~~~~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qdatetime.h:550:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QTime&)’
+  550 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QTime &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qdatetime.h:249:50: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QDataStream&’
+  249 |     friend Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QTime &);
+      |                                                  ^~~~~~~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qdatetime.h:552:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QDateTime&)’
+  552 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QDateTime &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qdatetime.h:537:50: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QDataStream&’
+  537 |     friend Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QDateTime &);
+      |                                                  ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtDBus/qdbuspendingreply.h:8,
+                 from /usr/local/Qt-6.5.3/include/QtDBus/qdbusreply.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtDBus/QDBusReply:1,
+                 from /home/mike/HeadUnit/MediaController.h:16,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:154:36: note: candidate: ‘const QDBusArgument& operator>>(const QDBusArgument&, QVariant&)’
+  154 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QVariant &v);
+      |                                    ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:154:81: note:   no known conversion for argument 2 from ‘QDBusArgument’ to ‘QVariant&’
+  154 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QVariant &v);
+      |                                                                       ~~~~~~~~~~^
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:159:36: note: candidate: ‘const QDBusArgument& operator>>(const QDBusArgument&, QDate&)’
+  159 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QDate &date);
+      |                                    ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:159:78: note:   no known conversion for argument 2 from ‘QDBusArgument’ to ‘QDate&’
+  159 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QDate &date);
+      |                                                                       ~~~~~~~^~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:162:36: note: candidate: ‘const QDBusArgument& operator>>(const QDBusArgument&, QTime&)’
+  162 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QTime &time);
+      |                                    ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:162:78: note:   no known conversion for argument 2 from ‘QDBusArgument’ to ‘QTime&’
+  162 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QTime &time);
+      |                                                                       ~~~~~~~^~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:165:36: note: candidate: ‘const QDBusArgument& operator>>(const QDBusArgument&, QDateTime&)’
+  165 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QDateTime &dt);
+      |                                    ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:165:82: note:   no known conversion for argument 2 from ‘QDBusArgument’ to ‘QDateTime&’
+  165 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QDateTime &dt);
+      |                                                                       ~~~~~~~~~~~^~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:168:36: note: candidate: ‘const QDBusArgument& operator>>(const QDBusArgument&, QRect&)’
+  168 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QRect &rect);
+      |                                    ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:168:78: note:   no known conversion for argument 2 from ‘QDBusArgument’ to ‘QRect&’
+  168 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QRect &rect);
+      |                                                                       ~~~~~~~^~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:171:36: note: candidate: ‘const QDBusArgument& operator>>(const QDBusArgument&, QRectF&)’
+  171 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QRectF &rect);
+      |                                    ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:171:79: note:   no known conversion for argument 2 from ‘QDBusArgument’ to ‘QRectF&’
+  171 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QRectF &rect);
+      |                                                                       ~~~~~~~~^~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:174:36: note: candidate: ‘const QDBusArgument& operator>>(const QDBusArgument&, QSize&)’
+  174 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QSize &size);
+      |                                    ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:174:78: note:   no known conversion for argument 2 from ‘QDBusArgument’ to ‘QSize&’
+  174 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QSize &size);
+      |                                                                       ~~~~~~~^~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:177:36: note: candidate: ‘const QDBusArgument& operator>>(const QDBusArgument&, QSizeF&)’
+  177 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QSizeF &size);
+      |                                    ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:177:79: note:   no known conversion for argument 2 from ‘QDBusArgument’ to ‘QSizeF&’
+  177 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QSizeF &size);
+      |                                                                       ~~~~~~~~^~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:180:36: note: candidate: ‘const QDBusArgument& operator>>(const QDBusArgument&, QPoint&)’
+  180 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QPoint &pt);
+      |                                    ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:180:79: note:   no known conversion for argument 2 from ‘QDBusArgument’ to ‘QPoint&’
+  180 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QPoint &pt);
+      |                                                                       ~~~~~~~~^~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:183:36: note: candidate: ‘const QDBusArgument& operator>>(const QDBusArgument&, QPointF&)’
+  183 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QPointF &pt);
+      |                                    ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:183:80: note:   no known conversion for argument 2 from ‘QDBusArgument’ to ‘QPointF&’
+  183 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QPointF &pt);
+      |                                                                       ~~~~~~~~~^~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:186:36: note: candidate: ‘const QDBusArgument& operator>>(const QDBusArgument&, QLine&)’
+  186 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QLine &line);
+      |                                    ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:186:78: note:   no known conversion for argument 2 from ‘QDBusArgument’ to ‘QLine&’
+  186 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QLine &line);
+      |                                                                       ~~~~~~~^~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:189:36: note: candidate: ‘const QDBusArgument& operator>>(const QDBusArgument&, QLineF&)’
+  189 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QLineF &line);
+      |                                    ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:189:79: note:   no known conversion for argument 2 from ‘QDBusArgument’ to ‘QLineF&’
+  189 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QLineF &line);
+      |                                                                       ~~~~~~~~^~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qcborvalue.h:9,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qjsonvalue.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qjsonobject.h:7,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qplugin.h:14,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimageiohandler.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimagereader.h:11,
+                 from /usr/local/Qt-6.5.3/include/QtGui/QImageReader:1,
+                 from /home/mike/HeadUnit/MediaController.cpp:6:
+/usr/local/Qt-6.5.3/include/QtCore/qcborcommon.h:101:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QCborSimpleType&)’
+  101 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &ds, QCborSimpleType &st);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qcborcommon.h:101:52: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QDataStream&’
+  101 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &ds, QCborSimpleType &st);
+      |                                       ~~~~~~~~~~~~~^~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qcborvalue.h:11,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qjsonvalue.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qjsonobject.h:7,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qplugin.h:14,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimageiohandler.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimagereader.h:11,
+                 from /usr/local/Qt-6.5.3/include/QtGui/QImageReader:1,
+                 from /home/mike/HeadUnit/MediaController.cpp:6:
+/usr/local/Qt-6.5.3/include/QtCore/qregularexpression.h:180:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QRegularExpression&)’
+  180 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &in, QRegularExpression &re);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qregularexpression.h:180:52: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QDataStream&’
+  180 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &in, QRegularExpression &re);
+      |                                       ~~~~~~~~~~~~~^~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qcborvalue.h:16,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qjsonvalue.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qjsonobject.h:7,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qplugin.h:14,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimageiohandler.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimagereader.h:11,
+                 from /usr/local/Qt-6.5.3/include/QtGui/QImageReader:1,
+                 from /home/mike/HeadUnit/MediaController.cpp:6:
+/usr/local/Qt-6.5.3/include/QtCore/quuid.h:171:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QUuid&)’
+  171 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QUuid &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/quuid.h:171:39: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QDataStream&’
+  171 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QUuid &);
+      |                                       ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qjsonvalue.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qjsonobject.h:7,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qplugin.h:14,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimageiohandler.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimagereader.h:11,
+                 from /usr/local/Qt-6.5.3/include/QtGui/QImageReader:1,
+                 from /home/mike/HeadUnit/MediaController.cpp:6:
+/usr/local/Qt-6.5.3/include/QtCore/qcborvalue.h:601:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QCborValue&)’
+  601 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QCborValue &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qcborvalue.h:601:39: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QDataStream&’
+  601 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QCborValue &);
+      |                                       ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qjsonobject.h:7,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qplugin.h:14,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimageiohandler.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimagereader.h:11,
+                 from /usr/local/Qt-6.5.3/include/QtGui/QImageReader:1,
+                 from /home/mike/HeadUnit/MediaController.cpp:6:
+/usr/local/Qt-6.5.3/include/QtCore/qjsonvalue.h:308:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QJsonValue&)’
+  308 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QJsonValue &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qjsonvalue.h:308:39: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QDataStream&’
+  308 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QJsonValue &);
+      |                                       ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qplugin.h:14,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimageiohandler.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimagereader.h:11,
+                 from /usr/local/Qt-6.5.3/include/QtGui/QImageReader:1,
+                 from /home/mike/HeadUnit/MediaController.cpp:6:
+/usr/local/Qt-6.5.3/include/QtCore/qjsonobject.h:286:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QJsonObject&)’
+  286 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QJsonObject &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qjsonobject.h:286:39: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QDataStream&’
+  286 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QJsonObject &);
+      |                                       ^~~~~~~~~~~~~
+/home/mike/HeadUnit/MediaController.cpp:1013:17: error: no match for ‘operator>>’ (operand types are ‘const QDBusArgument’ and ‘QDBusArgument’)
+ 1013 |             arg >> interfaces;
+      |             ~~~ ^~ ~~~~~~~~~~
+      |             |      |
+      |             |      QDBusArgument
+      |             const QDBusArgument
+In file included from /usr/local/Qt-6.5.3/include/QtDBus/qdbuspendingreply.h:8,
+                 from /usr/local/Qt-6.5.3/include/QtDBus/qdbusreply.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtDBus/QDBusReply:1,
+                 from /home/mike/HeadUnit/MediaController.h:16,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:87:26: note: candidate: ‘const QDBusArgument& QDBusArgument::operator>>(uchar&) const’
+   87 |     const QDBusArgument &operator>>(uchar &arg) const;
+      |                          ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:87:44: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘uchar&’ {aka ‘unsigned char&’}
+   87 |     const QDBusArgument &operator>>(uchar &arg) const;
+      |                                     ~~~~~~~^~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:88:26: note: candidate: ‘const QDBusArgument& QDBusArgument::operator>>(bool&) const’
+   88 |     const QDBusArgument &operator>>(bool &arg) const;
+      |                          ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:88:43: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘bool&’
+   88 |     const QDBusArgument &operator>>(bool &arg) const;
+      |                                     ~~~~~~^~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:89:26: note: candidate: ‘const QDBusArgument& QDBusArgument::operator>>(short int&) const’
+   89 |     const QDBusArgument &operator>>(short &arg) const;
+      |                          ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:89:44: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘short int&’
+   89 |     const QDBusArgument &operator>>(short &arg) const;
+      |                                     ~~~~~~~^~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:90:26: note: candidate: ‘const QDBusArgument& QDBusArgument::operator>>(ushort&) const’
+   90 |     const QDBusArgument &operator>>(ushort &arg) const;
+      |                          ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:90:45: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘ushort&’ {aka ‘short unsigned int&’}
+   90 |     const QDBusArgument &operator>>(ushort &arg) const;
+      |                                     ~~~~~~~~^~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:91:26: note: candidate: ‘const QDBusArgument& QDBusArgument::operator>>(int&) const’
+   91 |     const QDBusArgument &operator>>(int &arg) const;
+      |                          ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:91:42: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘int&’
+   91 |     const QDBusArgument &operator>>(int &arg) const;
+      |                                     ~~~~~^~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:92:26: note: candidate: ‘const QDBusArgument& QDBusArgument::operator>>(uint&) const’
+   92 |     const QDBusArgument &operator>>(uint &arg) const;
+      |                          ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:92:43: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘uint&’ {aka ‘unsigned int&’}
+   92 |     const QDBusArgument &operator>>(uint &arg) const;
+      |                                     ~~~~~~^~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:93:26: note: candidate: ‘const QDBusArgument& QDBusArgument::operator>>(qlonglong&) const’
+   93 |     const QDBusArgument &operator>>(qlonglong &arg) const;
+      |                          ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:93:48: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘qlonglong&’ {aka ‘long long int&’}
+   93 |     const QDBusArgument &operator>>(qlonglong &arg) const;
+      |                                     ~~~~~~~~~~~^~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:94:26: note: candidate: ‘const QDBusArgument& QDBusArgument::operator>>(qulonglong&) const’
+   94 |     const QDBusArgument &operator>>(qulonglong &arg) const;
+      |                          ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:94:49: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘qulonglong&’ {aka ‘long long unsigned int&’}
+   94 |     const QDBusArgument &operator>>(qulonglong &arg) const;
+      |                                     ~~~~~~~~~~~~^~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:95:26: note: candidate: ‘const QDBusArgument& QDBusArgument::operator>>(double&) const’
+   95 |     const QDBusArgument &operator>>(double &arg) const;
+      |                          ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:95:45: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘double&’
+   95 |     const QDBusArgument &operator>>(double &arg) const;
+      |                                     ~~~~~~~~^~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:96:26: note: candidate: ‘const QDBusArgument& QDBusArgument::operator>>(QString&) const’
+   96 |     const QDBusArgument &operator>>(QString &arg) const;
+      |                          ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:96:46: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QString&’
+   96 |     const QDBusArgument &operator>>(QString &arg) const;
+      |                                     ~~~~~~~~~^~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:97:26: note: candidate: ‘const QDBusArgument& QDBusArgument::operator>>(QDBusVariant&) const’
+   97 |     const QDBusArgument &operator>>(QDBusVariant &arg) const;
+      |                          ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:97:51: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QDBusVariant&’
+   97 |     const QDBusArgument &operator>>(QDBusVariant &arg) const;
+      |                                     ~~~~~~~~~~~~~~^~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:98:26: note: candidate: ‘const QDBusArgument& QDBusArgument::operator>>(QDBusObjectPath&) const’
+   98 |     const QDBusArgument &operator>>(QDBusObjectPath &arg) const;
+      |                          ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:98:54: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QDBusObjectPath&’
+   98 |     const QDBusArgument &operator>>(QDBusObjectPath &arg) const;
+      |                                     ~~~~~~~~~~~~~~~~~^~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:99:26: note: candidate: ‘const QDBusArgument& QDBusArgument::operator>>(QDBusSignature&) const’
+   99 |     const QDBusArgument &operator>>(QDBusSignature &arg) const;
+      |                          ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:99:53: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QDBusSignature&’
+   99 |     const QDBusArgument &operator>>(QDBusSignature &arg) const;
+      |                                     ~~~~~~~~~~~~~~~~^~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:100:26: note: candidate: ‘const QDBusArgument& QDBusArgument::operator>>(QDBusUnixFileDescriptor&) const’
+  100 |     const QDBusArgument &operator>>(QDBusUnixFileDescriptor &arg) const;
+      |                          ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:100:62: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QDBusUnixFileDescriptor&’
+  100 |     const QDBusArgument &operator>>(QDBusUnixFileDescriptor &arg) const;
+      |                                     ~~~~~~~~~~~~~~~~~~~~~~~~~^~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:101:26: note: candidate: ‘const QDBusArgument& QDBusArgument::operator>>(QStringList&) const’
+  101 |     const QDBusArgument &operator>>(QStringList &arg) const;
+      |                          ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:101:50: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QStringList&’ {aka ‘QList<QString>&’}
+  101 |     const QDBusArgument &operator>>(QStringList &arg) const;
+      |                                     ~~~~~~~~~~~~~^~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:102:26: note: candidate: ‘const QDBusArgument& QDBusArgument::operator>>(QByteArray&) const’
+  102 |     const QDBusArgument &operator>>(QByteArray &arg) const;
+      |                          ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:102:49: note:   no known conversion for argument 1 from ‘QDBusArgument’ to ‘QByteArray&’
+  102 |     const QDBusArgument &operator>>(QByteArray &arg) const;
+      |                                     ~~~~~~~~~~~~^~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qmetatype.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qobject.h:18,
+                 from /usr/local/Qt-6.5.3/include/QtCore/QObject:1,
+                 from /home/mike/HeadUnit/MediaController.h:4,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:389:21: note: candidate: ‘template<class Enum> QDataStream& operator>>(QDataStream&, QFlags<T>&)’
+  389 | inline QDataStream &operator>>(QDataStream &s, QFlags<Enum> &e)
+      |                     ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:389:21: note:   template argument deduction/substitution failed:
+/home/mike/HeadUnit/MediaController.cpp:1013:20: note:   ‘QDBusArgument’ is not derived from ‘QFlags<T>’
+ 1013 |             arg >> interfaces;
+      |                    ^~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qmetatype.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qobject.h:18,
+                 from /usr/local/Qt-6.5.3/include/QtCore/QObject:1,
+                 from /home/mike/HeadUnit/MediaController.h:4,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:404:1: note: candidate: ‘template<class T> std::enable_if_t<std::is_enum<_Tp>::value, QDataStream&> operator>>(QDataStream&, T&)’
+  404 | operator>>(QDataStream &s, T &t)
+      | ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:404:1: note:   template argument deduction/substitution failed:
+/home/mike/HeadUnit/MediaController.cpp:1013:13: note:   cannot convert ‘arg’ (type ‘const QDBusArgument’) to type ‘QDataStream&’
+ 1013 |             arg >> interfaces;
+      |             ^~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qmetatype.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qobject.h:18,
+                 from /usr/local/Qt-6.5.3/include/QtCore/QObject:1,
+                 from /home/mike/HeadUnit/MediaController.h:4,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:410:63: note: candidate: ‘template<class T> QDataStreamIfHasIStreamOperatorsContainer<QList<T>, T> operator>>(QDataStream&, QList<T>&)’
+  410 | inline QDataStreamIfHasIStreamOperatorsContainer<QList<T>, T> operator>>(QDataStream &s, QList<T> &v)
+      |                                                               ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:410:63: note:   template argument deduction/substitution failed:
+/home/mike/HeadUnit/MediaController.cpp:1013:20: note:   ‘QDBusArgument’ is not derived from ‘QList<T>’
+ 1013 |             arg >> interfaces;
+      |                    ^~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qmetatype.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qobject.h:18,
+                 from /usr/local/Qt-6.5.3/include/QtCore/QObject:1,
+                 from /home/mike/HeadUnit/MediaController.h:4,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:422:62: note: candidate: ‘template<class T> QDataStreamIfHasIStreamOperatorsContainer<QSet<T>, T> operator>>(QDataStream&, QSet<T>&)’
+  422 | inline QDataStreamIfHasIStreamOperatorsContainer<QSet<T>, T> operator>>(QDataStream &s, QSet<T> &set)
+      |                                                              ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:422:62: note:   template argument deduction/substitution failed:
+/home/mike/HeadUnit/MediaController.cpp:1013:20: note:   ‘QDBusArgument’ is not derived from ‘QSet<T>’
+ 1013 |             arg >> interfaces;
+      |                    ^~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qmetatype.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qobject.h:18,
+                 from /usr/local/Qt-6.5.3/include/QtCore/QObject:1,
+                 from /home/mike/HeadUnit/MediaController.h:4,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:434:73: note: candidate: ‘template<class Key, class T> QDataStreamIfHasIStreamOperatorsContainer<QHash<Key, T>, Key, T> operator>>(QDataStream&, QHash<Key, T>&)’
+  434 | inline QDataStreamIfHasIStreamOperatorsContainer<QHash<Key, T>, Key, T> operator>>(QDataStream &s, QHash<Key, T> &hash)
+      |                                                                         ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:434:73: note:   template argument deduction/substitution failed:
+/home/mike/HeadUnit/MediaController.cpp:1013:20: note:   ‘QDBusArgument’ is not derived from ‘QHash<Key, T>’
+ 1013 |             arg >> interfaces;
+      |                    ^~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qmetatype.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qobject.h:18,
+                 from /usr/local/Qt-6.5.3/include/QtCore/QObject:1,
+                 from /home/mike/HeadUnit/MediaController.h:4,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:447:78: note: candidate: ‘template<class Key, class T> QDataStreamIfHasIStreamOperatorsContainer<QMultiHash<Key, T>, Key, T> operator>>(QDataStream&, QMultiHash<Key, T>&)’
+  447 | inline QDataStreamIfHasIStreamOperatorsContainer<QMultiHash<Key, T>, Key, T> operator>>(QDataStream &s, QMultiHash<Key, T> &hash)
+      |                                                                              ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:447:78: note:   template argument deduction/substitution failed:
+/home/mike/HeadUnit/MediaController.cpp:1013:20: note:   ‘QDBusArgument’ is not derived from ‘QMultiHash<Key, T>’
+ 1013 |             arg >> interfaces;
+      |                    ^~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qmetatype.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qobject.h:18,
+                 from /usr/local/Qt-6.5.3/include/QtCore/QObject:1,
+                 from /home/mike/HeadUnit/MediaController.h:4,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:459:72: note: candidate: ‘template<class Key, class T> QDataStreamIfHasIStreamOperatorsContainer<QMap<Key, T>, Key, T> operator>>(QDataStream&, QMap<Key, T>&)’
+  459 | inline QDataStreamIfHasIStreamOperatorsContainer<QMap<Key, T>, Key, T> operator>>(QDataStream &s, QMap<Key, T> &map)
+      |                                                                        ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:459:72: note:   template argument deduction/substitution failed:
+/home/mike/HeadUnit/MediaController.cpp:1013:20: note:   ‘QDBusArgument’ is not derived from ‘QMap<Key, T>’
+ 1013 |             arg >> interfaces;
+      |                    ^~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qmetatype.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qobject.h:18,
+                 from /usr/local/Qt-6.5.3/include/QtCore/QObject:1,
+                 from /home/mike/HeadUnit/MediaController.h:4,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:471:77: note: candidate: ‘template<class Key, class T> QDataStreamIfHasIStreamOperatorsContainer<QMultiMap<Key, T>, Key, T> operator>>(QDataStream&, QMultiMap<Key, T>&)’
+  471 | inline QDataStreamIfHasIStreamOperatorsContainer<QMultiMap<Key, T>, Key, T> operator>>(QDataStream &s, QMultiMap<Key, T> &map)
+      |                                                                             ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:471:77: note:   template argument deduction/substitution failed:
+/home/mike/HeadUnit/MediaController.cpp:1013:20: note:   ‘QDBusArgument’ is not derived from ‘QMultiMap<Key, T>’
+ 1013 |             arg >> interfaces;
+      |                    ^~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qmetatype.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qobject.h:18,
+                 from /usr/local/Qt-6.5.3/include/QtCore/QObject:1,
+                 from /home/mike/HeadUnit/MediaController.h:4,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:483:49: note: candidate: ‘template<class T1, class T2> QDataStreamIfHasIStreamOperators<T1, T2> operator>>(QDataStream&, std::pair<_T1, _T2>&)’
+  483 | inline QDataStreamIfHasIStreamOperators<T1, T2> operator>>(QDataStream& s, std::pair<T1, T2> &p)
+      |                                                 ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:483:49: note:   template argument deduction/substitution failed:
+/home/mike/HeadUnit/MediaController.cpp:1013:20: note:   ‘QDBusArgument’ is not derived from ‘std::pair<_T1, _T2>’
+ 1013 |             arg >> interfaces;
+      |                    ^~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtDBus/qdbuspendingreply.h:8,
+                 from /usr/local/Qt-6.5.3/include/QtDBus/qdbusreply.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtDBus/QDBusReply:1,
+                 from /home/mike/HeadUnit/MediaController.h:16,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:208:29: note: candidate: ‘template<template<class> class Container, class T, class> const QDBusArgument& operator>>(const QDBusArgument&, Container<T>&)’
+  208 | inline const QDBusArgument &operator>>(const QDBusArgument &arg, Container<T> &list)
+      |                             ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:208:29: note:   template argument deduction/substitution failed:
+/home/mike/HeadUnit/MediaController.cpp:1013:20: note:   ‘QDBusArgument’ is not derived from ‘Container<T>’
+ 1013 |             arg >> interfaces;
+      |                    ^~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtDBus/qdbuspendingreply.h:8,
+                 from /usr/local/Qt-6.5.3/include/QtDBus/qdbusreply.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtDBus/QDBusReply:1,
+                 from /home/mike/HeadUnit/MediaController.h:16,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:268:29: note: candidate: ‘template<template<class, class> class Container, class Key, class T, typename std::enable_if<is_detected_v<QtPrivate::KeyAndValueTest, typename Container<Key, T>::iterator>, bool>::type <anonymous> > const QDBusArgument& operator>>(const QDBusArgument&, Container<Key, T>&)’
+  268 | inline const QDBusArgument &operator>>(const QDBusArgument &arg, Container<Key, T> &map)
+      |                             ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:268:29: note:   template argument deduction/substitution failed:
+/home/mike/HeadUnit/MediaController.cpp:1013:20: note:   ‘QDBusArgument’ is not derived from ‘Container<Key, T>’
+ 1013 |             arg >> interfaces;
+      |                    ^~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtDBus/qdbuspendingreply.h:8,
+                 from /usr/local/Qt-6.5.3/include/QtDBus/qdbusreply.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtDBus/QDBusReply:1,
+                 from /home/mike/HeadUnit/MediaController.h:16,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:322:29: note: candidate: ‘template<class T1, class T2> const QDBusArgument& operator>>(const QDBusArgument&, QPair<T1, T2>&)’
+  322 | inline const QDBusArgument &operator>>(const QDBusArgument &arg, QPair<T1, T2> &pair)
+      |                             ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:322:29: note:   template argument deduction/substitution failed:
+/home/mike/HeadUnit/MediaController.cpp:1013:20: note:   ‘QDBusArgument’ is not derived from ‘QPair<T1, T2>’
+ 1013 |             arg >> interfaces;
+      |                    ^~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qstring.h:14,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qobject.h:11,
+                 from /usr/local/Qt-6.5.3/include/QtCore/QObject:1,
+                 from /home/mike/HeadUnit/MediaController.h:4,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qchar.h:623:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QChar&)’
+  623 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QChar &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qchar.h:623:39: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  623 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QChar &);
+      |                                       ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qstringview.h:8,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qchar.h:656,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qstring.h:14,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qobject.h:11,
+                 from /usr/local/Qt-6.5.3/include/QtCore/QObject:1,
+                 from /home/mike/HeadUnit/MediaController.h:4,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qbytearray.h:603:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QByteArray&)’
+  603 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QByteArray &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qbytearray.h:603:39: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  603 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QByteArray &);
+      |                                       ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qobject.h:11,
+                 from /usr/local/Qt-6.5.3/include/QtCore/QObject:1,
+                 from /home/mike/HeadUnit/MediaController.h:4,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qstring.h:1585:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QString&)’
+ 1585 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QString &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qstring.h:1585:39: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+ 1585 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QString &);
+      |                                       ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qmetatype.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qobject.h:18,
+                 from /usr/local/Qt-6.5.3/include/QtCore/QObject:1,
+                 from /home/mike/HeadUnit/MediaController.h:4,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:542:21: note: candidate: ‘QDataStream& operator>>(QDataStream&, QKeyCombination&)’
+  542 | inline QDataStream &operator>>(QDataStream &s, QKeyCombination &combination)
+      |                     ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qdatastream.h:542:45: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  542 | inline QDataStream &operator>>(QDataStream &s, QKeyCombination &combination)
+      |                                ~~~~~~~~~~~~~^
+In file included from /usr/local/Qt-6.5.3/include/QtCore/QUrl:1,
+                 from /home/mike/HeadUnit/MediaController.h:6,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qurl.h:314:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QUrl&)’
+  314 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QUrl &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qurl.h:314:39: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  314 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QUrl &);
+      |                                       ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtGui/qimage.h:8,
+                 from /usr/local/Qt-6.5.3/include/QtGui/QImage:1,
+                 from /home/mike/HeadUnit/MediaController.h:7,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtGui/qcolor.h:262:38: note: candidate: ‘QDataStream& operator>>(QDataStream&, QColor&)’
+  262 |     friend Q_GUI_EXPORT QDataStream &operator>>(QDataStream &, QColor &);
+      |                                      ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtGui/qcolor.h:27:38: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+   27 | Q_GUI_EXPORT QDataStream &operator>>(QDataStream &, QColor &);
+      |                                      ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qrect.h:8,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qpaintdevice.h:9,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimage.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtGui/QImage:1,
+                 from /home/mike/HeadUnit/MediaController.h:7,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qmargins.h:90:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QMargins&)’
+   90 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QMargins &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qmargins.h:90:39: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+   90 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QMargins &);
+      |                                       ^~~~~~~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qmargins.h:340:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QMarginsF&)’
+  340 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QMarginsF &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qmargins.h:340:39: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  340 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QMarginsF &);
+      |                                       ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qrect.h:9,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qpaintdevice.h:9,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimage.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtGui/QImage:1,
+                 from /home/mike/HeadUnit/MediaController.h:7,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qsize.h:103:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QSize&)’
+  103 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QSize &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qsize.h:103:39: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  103 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QSize &);
+      |                                       ^~~~~~~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qsize.h:293:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QSizeF&)’
+  293 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QSizeF &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qsize.h:293:39: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  293 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QSizeF &);
+      |                                       ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qrect.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qpaintdevice.h:9,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimage.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtGui/QImage:1,
+                 from /home/mike/HeadUnit/MediaController.h:7,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qpoint.h:106:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QPoint&)’
+  106 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QPoint &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qpoint.h:106:39: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  106 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QPoint &);
+      |                                       ^~~~~~~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qpoint.h:305:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QPointF&)’
+  305 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QPointF &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qpoint.h:305:39: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  305 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QPointF &);
+      |                                       ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtGui/qpaintdevice.h:9,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimage.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtGui/QImage:1,
+                 from /home/mike/HeadUnit/MediaController.h:7,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qrect.h:147:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QRect&)’
+  147 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QRect &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qrect.h:147:39: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  147 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QRect &);
+      |                                       ^~~~~~~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qrect.h:613:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QRectF&)’
+  613 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QRectF &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qrect.h:613:39: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  613 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QRectF &);
+      |                                       ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtGui/qtransform.h:7,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimage.h:12,
+                 from /usr/local/Qt-6.5.3/include/QtGui/QImage:1,
+                 from /home/mike/HeadUnit/MediaController.h:7,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtGui/qpolygon.h:74:27: note: candidate: ‘QDataStream& operator>>(QDataStream&, QPolygon&)’
+   74 | Q_GUI_EXPORT QDataStream &operator>>(QDataStream &stream, QPolygon &polygon);
+      |                           ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtGui/qpolygon.h:74:51: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+   74 | Q_GUI_EXPORT QDataStream &operator>>(QDataStream &stream, QPolygon &polygon);
+      |                                      ~~~~~~~~~~~~~^~~~~~
+/usr/local/Qt-6.5.3/include/QtGui/qpolygon.h:141:27: note: candidate: ‘QDataStream& operator>>(QDataStream&, QPolygonF&)’
+  141 | Q_GUI_EXPORT QDataStream &operator>>(QDataStream &stream, QPolygonF &array);
+      |                           ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtGui/qpolygon.h:141:51: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  141 | Q_GUI_EXPORT QDataStream &operator>>(QDataStream &stream, QPolygonF &array);
+      |                                      ~~~~~~~~~~~~~^~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtGui/qtransform.h:8,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimage.h:12,
+                 from /usr/local/Qt-6.5.3/include/QtGui/QImage:1,
+                 from /home/mike/HeadUnit/MediaController.h:7,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtGui/qregion.h:137:27: note: candidate: ‘QDataStream& operator>>(QDataStream&, QRegion&)’
+  137 | Q_GUI_EXPORT QDataStream &operator>>(QDataStream &, QRegion &);
+      |                           ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtGui/qregion.h:108:49: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  108 |     friend Q_GUI_EXPORT QDataStream &operator>>(QDataStream &, QRegion &);
+      |                                                 ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtGui/qtransform.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimage.h:12,
+                 from /usr/local/Qt-6.5.3/include/QtGui/QImage:1,
+                 from /home/mike/HeadUnit/MediaController.h:7,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qline.h:175:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QLine&)’
+  175 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QLine &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qline.h:175:39: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  175 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QLine &);
+      |                                       ^~~~~~~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qline.h:400:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QLineF&)’
+  400 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QLineF &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qline.h:400:39: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  400 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QLineF &);
+      |                                       ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtGui/qimage.h:12,
+                 from /usr/local/Qt-6.5.3/include/QtGui/QImage:1,
+                 from /home/mike/HeadUnit/MediaController.h:7,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtGui/qtransform.h:323:27: note: candidate: ‘QDataStream& operator>>(QDataStream&, QTransform&)’
+  323 | Q_GUI_EXPORT QDataStream &operator>>(QDataStream &, QTransform &);
+      |                           ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtGui/qtransform.h:323:38: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  323 | Q_GUI_EXPORT QDataStream &operator>>(QDataStream &, QTransform &);
+      |                                      ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtGui/QImage:1,
+                 from /home/mike/HeadUnit/MediaController.h:7,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtGui/qimage.h:327:27: note: candidate: ‘QDataStream& operator>>(QDataStream&, QImage&)’
+  327 | Q_GUI_EXPORT QDataStream &operator>>(QDataStream &, QImage &);
+      |                           ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtGui/qimage.h:327:38: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  327 | Q_GUI_EXPORT QDataStream &operator>>(QDataStream &, QImage &);
+      |                                      ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qdebug.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qvariant.h:11,
+                 from /usr/local/Qt-6.5.3/include/QtCore/QVariant:1,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/qnetworkrequest.h:11,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/qnetworkaccessmanager.h:8,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/QNetworkAccessManager:1,
+                 from /home/mike/HeadUnit/MediaController.h:9,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qtextstream.h:189:21: note: candidate: ‘QTextStream& operator>>(QTextStream&, QTextStreamFunction)’
+  189 | inline QTextStream &operator>>(QTextStream &s, QTextStreamFunction f)
+      |                     ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qtextstream.h:189:45: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QTextStream&’
+  189 | inline QTextStream &operator>>(QTextStream &s, QTextStreamFunction f)
+      |                                ~~~~~~~~~~~~~^
+In file included from /usr/local/Qt-6.5.3/include/QtCore/QVariant:1,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/qnetworkrequest.h:11,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/qnetworkaccessmanager.h:8,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/QNetworkAccessManager:1,
+                 from /home/mike/HeadUnit/MediaController.h:9,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qvariant.h:536:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QVariant&)’
+  536 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &s, QVariant &p);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qvariant.h:536:52: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  536 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &s, QVariant &p);
+      |                                       ~~~~~~~~~~~~~^
+/usr/local/Qt-6.5.3/include/QtCore/qvariant.h:543:21: note: candidate: ‘QDataStream& operator>>(QDataStream&, QVariant::Type&)’
+  543 | inline QDataStream &operator>>(QDataStream &s, QVariant::Type &p)
+      |                     ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qvariant.h:543:45: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  543 | inline QDataStream &operator>>(QDataStream &s, QVariant::Type &p)
+      |                                ~~~~~~~~~~~~~^
+In file included from /usr/local/Qt-6.5.3/include/QtNetwork/qtcpsocket.h:9,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/qsslsocket.h:11,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/qsslconfiguration.h:26,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/QSslConfiguration:1,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/qnetworkaccessmanager.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/QNetworkAccessManager:1,
+                 from /home/mike/HeadUnit/MediaController.h:9,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtNetwork/qhostaddress.h:153:31: note: candidate: ‘QDataStream& operator>>(QDataStream&, QHostAddress&)’
+  153 | Q_NETWORK_EXPORT QDataStream &operator>>(QDataStream &, QHostAddress &);
+      |                               ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtNetwork/qhostaddress.h:153:42: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  153 | Q_NETWORK_EXPORT QDataStream &operator>>(QDataStream &, QHostAddress &);
+      |                                          ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qcalendar.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qdatetime.h:8,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/qsslcertificate.h:16,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/qsslerror.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/qsslsocket.h:12,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/qsslconfiguration.h:26,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/QSslConfiguration:1,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/qnetworkaccessmanager.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/QNetworkAccessManager:1,
+                 from /home/mike/HeadUnit/MediaController.h:9,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qlocale.h:1155:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QLocale&)’
+ 1155 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QLocale &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qlocale.h:1155:39: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+ 1155 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QLocale &);
+      |                                       ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtNetwork/qsslcertificate.h:16,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/qsslerror.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/qsslsocket.h:12,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/qsslconfiguration.h:26,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/QSslConfiguration:1,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/qnetworkaccessmanager.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtNetwork/QNetworkAccessManager:1,
+                 from /home/mike/HeadUnit/MediaController.h:9,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtCore/qdatetime.h:548:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QDate&)’
+  548 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QDate &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qdatetime.h:183:50: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  183 |     friend Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QDate &);
+      |                                                  ^~~~~~~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qdatetime.h:550:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QTime&)’
+  550 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QTime &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qdatetime.h:249:50: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  249 |     friend Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QTime &);
+      |                                                  ^~~~~~~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qdatetime.h:552:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QDateTime&)’
+  552 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QDateTime &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qdatetime.h:537:50: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  537 |     friend Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QDateTime &);
+      |                                                  ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtDBus/qdbuspendingreply.h:8,
+                 from /usr/local/Qt-6.5.3/include/QtDBus/qdbusreply.h:13,
+                 from /usr/local/Qt-6.5.3/include/QtDBus/QDBusReply:1,
+                 from /home/mike/HeadUnit/MediaController.h:16,
+                 from /home/mike/HeadUnit/MediaController.cpp:1:
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:154:36: note: candidate: ‘const QDBusArgument& operator>>(const QDBusArgument&, QVariant&)’
+  154 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QVariant &v);
+      |                                    ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:154:81: note:   no known conversion for argument 2 from ‘QDBusArgument’ to ‘QVariant&’
+  154 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QVariant &v);
+      |                                                                       ~~~~~~~~~~^
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:159:36: note: candidate: ‘const QDBusArgument& operator>>(const QDBusArgument&, QDate&)’
+  159 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QDate &date);
+      |                                    ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:159:78: note:   no known conversion for argument 2 from ‘QDBusArgument’ to ‘QDate&’
+  159 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QDate &date);
+      |                                                                       ~~~~~~~^~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:162:36: note: candidate: ‘const QDBusArgument& operator>>(const QDBusArgument&, QTime&)’
+  162 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QTime &time);
+      |                                    ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:162:78: note:   no known conversion for argument 2 from ‘QDBusArgument’ to ‘QTime&’
+  162 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QTime &time);
+      |                                                                       ~~~~~~~^~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:165:36: note: candidate: ‘const QDBusArgument& operator>>(const QDBusArgument&, QDateTime&)’
+  165 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QDateTime &dt);
+      |                                    ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:165:82: note:   no known conversion for argument 2 from ‘QDBusArgument’ to ‘QDateTime&’
+  165 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QDateTime &dt);
+      |                                                                       ~~~~~~~~~~~^~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:168:36: note: candidate: ‘const QDBusArgument& operator>>(const QDBusArgument&, QRect&)’
+  168 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QRect &rect);
+      |                                    ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:168:78: note:   no known conversion for argument 2 from ‘QDBusArgument’ to ‘QRect&’
+  168 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QRect &rect);
+      |                                                                       ~~~~~~~^~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:171:36: note: candidate: ‘const QDBusArgument& operator>>(const QDBusArgument&, QRectF&)’
+  171 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QRectF &rect);
+      |                                    ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:171:79: note:   no known conversion for argument 2 from ‘QDBusArgument’ to ‘QRectF&’
+  171 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QRectF &rect);
+      |                                                                       ~~~~~~~~^~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:174:36: note: candidate: ‘const QDBusArgument& operator>>(const QDBusArgument&, QSize&)’
+  174 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QSize &size);
+      |                                    ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:174:78: note:   no known conversion for argument 2 from ‘QDBusArgument’ to ‘QSize&’
+  174 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QSize &size);
+      |                                                                       ~~~~~~~^~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:177:36: note: candidate: ‘const QDBusArgument& operator>>(const QDBusArgument&, QSizeF&)’
+  177 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QSizeF &size);
+      |                                    ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:177:79: note:   no known conversion for argument 2 from ‘QDBusArgument’ to ‘QSizeF&’
+  177 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QSizeF &size);
+      |                                                                       ~~~~~~~~^~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:180:36: note: candidate: ‘const QDBusArgument& operator>>(const QDBusArgument&, QPoint&)’
+  180 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QPoint &pt);
+      |                                    ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:180:79: note:   no known conversion for argument 2 from ‘QDBusArgument’ to ‘QPoint&’
+  180 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QPoint &pt);
+      |                                                                       ~~~~~~~~^~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:183:36: note: candidate: ‘const QDBusArgument& operator>>(const QDBusArgument&, QPointF&)’
+  183 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QPointF &pt);
+      |                                    ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:183:80: note:   no known conversion for argument 2 from ‘QDBusArgument’ to ‘QPointF&’
+  183 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QPointF &pt);
+      |                                                                       ~~~~~~~~~^~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:186:36: note: candidate: ‘const QDBusArgument& operator>>(const QDBusArgument&, QLine&)’
+  186 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QLine &line);
+      |                                    ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:186:78: note:   no known conversion for argument 2 from ‘QDBusArgument’ to ‘QLine&’
+  186 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QLine &line);
+      |                                                                       ~~~~~~~^~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:189:36: note: candidate: ‘const QDBusArgument& operator>>(const QDBusArgument&, QLineF&)’
+  189 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QLineF &line);
+      |                                    ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtDBus/qdbusargument.h:189:79: note:   no known conversion for argument 2 from ‘QDBusArgument’ to ‘QLineF&’
+  189 | Q_DBUS_EXPORT const QDBusArgument &operator>>(const QDBusArgument &a, QLineF &line);
+      |                                                                       ~~~~~~~~^~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qcborvalue.h:9,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qjsonvalue.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qjsonobject.h:7,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qplugin.h:14,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimageiohandler.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimagereader.h:11,
+                 from /usr/local/Qt-6.5.3/include/QtGui/QImageReader:1,
+                 from /home/mike/HeadUnit/MediaController.cpp:6:
+/usr/local/Qt-6.5.3/include/QtCore/qcborcommon.h:101:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QCborSimpleType&)’
+  101 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &ds, QCborSimpleType &st);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qcborcommon.h:101:52: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  101 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &ds, QCborSimpleType &st);
+      |                                       ~~~~~~~~~~~~~^~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qcborvalue.h:11,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qjsonvalue.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qjsonobject.h:7,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qplugin.h:14,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimageiohandler.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimagereader.h:11,
+                 from /usr/local/Qt-6.5.3/include/QtGui/QImageReader:1,
+                 from /home/mike/HeadUnit/MediaController.cpp:6:
+/usr/local/Qt-6.5.3/include/QtCore/qregularexpression.h:180:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QRegularExpression&)’
+  180 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &in, QRegularExpression &re);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qregularexpression.h:180:52: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  180 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &in, QRegularExpression &re);
+      |                                       ~~~~~~~~~~~~~^~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qcborvalue.h:16,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qjsonvalue.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qjsonobject.h:7,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qplugin.h:14,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimageiohandler.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimagereader.h:11,
+                 from /usr/local/Qt-6.5.3/include/QtGui/QImageReader:1,
+                 from /home/mike/HeadUnit/MediaController.cpp:6:
+/usr/local/Qt-6.5.3/include/QtCore/quuid.h:171:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QUuid&)’
+  171 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QUuid &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/quuid.h:171:39: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  171 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QUuid &);
+      |                                       ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qjsonvalue.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qjsonobject.h:7,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qplugin.h:14,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimageiohandler.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimagereader.h:11,
+                 from /usr/local/Qt-6.5.3/include/QtGui/QImageReader:1,
+                 from /home/mike/HeadUnit/MediaController.cpp:6:
+/usr/local/Qt-6.5.3/include/QtCore/qcborvalue.h:601:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QCborValue&)’
+  601 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QCborValue &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qcborvalue.h:601:39: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  601 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QCborValue &);
+      |                                       ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qjsonobject.h:7,
+                 from /usr/local/Qt-6.5.3/include/QtCore/qplugin.h:14,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimageiohandler.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimagereader.h:11,
+                 from /usr/local/Qt-6.5.3/include/QtGui/QImageReader:1,
+                 from /home/mike/HeadUnit/MediaController.cpp:6:
+/usr/local/Qt-6.5.3/include/QtCore/qjsonvalue.h:308:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QJsonValue&)’
+  308 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QJsonValue &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qjsonvalue.h:308:39: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  308 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QJsonValue &);
+      |                                       ^~~~~~~~~~~~~
+In file included from /usr/local/Qt-6.5.3/include/QtCore/qplugin.h:14,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimageiohandler.h:10,
+                 from /usr/local/Qt-6.5.3/include/QtGui/qimagereader.h:11,
+                 from /usr/local/Qt-6.5.3/include/QtGui/QImageReader:1,
+                 from /home/mike/HeadUnit/MediaController.cpp:6:
+/usr/local/Qt-6.5.3/include/QtCore/qjsonobject.h:286:28: note: candidate: ‘QDataStream& operator>>(QDataStream&, QJsonObject&)’
+  286 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QJsonObject &);
+      |                            ^~~~~~~~
+/usr/local/Qt-6.5.3/include/QtCore/qjsonobject.h:286:39: note:   no known conversion for argument 1 from ‘const QDBusArgument’ to ‘QDataStream&’
+  286 | Q_CORE_EXPORT QDataStream &operator>>(QDataStream &, QJsonObject &);
+      |                                       ^~~~~~~~~~~~~
+make[2]: *** [CMakeFiles/appHeadUnit.dir/build.make:565: CMakeFiles/appHeadUnit.dir/MediaController.cpp.o] Error 1
+make[2]: *** Waiting for unfinished jobs....
+make[1]: *** [CMakeFiles/Makefile2:99: CMakeFiles/appHeadUnit.dir/all] Error 2
+make: *** [Makefile:91: all] Error 2
+mike@mike-HeadUnit:~/HeadUnit/build$ 
+
+

@@ -34,16 +34,17 @@ int main(int argc, char *argv[])
 {
     qInstallMessageHandler(myMessageHandler);
     qputenv("QML_XHR_ALLOW_FILE_READ", "1");
-    qputenv("QTWEBENGINE_CHROMIUM_FLAGS", "--use-angle=d3d11 --ignore-gpu-blocklist --widevine-path=\"C:/Dev/HeadUnit/widevine/widevinecdm.dll\" --disable-web-security --disable-site-isolation-trials");
-    qputenv("QSG_RHI_BACKEND", "d3d11");
-    qputenv("QTWEBENGINE_LOGGING", "1");
+    qputenv("QTWEBENGINE_CHROMIUM_FLAGS", "--disable-gpu --disable-software-rasterizer --no-sandbox --single-process");
 
     QCoreApplication::setOrganizationName("TruckLabs");
     QCoreApplication::setOrganizationDomain("truck.app");
     QCoreApplication::setApplicationName("HeadUnit");
 
-    QGuiApplication app(argc, argv);
+    // CRITICAL FIX: Initialize WebEngine BEFORE QGuiApplication
     QtWebEngineQuick::initialize();
+    
+    // NOW create the application
+    QGuiApplication app(argc, argv);
 
     // Create all controllers
     TidalController tidalController;

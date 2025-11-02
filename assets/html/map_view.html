@@ -1,3 +1,5 @@
+cd ~/HeadUnit
+cat > assets/html/map_view.html << 'MAPEOF'
 <!DOCTYPE html>
 <html>
 <head>
@@ -18,8 +20,25 @@
             font-family: Arial, sans-serif;
         }
         #map {
-            width: 100vw;
-            height: 100vh;
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            width: 100%;
+            height: 100%;
+}
+
+        /* Hide Google Maps UI clutter for small screen */
+        .gm-style-cc,
+        .gm-style a[href^="https://maps.google.com/maps"],
+        .gmnoprint,
+        .gm-bundled-control,
+        .gm-svpc,
+        .gm-control-active,
+        .gm-style > div:last-child,
+        a[href^="https://maps.google.com/maps"] {
+            display: none !important;
         }
 
         /* Floating action button */
@@ -249,7 +268,7 @@
             transform: scale(0.95);
         }
 
-        /* Status bar - minimalist */
+        /* Status bar - hidden */
         .status-bar {
             position: absolute;
             top: 10px;
@@ -263,13 +282,14 @@
             border-radius: 20px;
             font-size: 12px;
             white-space: nowrap;
+            display: none;
         }
     </style>
 </head>
 <body>
     <div id="map"></div>
 
-    <!-- Status bar -->
+    <!-- Status bar (hidden) -->
     <div class="status-bar" id="status">Initializing...</div>
 
     <!-- Search panel (hidden by default) -->
@@ -317,7 +337,7 @@
     <!-- Compact controls (right side) -->
     <div class="compact-controls">
         <button class="control-btn" onclick="centerOnUser()" title="My Location">📍</button>
-        <button class="control-btn" id="styleBtn" onclick="toggleMapStyle()" title="Map Style">🎨</button>
+        <button class="control-btn" id="viewBtn" onclick="toggleMapView()" title="Toggle View">🛰️</button>
     </div>
 
     <!-- Main FAB (search) -->
@@ -330,6 +350,7 @@
         let directionsRenderer = null;
         let currentRoute = null;
         let currentStyle = 'dark';
+        let currentMapType = 'roadmap';
         let mapInitialized = false;
         let mapInitializing = false;
         let loadHandlerCalled = false;
@@ -473,11 +494,9 @@
                 mapInitializing = true;
                 updateStatus('Loading map...');
 
-                // Check if script already exists
                 const existingScript = document.querySelector('script[src*="maps.googleapis.com"]');
                 if (existingScript) {
                     console.log('Google Maps script already loading/loaded');
-                    // Wait for it to finish
                     setTimeout(() => {
                         if (window.google && window.google.maps) {
                             createMap();
@@ -518,12 +537,10 @@
             }
 
             try {
-                // Determine initial map style based on theme
                 const themeToUse = pendingTheme || currentTheme;
                 let initialStyle = darkMapStyle;
                 let styleName = 'dark';
 
-                // Detect RetroVFD theme
                 if (themeToUse.bg === '#100a00' || themeToUse.primary === '#00ffcc') {
                     initialStyle = retroMapStyle;
                     styleName = 'retro';
@@ -536,11 +553,14 @@
                     center: { lat: 51.0447, lng: -114.0719 },
                     zoom: 13,
                     styles: initialStyle,
+                    mapTypeId: 'roadmap',
                     disableDefaultUI: true,
-                    zoomControl: true,
-                    zoomControlOptions: {
-                        position: google.maps.ControlPosition.LEFT_BOTTOM
-                    }
+                    zoomControl: false,
+                    mapTypeControl: false,
+                    scaleControl: false,
+                    streetViewControl: false,
+                    rotateControl: false,
+                    fullscreenControl: false
                 });
 
                 currentStyle = styleName;
@@ -556,10 +576,7 @@
                     }
                 });
 
-                // Initialize autocomplete for address inputs
                 initAutocomplete();
-
-                // Get user's current location on startup
                 getCurrentLocation();
 
                 mapInitialized = true;
@@ -573,13 +590,12 @@
             }
         }
 
-        // Make createMap global for Google Maps callback
         window.createMap = createMap;
 
         function getCurrentLocation() {
             if (!navigator.geolocation) {
                 console.log('Geolocation not available, using default test location');
-                userLocation = { lat: 51.0447, lng: -114.0719 }; // Okotoks/Calgary area
+                userLocation = { lat: 51.0447, lng: -114.0719 };
                 return;
             }
 
@@ -593,7 +609,7 @@
                 },
                 function(error) {
                     console.log('Geolocation failed (' + error.message + '), using default test location');
-                    userLocation = { lat: 51.0447, lng: -114.0719 }; // Fallback for desktop testing
+                    userLocation = { lat: 51.0447, lng: -114.0719 };
                 }
             );
         }
@@ -605,29 +621,24 @@
             }
 
             try {
-                // Get input elements
                 const originInput = document.getElementById('originInput');
                 const destInput = document.getElementById('destInput');
 
-                // Create autocomplete for origin with updated API
                 originAutocomplete = new google.maps.places.Autocomplete(originInput, {
                     fields: ['formatted_address', 'geometry', 'name'],
                     types: ['geocode', 'establishment']
                 });
 
-                // Create autocomplete for destination with updated API
                 destAutocomplete = new google.maps.places.Autocomplete(destInput, {
                     fields: ['formatted_address', 'geometry', 'name'],
                     types: ['geocode', 'establishment']
                 });
 
-                // Bind autocomplete to map bounds for better suggestions
                 if (map) {
                     originAutocomplete.bindTo('bounds', map);
                     destAutocomplete.bindTo('bounds', map);
                 }
 
-                // Handle place selection for origin
                 originAutocomplete.addListener('place_changed', function() {
                     const place = originAutocomplete.getPlace();
                     if (!place.geometry) {
@@ -637,7 +648,6 @@
                     console.log('Origin selected:', place.formatted_address || place.name);
                 });
 
-                // Handle place selection for destination
                 destAutocomplete.addListener('place_changed', function() {
                     const place = destAutocomplete.getPlace();
                     if (!place.geometry) {
@@ -646,7 +656,6 @@
                     }
                     console.log('Destination selected:', place.formatted_address || place.name);
 
-                    // Optionally center map on selected destination
                     if (place.geometry.viewport) {
                         map.fitBounds(place.geometry.viewport);
                     } else {
@@ -661,23 +670,31 @@
             }
         }
 
-        function toggleMapStyle() {
+        function toggleMapView() {
             if (!map) {
                 updateStatus('⚠ Map not ready');
                 return;
             }
 
-            if (currentStyle === 'dark') {
-                map.setOptions({ styles: retroMapStyle });
-                currentStyle = 'retro';
-            } else if (currentStyle === 'retro') {
-                map.setOptions({ styles: [] });
-                currentStyle = 'default';
+            if (currentMapType === 'roadmap') {
+                map.setMapTypeId('satellite');
+                currentMapType = 'satellite';
+                updateStatus('🛰️ Satellite');
+                document.getElementById('viewBtn').textContent = '🗺️';
             } else {
-                map.setOptions({ styles: darkMapStyle });
-                currentStyle = 'dark';
+                map.setMapTypeId('roadmap');
+                currentMapType = 'roadmap';
+                // Restore theme-appropriate style
+                if (currentTheme.bg === '#100a00' || currentTheme.primary === '#00ffcc') {
+                    map.setOptions({ styles: retroMapStyle });
+                    currentStyle = 'retro';
+                } else {
+                    map.setOptions({ styles: darkMapStyle });
+                    currentStyle = 'dark';
+                }
+                updateStatus('🗺️ Map');
+                document.getElementById('viewBtn').textContent = '🛰️';
             }
-            updateStatus(`Style: ${currentStyle}`);
         }
 
         function centerOnUser() {
@@ -700,9 +717,7 @@
                         lng: position.coords.longitude
                     };
 
-                    // Save user location for routing
                     userLocation = pos;
-
                     map.setCenter(pos);
                     map.setZoom(15);
 
@@ -798,13 +813,11 @@
 
             updateStatus('Calculating...');
 
-            // Check if origin is "Current location" or empty - use GPS
             const isCurrentLocation = !originValue ||
                                      originValue.toLowerCase() === 'current location' ||
                                      originValue === '';
 
             if (isCurrentLocation) {
-                // If we don't have user location yet, try to get it
                 if (!userLocation) {
                     updateStatus('Getting your location...');
                     navigator.geolocation.getCurrentPosition(
@@ -829,7 +842,6 @@
                 }
             }
 
-            // Otherwise use the text address they entered
             calculateRoute(originValue, dest);
         }
 
@@ -902,9 +914,7 @@
             document.documentElement.style.setProperty('--primary-color', theme.primary);
             document.documentElement.style.setProperty('--text-color', theme.text);
 
-            // If map is already created, update it
-            if (map) {
-                // Detect which theme we're switching to
+            if (map && currentMapType === 'roadmap') {
                 if (theme.bg === '#100a00' || theme.primary === '#00ffcc') {
                     map.setOptions({ styles: retroMapStyle });
                     currentStyle = 'retro';
@@ -915,7 +925,6 @@
                     console.log('Switched to Cyberpunk map style');
                 }
 
-                // Update route colors if route exists
                 if (directionsRenderer && currentRoute) {
                     directionsRenderer.setOptions({
                         polylineOptions: {
@@ -924,7 +933,6 @@
                             strokeOpacity: 0.8
                         }
                     });
-                    // Redraw the route to apply new colors
                     directionsRenderer.setDirections(currentRoute);
                 }
             }
@@ -970,7 +978,6 @@
             }
         };
 
-        // Only initialize once on load
         window.addEventListener('load', function() {
             if (!loadHandlerCalled) {
                 loadHandlerCalled = true;
@@ -978,7 +985,6 @@
             }
         });
 
-        // Fallback timeout - if map doesn't initialize in 10 seconds, show error
         setTimeout(function() {
             if (!mapInitialized && !mapInitializing) {
                 console.log('Map initialization timeout - waiting for QML init command');
@@ -991,3 +997,4 @@
     </script>
 </body>
 </html>
+MAPEOF

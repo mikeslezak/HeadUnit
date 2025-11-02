@@ -420,7 +420,7 @@ Item {
 
         // Auto-connect in mock mode for testing
         if (!mediaController.isConnected) {
-            mediaController.connectToPhone("00:00:00:00:00:00")
+            mediaController.connectToDevice("80:96:98:C8:69:17")
         }
     }
 }

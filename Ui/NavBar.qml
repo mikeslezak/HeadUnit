@@ -156,11 +156,6 @@ Rectangle {
                 console.log("Nav icon loaded:", source)
               }
             }
-
-            layer.enabled: true
-            layer.effect: ColorOverlay {
-              color: parent.parent.parent.isActive ? root._accent : root._iconCol
-            }
           }
 
           MouseArea {
@@ -242,11 +237,6 @@ Rectangle {
           } else if (status === Image.Ready) {
             console.log("Home icon loaded:", source)
           }
-        }
-
-        layer.enabled: true
-        layer.effect: ColorOverlay {
-          color: parent.parent.parent.isActive ? root._accent : root._iconCol
         }
       }
 
