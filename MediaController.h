@@ -168,6 +168,7 @@ private:
     QString findMediaPlayerPath(const QString &devicePath);
     void setupPropertyMonitoring(const QString &path);
     QString addressToPath(const QString &address);
+    QVariantMap extractTrackMetadata(const QVariant &trackVariant);
 #endif
 
     void downloadAlbumArt(const QUrl &url);
