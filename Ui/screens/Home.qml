@@ -19,156 +19,56 @@ Item {
         anchors.fill: parent
         color: bgCol
 
-        SwipeView {
-            id: swipeView
-            anchors.fill: parent
-            anchors.leftMargin: 20
-            anchors.rightMargin: 20
-            anchors.topMargin: 40
-            anchors.bottomMargin: 60
+        // Single page with all functional apps in a 3x2 grid
+        Grid {
+            anchors.centerIn: parent
+            columns: 3
+            rows: 2
+            columnSpacing: 40
+            rowSpacing: 40
 
-            // Page 1 - Main Apps
-            Item {
-                Grid {
-                    anchors.centerIn: parent
-                    columns: 4
-                    rows: 2
-                    columnSpacing: 32
-                    rowSpacing: 32
-
-                    // Maps
-                    AppIcon {
-                        appKey: "maps"
-                        appName: "Maps"
-                        iconKey: "maps"
-                    }
-
-                    // Phone
-                    AppIcon {
-                        appKey: "phone"
-                        appName: "Phone"
-                        iconKey: "phone"
-                    }
-
-                    // Messages
-                    AppIcon {
-                        appKey: "messages"
-                        appName: "Messages"
-                        iconKey: "messages"
-                    }
-
-                    // Music (Bluetooth)
-                    AppIcon {
-                        appKey: "music"
-                        appName: "Music"
-                        iconKey: "music"
-                    }
-
-                    // Tidal
-                    AppIcon {
-                        appKey: "tidal"
-                        appName: "Tidal"
-                        iconKey: "tidal"
-                    }
-
-                    // Spotify
-                    AppIcon {
-                        appKey: "spotify"
-                        appName: "Spotify"
-                        iconKey: "spotify"
-                    }
-
-                    // Radio
-                    AppIcon {
-                        appKey: "radio"
-                        appName: "Radio"
-                        iconKey: "radio"
-                    }
-
-                    // Podcasts
-                    AppIcon {
-                        appKey: "podcasts"
-                        appName: "Podcasts"
-                        iconKey: "podcasts"
-                    }
-                }
+            // Row 1
+            // Maps
+            AppIcon {
+                appKey: "maps"
+                appName: "Maps"
+                iconKey: "maps"
             }
 
-            // Page 2 - Vehicle & Info
-            Item {
-                Grid {
-                    anchors.centerIn: parent
-                    columns: 4
-                    rows: 2
-                    columnSpacing: 32
-                    rowSpacing: 32
-
-                    // Climate
-                    AppIcon {
-                        appKey: "climate"
-                        appName: "Climate"
-                        iconKey: "climate"
-                    }
-
-                    // Vehicle
-                    AppIcon {
-                        appKey: "vehicle"
-                        appName: "Vehicle"
-                        iconKey: "vehicle"
-                    }
-
-                    // Camera
-                    AppIcon {
-                        appKey: "camera"
-                        appName: "Camera"
-                        iconKey: "camera"
-                    }
-
-                    // Contacts
-                    AppIcon {
-                        appKey: "contacts"
-                        appName: "Contacts"
-                        iconKey: "contacts"
-                    }
-
-                    // Weather
-                    AppIcon {
-                        appKey: "weather"
-                        appName: "Weather"
-                        iconKey: "weather"
-                    }
-
-                    // Settings
-                    AppIcon {
-                        appKey: "settings"
-                        appName: "Settings"
-                        iconKey: "settings"
-                    }
-
-                    // Placeholder
-                    PlaceholderIcon { placeholderText: "Coming" }
-                    PlaceholderIcon { placeholderText: "Soon" }
-                }
+            // Phone
+            AppIcon {
+                appKey: "phone"
+                appName: "Phone"
+                iconKey: "phone"
             }
-        }
 
-        // Page indicator dots
-        Row {
-            anchors.horizontalCenter: parent.horizontalCenter
-            anchors.bottom: parent.bottom
-            anchors.bottomMargin: 20
-            spacing: 8
+            // Messages
+            AppIcon {
+                appKey: "messages"
+                appName: "Messages"
+                iconKey: "messages"
+            }
 
-            Repeater {
-                model: swipeView.count
-                Rectangle {
-                    width: 8
-                    height: 8
-                    radius: 4
-                    color: swipeView.currentIndex === index ? primaryCol : textCol
-                    opacity: swipeView.currentIndex === index ? 1.0 : 0.3
-                    Behavior on opacity { NumberAnimation { duration: 200 } }
-                }
+            // Row 2
+            // Music
+            AppIcon {
+                appKey: "music"
+                appName: "Music"
+                iconKey: "music"
+            }
+
+            // Contacts
+            AppIcon {
+                appKey: "contacts"
+                appName: "Contacts"
+                iconKey: "contacts"
+            }
+
+            // Settings
+            AppIcon {
+                appKey: "settings"
+                appName: "Settings"
+                iconKey: "settings"
             }
         }
     }
@@ -235,37 +135,6 @@ Item {
             onPressed: { appScale.xScale = 0.92; appScale.yScale = 0.92 }
             onReleased: { appScale.xScale = 1; appScale.yScale = 1 }
             onClicked: root.appSelected(appKey)
-        }
-    }
-
-    // Placeholder Icon Component
-    component PlaceholderIcon: Item {
-        width: 100
-        height: 110
-        opacity: 0.3
-
-        required property string placeholderText
-
-        Column {
-            anchors.centerIn: parent
-            spacing: 12
-
-            Rectangle {
-                width: root.iconSize + 16
-                height: root.iconSize + 16
-                color: primaryCol
-                opacity: 0.1
-                radius: 14
-                anchors.horizontalCenter: parent.horizontalCenter
-            }
-
-            Text {
-                text: placeholderText
-                color: textCol
-                font.pixelSize: fontSize - 2
-                font.family: fontFamily
-                anchors.horizontalCenter: parent.horizontalCenter
-            }
         }
     }
 }

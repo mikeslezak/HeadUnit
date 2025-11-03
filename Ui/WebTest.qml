@@ -10,7 +10,7 @@ Item {
         anchors.fill: parent
         settings.webGLEnabled: false
         settings.accelerated2dCanvasEnabled: false
-        url: "qrc:/qt/qml/HeadUnit/assets/html/tidal_player.html"
+        url: "about:blank"
 
         onLoadingChanged: (loadRequest) => {
             if (loadRequest.status === WebEngineView.LoadStarted) {

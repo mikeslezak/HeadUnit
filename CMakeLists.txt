@@ -24,17 +24,21 @@ set(CMAKE_AUTOUIC ON)
 
 qt_add_executable(appHeadUnit
     main.cpp
-    tidalcontroller.cpp
     MediaController.cpp
     VoiceAssistant.cpp
     NotificationManager.cpp
+    BluetoothManager.cpp
+    ContactManager.cpp
+    MessageManager.cpp
 )
 
 target_sources(appHeadUnit PRIVATE
-    tidalcontroller.h
     MediaController.h
     VoiceAssistant.h
     NotificationManager.h
+    BluetoothManager.h
+    ContactManager.h
+    MessageManager.h
 )
 
 qt_add_qml_module(appHeadUnit
@@ -59,7 +63,6 @@ qt_add_qml_module(appHeadUnit
         Ui/screens/Music.qml
         Ui/screens/Maps.qml
         Ui/screens/Settings.qml
-        Ui/screens/Tidal.qml
         Ui/screens/Spotify.qml
         Ui/screens/Radio.qml
         Ui/screens/Podcasts.qml
@@ -70,11 +73,8 @@ qt_add_qml_module(appHeadUnit
         Ui/screens/Messages.qml
         Ui/screens/Contacts.qml
         Ui/screens/Weather.qml
-        Ui/TidalWeb.qml
-        Ui/TidalNative.qml
         Ui/MapWeb.qml
     RESOURCES
-        assets/html/tidal_player.html
         assets/html/map_view.html
         themes/Cyberpunk/tokens.json
         themes/Cyberpunk/fonts/Orbitron-Regular.ttf
@@ -94,7 +94,6 @@ qt_add_qml_module(appHeadUnit
         themes/Cyberpunk/icons/phone_cyber.png
         themes/Cyberpunk/icons/messages_cyber.png
         themes/Cyberpunk/icons/contacts_cyber.png
-        themes/Cyberpunk/icons/tidal_cyber.svg
         themes/Cyberpunk/icons/spotify_cyber.svg
         themes/Cyberpunk/icons/radio_cyber.png
         themes/Cyberpunk/icons/podcast_cyber.png
@@ -114,7 +113,6 @@ qt_add_qml_module(appHeadUnit
         themes/RetroVFD/icons/phone_vfd.svg
         themes/RetroVFD/icons/messages_vfd.svg
         themes/RetroVFD/icons/contacts_vfd.svg
-        themes/RetroVFD/icons/tidal_vfd.svg
         themes/RetroVFD/icons/spotify_vfd.svg
         themes/RetroVFD/icons/radio_vfd.svg
         themes/RetroVFD/icons/podcasts_vfd.svg

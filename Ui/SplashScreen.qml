@@ -31,9 +31,9 @@ Rectangle {
     readonly property int subtitleSize: Number(theme?.splash?.subtitleSize ?? 18)
 
     // Timing
-    readonly property int charDuration: Number(theme?.splash?.charDuration ?? 100)
-    readonly property int holdDuration: Number(theme?.splash?.holdDuration ?? 3000)
-    readonly property int fadeOutDuration: Number(theme?.splash?.fadeOutDuration ?? 1000)
+    readonly property int charDuration: Number(theme?.splash?.charDuration ?? 180)
+    readonly property int holdDuration: Number(theme?.splash?.holdDuration ?? 12000)
+    readonly property int fadeOutDuration: Number(theme?.splash?.fadeOutDuration ?? 3500)
 
     // Effects
     readonly property bool showScanlines: (theme?.splash?.scanlines ?? true)
@@ -103,11 +103,22 @@ Rectangle {
         }
 
         NumberAnimation on opacity {
+            id: scanlinePulse
             from: scanlineOpacity * 0.8
             to: scanlineOpacity * 1.2
             duration: 2000
             loops: Animation.Infinite
             easing.type: Easing.InOutSine
+        }
+
+        // Fade out animation for scanlines
+        NumberAnimation {
+            id: scanlineFadeOut
+            target: scanlinesCanvas
+            property: "opacity"
+            to: 0.0
+            duration: root.fadeOutDuration
+            easing.type: Easing.InOutQuad
         }
 
         onWidthChanged: requestPaint()
@@ -219,7 +230,9 @@ Rectangle {
 
                 function updateLogoSource() {
                     if (theme?.splash?.logo && theme?.name) {
-                        source = "qrc:/qt/qml/HeadUnit/themes/" + theme.name + "/" + String(theme.splash.logo)
+                        // Use Qt.resolvedUrl to resolve relative to the HeadUnit module
+                        source = Qt.resolvedUrl("qrc:/HeadUnit/themes/" + theme.name + "/" + String(theme.splash.logo))
+                        console.log("Splash: Logo source set to:", source)
                     }
                 }
 
@@ -387,6 +400,10 @@ Rectangle {
     Timer {
         id: holdTimer
         interval: root.holdDuration
-        onTriggered: fadeOut.start()
+        onTriggered: {
+            scanlinePulse.stop()
+            scanlineFadeOut.start()
+            fadeOut.start()
+        }
     }
 }

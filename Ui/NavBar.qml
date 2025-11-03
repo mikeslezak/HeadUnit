@@ -18,7 +18,6 @@ Rectangle {
     "phone":    { key: "phone",    icon: "phone" },
     "messages": { key: "messages", icon: "messages" },
     "contacts": { key: "contacts", icon: "contacts" },
-    "tidal":    { key: "tidal",    icon: "tidal" },
     "spotify":  { key: "spotify",  icon: "spotify" },
     "radio":    { key: "radio",    icon: "radio" },
     "podcasts": { key: "podcasts", icon: "podcasts" },

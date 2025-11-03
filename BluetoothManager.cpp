@@ -159,6 +159,7 @@ BluetoothManager::BluetoothManager(QObject *parent)
     , m_deviceModel(new BluetoothDeviceModel(this))
     , m_scanTimer(new QTimer(this))
     , m_ofonoUpdateTimer(new QTimer(this))
+    , m_batteryCheckTimer(new QTimer(this))
 #ifndef Q_OS_WIN
     , m_adapterInterface(nullptr)
 #endif
@@ -188,6 +189,11 @@ BluetoothManager::BluetoothManager(QObject *parent)
     connect(m_ofonoUpdateTimer, &QTimer::timeout, this, &BluetoothManager::updateOfonoSignal);
     m_ofonoUpdateTimer->setInterval(10000); // 10 seconds
     m_ofonoUpdateTimer->start();
+
+    // Setup battery check timer (update every 30 seconds)
+    connect(m_batteryCheckTimer, &QTimer::timeout, this, &BluetoothManager::checkBatteryLevels);
+    m_batteryCheckTimer->setInterval(30000); // 30 seconds
+    m_batteryCheckTimer->start();
 }
 
 BluetoothManager::~BluetoothManager()
@@ -986,6 +992,33 @@ bool BluetoothManager::isDevicePaired(const QString &address)
     return device ? device->paired : false;
 }
 
+QString BluetoothManager::getFirstConnectedDeviceAddress()
+{
+    // Find the first connected device and return its address
+    for (int i = 0; i < m_deviceModel->rowCount(); ++i) {
+        QModelIndex index = m_deviceModel->index(i, 0);
+        if (m_deviceModel->data(index, BluetoothDeviceModel::ConnectedRole).toBool()) {
+            return m_deviceModel->data(index, BluetoothDeviceModel::AddressRole).toString();
+        }
+    }
+    return QString();  // No connected device
+}
+
+QString BluetoothManager::getFirstPairedDeviceAddress()
+{
+    // Find the first paired and trusted device and return its address
+    for (int i = 0; i < m_deviceModel->rowCount(); ++i) {
+        QModelIndex index = m_deviceModel->index(i, 0);
+        if (m_deviceModel->data(index, BluetoothDeviceModel::PairedRole).toBool() &&
+            m_deviceModel->data(index, BluetoothDeviceModel::TrustedRole).toBool()) {
+            QString address = m_deviceModel->data(index, BluetoothDeviceModel::AddressRole).toString();
+            qDebug() << "BluetoothManager: Found paired device:" << address;
+            return address;
+        }
+    }
+    return QString();  // No paired device
+}
+
 int BluetoothManager::getConnectedDeviceBattery()
 {
     // Find the first connected device
@@ -1315,4 +1348,408 @@ void BluetoothManager::generateMockDevices()
     setStatusMessage("Mock: 3 devices found");
 
     qDebug() << "BluetoothManager: Generated" << mockDevices.count() << "mock devices";
+}
+
+// ========================================================================
+// BATTERY MONITORING
+// ========================================================================
+
+void BluetoothManager::checkBatteryLevels()
+{
+#ifndef Q_OS_WIN
+    // Check battery for all connected devices
+    for (int i = 0; i < m_deviceModel->rowCount(); ++i) {
+        QModelIndex index = m_deviceModel->index(i, 0);
+        if (m_deviceModel->data(index, BluetoothDeviceModel::ConnectedRole).toBool()) {
+            QString devicePath = m_deviceModel->data(index, BluetoothDeviceModel::PathRole).toString();
+            if (!devicePath.isEmpty()) {
+                updateDeviceBattery(devicePath);
+            }
+        }
+    }
+#endif
+}
+
+#ifndef Q_OS_WIN
+void BluetoothManager::updateDeviceBattery(const QString &devicePath)
+{
+    // Get battery properties via BlueZ DBus
+    QVariantMap batteryProps = getBatteryProperties(devicePath);
+    
+    if (!batteryProps.isEmpty()) {
+        int newBattery = batteryProps.value("Percentage", -1).toInt();
+        
+        // Find the device in our model and update it
+        for (int i = 0; i < m_deviceModel->rowCount(); ++i) {
+            QModelIndex index = m_deviceModel->index(i, 0);
+            QString path = m_deviceModel->data(index, BluetoothDeviceModel::PathRole).toString();
+            
+            if (path == devicePath) {
+                // Get device properties from the model
+                QString address = m_deviceModel->data(index, BluetoothDeviceModel::AddressRole).toString();
+                BluetoothDevice *devicePtr = m_deviceModel->findDevice(address);
+
+                if (!devicePtr) break;
+
+                int oldBattery = devicePtr->batteryLevel;
+
+                if (newBattery != oldBattery && newBattery >= 0) {
+                    BluetoothDevice device = *devicePtr;
+                    device.batteryLevel = newBattery;
+                    
+                    // Detect charging by tracking battery history
+                    m_batteryHistory.append(newBattery);
+                    if (m_batteryHistory.size() > 3) {
+                        m_batteryHistory.removeFirst();
+                    }
+                    
+                    // If battery increased by 5% or more in last 3 readings, assume charging
+                    if (m_batteryHistory.size() >= 3) {
+                        int diff = m_batteryHistory.last() - m_batteryHistory.first();
+                        device.isCharging = (diff >= 5);
+                    }
+                    
+                    m_deviceModel->updateDevice(device.address, device);
+                    emit deviceCountChanged(); // Signal UI to update
+                    
+                    qDebug() << "BluetoothManager: Battery updated for" << device.name 
+                             << "-" << newBattery << "%" << (device.isCharging ? "(Charging)" : "");
+                }
+                break;
+            }
+        }
+    }
+}
+#endif
+
+// ========================================================================
+// PHONE CALL METHODS
+// ========================================================================
+
+void BluetoothManager::dialNumber(const QString &phoneNumber)
+{
+#ifdef Q_OS_WIN
+    qDebug() << "BluetoothManager: Mock dial" << phoneNumber;
+    setStatusMessage("Mock: Dialing " + phoneNumber);
+#else
+    if (phoneNumber.isEmpty()) {
+        qWarning() << "BluetoothManager: Cannot dial empty number";
+        return;
+    }
+
+    qDebug() << "BluetoothManager: Attempting to dial" << phoneNumber;
+
+    // Use oFono for phone calls via D-Bus
+    QDBusInterface ofonoManager(
+        "org.ofono",
+        "/",
+        "org.ofono.Manager",
+        QDBusConnection::systemBus()
+    );
+
+    if (!ofonoManager.isValid()) {
+        qWarning() << "BluetoothManager: oFono not available:" << ofonoManager.lastError().message();
+        qDebug() << "BluetoothManager: Attempting fallback via Bluetooth HFP";
+
+        // Fallback: Try using BlueZ HFP directly
+        QString deviceAddress = getFirstConnectedDeviceAddress();
+        if (deviceAddress.isEmpty()) {
+            qWarning() << "BluetoothManager: No connected device for phone call";
+            return;
+        }
+
+        qDebug() << "BluetoothManager: Dialing via connected device:" << deviceAddress;
+        qDebug() << "BluetoothManager: Note - actual call routing depends on phone integration";
+        return;
+    }
+
+    // Get modems from oFono
+    QDBusReply<QDBusArgument> reply = ofonoManager.call("GetModems");
+    if (!reply.isValid()) {
+        qWarning() << "BluetoothManager: Failed to get modems:" << reply.error().message();
+        return;
+    }
+
+    // Parse modem list
+    QDBusArgument arg = reply.value();
+    arg.beginArray();
+
+    QString modemPath;
+    while (!arg.atEnd()) {
+        arg.beginStructure();
+        arg >> modemPath;
+        arg.beginMap();
+        arg.endMap();
+        arg.endStructure();
+        break;  // Use first modem
+    }
+    arg.endArray();
+
+    if (modemPath.isEmpty()) {
+        qWarning() << "BluetoothManager: No modems found";
+        return;
+    }
+
+    qDebug() << "BluetoothManager: Using modem:" << modemPath;
+
+    // Use VoiceCallManager interface to dial
+    QDBusInterface vcm(
+        "org.ofono",
+        modemPath,
+        "org.ofono.VoiceCallManager",
+        QDBusConnection::systemBus()
+    );
+
+    if (!vcm.isValid()) {
+        qWarning() << "BluetoothManager: VoiceCallManager not available:" << vcm.lastError().message();
+        return;
+    }
+
+    // Dial the number
+    QDBusReply<QDBusObjectPath> dialReply = vcm.call("Dial", phoneNumber, "");
+
+    if (dialReply.isValid()) {
+        qDebug() << "BluetoothManager: Call initiated successfully to" << phoneNumber;
+        qDebug() << "BluetoothManager: Call path:" << dialReply.value().path();
+        setStatusMessage("Calling " + phoneNumber);
+    } else {
+        qWarning() << "BluetoothManager: Dial failed:" << dialReply.error().message();
+        setStatusMessage("Call failed");
+    }
+#endif
+}
+
+void BluetoothManager::answerCall()
+{
+#ifdef Q_OS_WIN
+    qDebug() << "BluetoothManager: Mock answer call";
+    setStatusMessage("Mock: Call answered");
+#else
+    qDebug() << "BluetoothManager: Attempting to answer call";
+
+    QDBusInterface ofonoManager(
+        "org.ofono",
+        "/",
+        "org.ofono.Manager",
+        QDBusConnection::systemBus()
+    );
+
+    if (!ofonoManager.isValid()) {
+        qWarning() << "BluetoothManager: oFono not available";
+        return;
+    }
+
+    // Get modems
+    QDBusReply<QDBusArgument> reply = ofonoManager.call("GetModems");
+    if (!reply.isValid()) {
+        qWarning() << "BluetoothManager: Failed to get modems";
+        return;
+    }
+
+    QDBusArgument arg = reply.value();
+    arg.beginArray();
+
+    QString modemPath;
+    while (!arg.atEnd()) {
+        arg.beginStructure();
+        arg >> modemPath;
+        arg.beginMap();
+        arg.endMap();
+        arg.endStructure();
+        break;
+    }
+    arg.endArray();
+
+    if (modemPath.isEmpty()) {
+        qWarning() << "BluetoothManager: No modems found";
+        return;
+    }
+
+    // Get active calls
+    QDBusInterface vcm(
+        "org.ofono",
+        modemPath,
+        "org.ofono.VoiceCallManager",
+        QDBusConnection::systemBus()
+    );
+
+    if (!vcm.isValid()) {
+        qWarning() << "BluetoothManager: VoiceCallManager not available";
+        return;
+    }
+
+    QDBusReply<QDBusArgument> callsReply = vcm.call("GetCalls");
+    if (!callsReply.isValid()) {
+        qWarning() << "BluetoothManager: Failed to get calls";
+        return;
+    }
+
+    // Find incoming call
+    QDBusArgument callsArg = callsReply.value();
+    callsArg.beginArray();
+
+    while (!callsArg.atEnd()) {
+        callsArg.beginStructure();
+        QDBusObjectPath callPath;
+        callsArg >> callPath;
+        callsArg.beginMap();
+        callsArg.endMap();
+        callsArg.endStructure();
+
+        // Answer this call
+        QDBusInterface callIface(
+            "org.ofono",
+            callPath.path(),
+            "org.ofono.VoiceCall",
+            QDBusConnection::systemBus()
+        );
+
+        if (callIface.isValid()) {
+            QDBusReply<void> answerReply = callIface.call("Answer");
+            if (answerReply.isValid()) {
+                qDebug() << "BluetoothManager: Call answered";
+                setStatusMessage("Call answered");
+            } else {
+                qWarning() << "BluetoothManager: Answer failed:" << answerReply.error().message();
+            }
+        }
+        break;  // Answer first call
+    }
+    callsArg.endArray();
+#endif
+}
+
+void BluetoothManager::hangupCall()
+{
+#ifdef Q_OS_WIN
+    qDebug() << "BluetoothManager: Mock hangup call";
+    setStatusMessage("Mock: Call ended");
+#else
+    qDebug() << "BluetoothManager: Attempting to hang up call";
+
+    QDBusInterface ofonoManager(
+        "org.ofono",
+        "/",
+        "org.ofono.Manager",
+        QDBusConnection::systemBus()
+    );
+
+    if (!ofonoManager.isValid()) {
+        qWarning() << "BluetoothManager: oFono not available";
+        return;
+    }
+
+    // Get modems
+    QDBusReply<QDBusArgument> reply = ofonoManager.call("GetModems");
+    if (!reply.isValid()) {
+        qWarning() << "BluetoothManager: Failed to get modems";
+        return;
+    }
+
+    QDBusArgument arg = reply.value();
+    arg.beginArray();
+
+    QString modemPath;
+    while (!arg.atEnd()) {
+        arg.beginStructure();
+        arg >> modemPath;
+        arg.beginMap();
+        arg.endMap();
+        arg.endStructure();
+        break;
+    }
+    arg.endArray();
+
+    if (modemPath.isEmpty()) {
+        qWarning() << "BluetoothManager: No modems found";
+        return;
+    }
+
+    // Hangup all calls
+    QDBusInterface vcm(
+        "org.ofono",
+        modemPath,
+        "org.ofono.VoiceCallManager",
+        QDBusConnection::systemBus()
+    );
+
+    if (!vcm.isValid()) {
+        qWarning() << "BluetoothManager: VoiceCallManager not available";
+        return;
+    }
+
+    QDBusReply<void> hangupReply = vcm.call("HangupAll");
+    if (hangupReply.isValid()) {
+        qDebug() << "BluetoothManager: Call hung up";
+        setStatusMessage("Call ended");
+    } else {
+        qWarning() << "BluetoothManager: Hangup failed:" << hangupReply.error().message();
+    }
+#endif
+}
+
+void BluetoothManager::sendDTMF(const QString &tones)
+{
+#ifdef Q_OS_WIN
+    qDebug() << "BluetoothManager: Mock send DTMF:" << tones;
+#else
+    if (tones.isEmpty()) {
+        return;
+    }
+
+    qDebug() << "BluetoothManager: Sending DTMF tones:" << tones;
+
+    QDBusInterface ofonoManager(
+        "org.ofono",
+        "/",
+        "org.ofono.Manager",
+        QDBusConnection::systemBus()
+    );
+
+    if (!ofonoManager.isValid()) {
+        qWarning() << "BluetoothManager: oFono not available";
+        return;
+    }
+
+    // Get modems
+    QDBusReply<QDBusArgument> reply = ofonoManager.call("GetModems");
+    if (!reply.isValid()) {
+        return;
+    }
+
+    QDBusArgument arg = reply.value();
+    arg.beginArray();
+
+    QString modemPath;
+    while (!arg.atEnd()) {
+        arg.beginStructure();
+        arg >> modemPath;
+        arg.beginMap();
+        arg.endMap();
+        arg.endStructure();
+        break;
+    }
+    arg.endArray();
+
+    if (modemPath.isEmpty()) {
+        return;
+    }
+
+    // Send tones
+    QDBusInterface vcm(
+        "org.ofono",
+        modemPath,
+        "org.ofono.VoiceCallManager",
+        QDBusConnection::systemBus()
+    );
+
+    if (vcm.isValid()) {
+        QDBusReply<void> dtmfReply = vcm.call("SendTones", tones);
+        if (dtmfReply.isValid()) {
+            qDebug() << "BluetoothManager: DTMF tones sent successfully";
+        } else {
+            qWarning() << "BluetoothManager: SendTones failed:" << dtmfReply.error().message();
+        }
+    }
+#endif
 }

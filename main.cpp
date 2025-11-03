@@ -4,10 +4,12 @@
 #include <QCoreApplication>
 #include <QtWebEngineQuick/QtWebEngineQuick>
 #include <QDebug>
-#include "tidalcontroller.h"
 #include "MediaController.h"
 #include "VoiceAssistant.h"
 #include "NotificationManager.h"
+#include "BluetoothManager.h"
+#include "ContactManager.h"
+#include "MessageManager.h"
 
 void myMessageHandler(QtMsgType type, const QMessageLogContext &context, const QString &msg) {
     QByteArray localMsg = msg.toLocal8Bit();
@@ -47,18 +49,22 @@ int main(int argc, char *argv[])
     QGuiApplication app(argc, argv);
 
     // Create all controllers
-    TidalController tidalController;
     MediaController mediaController;
     VoiceAssistant voiceAssistant;
     NotificationManager notificationManager;
+    BluetoothManager bluetoothManager;
+    ContactManager contactManager;
+    MessageManager messageManager;
 
     QQmlApplicationEngine engine;
 
     // Expose all controllers to QML
-    engine.rootContext()->setContextProperty("tidalController", &tidalController);
     engine.rootContext()->setContextProperty("mediaController", &mediaController);
     engine.rootContext()->setContextProperty("voiceAssistant", &voiceAssistant);
     engine.rootContext()->setContextProperty("notificationManager", &notificationManager);
+    engine.rootContext()->setContextProperty("bluetoothManager", &bluetoothManager);
+    engine.rootContext()->setContextProperty("contactManager", &contactManager);
+    engine.rootContext()->setContextProperty("messageManager", &messageManager);
 
     // Load QML - version compatible approach
 #if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
@@ -83,10 +89,12 @@ int main(int argc, char *argv[])
 
     qDebug() << "=== HeadUnit Started Successfully ===";
     qDebug() << "Controllers initialized:";
-    qDebug() << "  - Tidal:         " << &tidalController;
     qDebug() << "  - Media:         " << &mediaController;
     qDebug() << "  - Voice:         " << &voiceAssistant;
     qDebug() << "  - Notifications: " << &notificationManager;
+    qDebug() << "  - Bluetooth:     " << &bluetoothManager;
+    qDebug() << "  - Contacts:      " << &contactManager;
+    qDebug() << "  - Messages:      " << &messageManager;
 
     return app.exec();
 }

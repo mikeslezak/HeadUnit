@@ -5,12 +5,12 @@ import "Ui"
 
 Window {
     id: mainWindow
-    width: 932
-    height: 430
-    minimumWidth: 932
-    maximumWidth: 932
-    minimumHeight: 430
-    maximumHeight: 430
+    width: 1280
+    height: 400
+    minimumWidth: 1280
+    maximumWidth: 1280
+    minimumHeight: 400
+    maximumHeight: 400
     visible: true
     title: "HeadUnit"
     visibility: Window.FullScreen
@@ -35,7 +35,6 @@ Window {
 
     property var appActivity: ({
         "music": { active: false, lastUsed: 0 },
-        "tidal": { active: false, lastUsed: 0 },
         "spotify": { active: false, lastUsed: 0 },
         "radio": { active: false, lastUsed: 0 },
         "podcasts": { active: false, lastUsed: 0 },
@@ -87,7 +86,6 @@ Window {
             console.log("Audio source switching:", activeAudioSource, "→", source)
 
             if (source !== "phone") mediaController.pause()
-            if (source !== "tidal") tidalController.pause()
 
             activeAudioSource = source
         }
@@ -108,13 +106,17 @@ Window {
         homeLoader.active = (key === "home")
         settingsLoader.active = (key === "settings")
         musicLoader.active = (key === "music")
-        tidalLoader.active = (key === "tidal")
         spotifyLoader.active = (key === "spotify")
         radioLoader.active = (key === "radio")
         podcastsLoader.active = (key === "podcasts")
         mapsLoader.active = (key === "maps")
         phoneLoader.active = (key === "phone")
+        messagesLoader.active = (key === "messages")
+        contactsLoader.active = (key === "contacts")
         cameraLoader.active = (key === "camera")
+        climateLoader.active = (key === "climate")
+        vehicleLoader.active = (key === "vehicle")
+        weatherLoader.active = (key === "weather")
     }
 
     function updateRecentApps(appKey) {
@@ -168,10 +170,40 @@ Window {
         running: true
         repeat: false
         onTriggered: {
-            console.log("Auto-connecting to iPhone...")
-            notificationManager.connectToDevice("00:00:00:00:00:00", "ios")
-            voiceAssistant.connectToPhone("00:00:00:00:00:00")
+            var connectedAddress = bluetoothManager.getFirstConnectedDeviceAddress()
+
+            if (connectedAddress !== "") {
+                console.log("Device already connected, setting up services:", connectedAddress)
+                setupDeviceServices(connectedAddress)
+            } else {
+                // No connected device, check for paired devices and initiate connection
+                var pairedAddress = bluetoothManager.getFirstPairedDeviceAddress()
+                if (pairedAddress !== "") {
+                    console.log("Found paired device, initiating connection:", pairedAddress)
+                    bluetoothManager.connectToDevice(pairedAddress)
+                    // Wait for deviceConnected signal (handled below)
+                } else {
+                    console.log("No paired Bluetooth device found for auto-connect")
+                }
+            }
         }
+    }
+
+    // Handle successful Bluetooth connection
+    Connections {
+        target: bluetoothManager
+        function onDeviceConnected(address) {
+            console.log("Device connected successfully:", address)
+            setupDeviceServices(address)
+        }
+    }
+
+    // Setup device services (MediaController, NotificationManager, etc.)
+    function setupDeviceServices(address) {
+        console.log("Setting up device services for:", address)
+        mediaController.connectToDevice(address)
+        notificationManager.connectToDevice(address, "ios")
+        voiceAssistant.connectToPhone(address)
     }
 
     // Timer to wait for voice connection
@@ -397,16 +429,6 @@ Window {
                 }
 
                 Loader {
-                    id: tidalLoader
-                    anchors.fill: parent
-                    visible: mainWindow.currentScreen === "tidal"
-                    active: false
-                    asynchronous: true
-                    source: "Ui/screens/Tidal.qml"
-                    onLoaded: { item.theme = theme }
-                }
-
-                Loader {
                     id: spotifyLoader
                     anchors.fill: parent
                     visible: mainWindow.currentScreen === "spotify"
@@ -458,12 +480,62 @@ Window {
                 }
 
                 Loader {
+                    id: messagesLoader
+                    anchors.fill: parent
+                    visible: mainWindow.currentScreen === "messages"
+                    active: false
+                    asynchronous: true
+                    source: "Ui/screens/Messages.qml"
+                    onLoaded: { item.theme = theme }
+                }
+
+                Loader {
+                    id: contactsLoader
+                    anchors.fill: parent
+                    visible: mainWindow.currentScreen === "contacts"
+                    active: false
+                    asynchronous: true
+                    source: "Ui/screens/Contacts.qml"
+                    onLoaded: { item.theme = theme }
+                }
+
+                Loader {
                     id: cameraLoader
                     anchors.fill: parent
                     visible: mainWindow.currentScreen === "camera"
                     active: false
                     asynchronous: true
                     source: "Ui/screens/Camera.qml"
+                    onLoaded: { item.theme = theme }
+                }
+
+                Loader {
+                    id: climateLoader
+                    anchors.fill: parent
+                    visible: mainWindow.currentScreen === "climate"
+                    active: false
+                    asynchronous: true
+                    source: "Ui/screens/Climate.qml"
+                    onLoaded: { item.theme = theme }
+                }
+
+                Loader {
+                    id: vehicleLoader
+                    anchors.fill: parent
+                    visible: mainWindow.currentScreen === "vehicle"
+                    active: false
+                    asynchronous: true
+                    source: "Ui/screens/Vehicle.qml"
+                    onLoaded: { item.theme = theme }
+                }
+
+                Loader {
+                    id: weatherLoader
+                    anchors.fill: parent
+                    visible: mainWindow.currentScreen === "weather"
+                    active: false
+                    asynchronous: true
+                    source: "Ui/screens/Weather.qml"
                     onLoaded: { item.theme = theme }
                 }
             }

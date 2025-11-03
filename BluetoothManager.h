@@ -129,9 +129,17 @@ public slots:
     Q_INVOKABLE QString getDeviceName(const QString &address);
     Q_INVOKABLE bool isDeviceConnected(const QString &address);
     Q_INVOKABLE bool isDevicePaired(const QString &address);
+    Q_INVOKABLE QString getFirstConnectedDeviceAddress();
+    Q_INVOKABLE QString getFirstPairedDeviceAddress();
     Q_INVOKABLE int getConnectedDeviceBattery();
     Q_INVOKABLE bool isConnectedDeviceCharging();
     Q_INVOKABLE int getConnectedDeviceSignal();
+
+    // Phone call methods
+    Q_INVOKABLE void dialNumber(const QString &phoneNumber);
+    Q_INVOKABLE void answerCall();
+    Q_INVOKABLE void hangupCall();
+    Q_INVOKABLE void sendDTMF(const QString &tones);
 
 signals:
     void scanningChanged();
@@ -152,6 +160,7 @@ signals:
 private slots:
     void onScanTimeout();
     void updateOfonoSignal();
+    void checkBatteryLevels();
 
 #ifndef Q_OS_WIN
     void onInterfacesAdded(const QDBusObjectPath &path, const QVariantMap &interfaces);
@@ -173,6 +182,7 @@ private:
     QString pathToAddress(const QString &path);
     QVariantMap getDeviceProperties(const QString &path);
     QVariantMap getBatteryProperties(const QString &path);
+    void updateDeviceBattery(const QString &devicePath);
 #endif
 
     void generateMockDevices();
@@ -190,6 +200,7 @@ private:
     BluetoothDeviceModel *m_deviceModel;
     QTimer *m_scanTimer;
     QTimer *m_ofonoUpdateTimer;
+    QTimer *m_batteryCheckTimer;
 
 #ifndef Q_OS_WIN
     QDBusInterface *m_adapterInterface;

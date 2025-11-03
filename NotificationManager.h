@@ -13,6 +13,7 @@
 #ifndef Q_OS_WIN
 #include <QBluetoothUuid>
 #include <QBluetoothAddress>
+#include <QBluetoothDeviceInfo>
 #include <QLowEnergyController>
 #include <QLowEnergyService>
 #include <QLowEnergyCharacteristic>
@@ -40,6 +41,7 @@ class NotificationManager : public QObject
     Q_PROPERTY(int autoDismissAfter READ autoDismissAfter WRITE setAutoDismissAfter NOTIFY autoDismissAfterChanged)
     Q_PROPERTY(QStringList quickReplies READ quickReplies WRITE setQuickReplies NOTIFY quickRepliesChanged)
     Q_PROPERTY(bool hasUnread READ hasUnread NOTIFY hasUnreadChanged)
+    Q_PROPERTY(int phoneBatteryLevel READ phoneBatteryLevel NOTIFY phoneBatteryLevelChanged)
 
 public:
     // ========== NOTIFICATION CATEGORIES ==========
@@ -85,6 +87,7 @@ public:
     int autoDismissAfter() const { return m_autoDismissAfter; }
     QStringList quickReplies() const { return m_quickReplies; }
     bool hasUnread() const;
+    int phoneBatteryLevel() const { return m_phoneBatteryLevel; }
 
 public slots:
     // ========== CONNECTION ==========
@@ -140,6 +143,7 @@ signals:
     void showPreviewsChanged();
     void autoDismissAfterChanged();
     void quickRepliesChanged();
+    void phoneBatteryLevelChanged();
 
     void notificationReceived(const QVariantMap &notification);
     void notificationDismissed(const QString &notificationId);
@@ -191,6 +195,8 @@ private:
 
     QTimer *m_dismissTimer;
     QMap<QString, QTimer*> m_snoozeTimers;
+
+    int m_phoneBatteryLevel;  // -1 if unavailable, 0-100 otherwise
 
     bool m_mockMode;
 

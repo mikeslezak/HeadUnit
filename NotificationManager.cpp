@@ -9,6 +9,12 @@
 const QBluetoothUuid NotificationManager::ANCS_SERVICE_UUID(
     QString("{7905F431-B5CE-4E99-A40F-4B1E122D00D0}"));
 
+// Battery Service UUID: 0x180F (standard Bluetooth SIG UUID)
+const QBluetoothUuid BATTERY_SERVICE_UUID(QBluetoothUuid::ServiceClassUuid::BatteryService);
+
+// Battery Level Characteristic UUID: 0x2A19
+const QBluetoothUuid BATTERY_LEVEL_CHAR_UUID(QBluetoothUuid::CharacteristicType::BatteryLevel);
+
 // ANCS Characteristic UUIDs
 const QBluetoothUuid NotificationManager::ANCS_NOTIFICATION_SOURCE_UUID(
     QString("{9FBF120D-6301-42D9-8C58-25E699A21DBD}"));
@@ -30,6 +36,7 @@ NotificationManager::NotificationManager(QObject *parent)
     , m_showPreviews(true)
     , m_autoDismissAfter(30)  // 30 seconds default
     , m_dismissTimer(new QTimer(this))
+    , m_phoneBatteryLevel(-1)
 #ifndef Q_OS_WIN
     , m_bleController(nullptr)
     , m_ancsService(nullptr)
@@ -150,22 +157,37 @@ void NotificationManager::connectToDevice(const QString &deviceAddress, const QS
             m_bleController->deleteLater();
         }
 
-        // Qt 6.2 BLE API requires QBluetoothDeviceInfo, not QBluetoothAddress
-        // Notifications temporarily disabled - requires device discovery implementation
-        qWarning() << "BLE notifications not supported in Qt 6.2 - upgrade to Qt 6.3+ or implement device discovery";
-        return;
+        // Create a minimal QBluetoothDeviceInfo for the iPhone
+        // This is needed because Qt 6.x requires QBluetoothDeviceInfo for createCentral()
+        QBluetoothDeviceInfo deviceInfo(address, "iPhone", 0);  // Name will be resolved automatically
+
+        // Create BLE controller
+        m_bleController = QLowEnergyController::createCentral(deviceInfo, this);
+
+        if (!m_bleController) {
+            qWarning() << "NotificationManager: Failed to create BLE controller";
+            emit error("Failed to create BLE controller");
+            return;
+        }
+
+        qDebug() << "NotificationManager: Creating BLE connection to" << deviceAddress;
 
         connect(m_bleController, &QLowEnergyController::serviceDiscovered,
                 this, &NotificationManager::onServiceDiscovered);
         connect(m_bleController, &QLowEnergyController::connected,
                 this, [this]() {
-                    qDebug() << "BLE connected, discovering services...";
+                    qDebug() << "NotificationManager: BLE connected, discovering services...";
                     m_bleController->discoverServices();
                 });
         connect(m_bleController, &QLowEnergyController::disconnected,
                 this, [this]() {
+                    qDebug() << "NotificationManager: BLE disconnected";
                     m_isConnected = false;
                     emit connectionChanged();
+                });
+        connect(m_bleController, &QLowEnergyController::errorOccurred,
+                this, [this](QLowEnergyController::Error error) {
+                    qWarning() << "NotificationManager: BLE error:" << error;
                 });
 
         m_bleController->connectToDevice();
@@ -836,12 +858,12 @@ void NotificationManager::generateMockNotifications()
 void NotificationManager::onServiceDiscovered(const QBluetoothUuid &uuid)
 {
     if (uuid == ANCS_SERVICE_UUID) {
-        qDebug() << "ANCS service discovered!";
+        qDebug() << "NotificationManager: ANCS service discovered!";
 
         m_ancsService = m_bleController->createServiceObject(ANCS_SERVICE_UUID, this);
 
         if (!m_ancsService) {
-            qWarning() << "Failed to create ANCS service object";
+            qWarning() << "NotificationManager: Failed to create ANCS service object";
             return;
         }
 
@@ -853,6 +875,46 @@ void NotificationManager::onServiceDiscovered(const QBluetoothUuid &uuid)
                 this, &NotificationManager::onCharacteristicRead);
 
         m_ancsService->discoverDetails();
+    }
+    else if (uuid == BATTERY_SERVICE_UUID) {
+        qDebug() << "NotificationManager: Battery Service discovered!";
+
+        QLowEnergyService *batteryService = m_bleController->createServiceObject(BATTERY_SERVICE_UUID, this);
+
+        if (!batteryService) {
+            qWarning() << "NotificationManager: Failed to create Battery service object";
+            return;
+        }
+
+        connect(batteryService, &QLowEnergyService::stateChanged,
+                this, [this, batteryService](QLowEnergyService::ServiceState state) {
+                    if (state == QLowEnergyService::RemoteServiceDiscovered) {
+                        qDebug() << "NotificationManager: Battery service details discovered";
+
+                        QLowEnergyCharacteristic batteryChar = batteryService->characteristic(BATTERY_LEVEL_CHAR_UUID);
+
+                        if (batteryChar.isValid()) {
+                            qDebug() << "NotificationManager: Reading battery level characteristic...";
+                            batteryService->readCharacteristic(batteryChar);
+                        } else {
+                            qWarning() << "NotificationManager: Battery level characteristic not found";
+                        }
+                    }
+                });
+
+        connect(batteryService, &QLowEnergyService::characteristicRead,
+                this, [this](const QLowEnergyCharacteristic &characteristic, const QByteArray &value) {
+                    if (characteristic.uuid() == BATTERY_LEVEL_CHAR_UUID && !value.isEmpty()) {
+                        int batteryLevel = static_cast<quint8>(value[0]);
+                        qDebug() << "NotificationManager: iPhone battery level:" << batteryLevel << "%";
+
+                        // Update battery level and notify QML
+                        m_phoneBatteryLevel = batteryLevel;
+                        emit phoneBatteryLevelChanged();
+                    }
+                });
+
+        batteryService->discoverDetails();
     }
 }
 

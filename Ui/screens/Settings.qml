@@ -143,42 +143,50 @@ Item {
             }
 
             // DISPLAY MENU
-            Column {
+            Flickable {
                 visible: currentMenu === 1
-                anchors.centerIn: parent
-                spacing: 16
-                width: parent.width - 40
+                anchors.fill: parent
+                contentHeight: displayColumn.height
+                clip: true
 
-                Text {
-                    text: "Select Theme"
-                    color: primaryCol
-                    font.pixelSize: fontSize + 2
-                    font.family: fontFamily
-                    font.weight: Font.Bold
-                }
-
-                Row {
-                    spacing: 16
+                Column {
+                    id: displayColumn
                     anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.top: parent.top
+                    spacing: 16
+                    width: parent.width - 40
 
-                    ThemeOption {
-                        themeName: "Cyberpunk"
-                        description: "Neon Future"
-                        isActive: theme?.name === "Cyberpunk"
-                        onClicked: {
-                            if (theme && theme.load) {
-                                theme.load("Cyberpunk")
-                            }
-                        }
+                    Text {
+                        text: "Select Theme"
+                        color: primaryCol
+                        font.pixelSize: fontSize + 2
+                        font.family: fontFamily
+                        font.weight: Font.Bold
                     }
 
-                    ThemeOption {
-                        themeName: "RetroVFD"
-                        description: "Classic Display"
-                        isActive: theme?.name === "RetroVFD"
-                        onClicked: {
-                            if (theme && theme.load) {
-                                theme.load("RetroVFD")
+                    Row {
+                        spacing: 16
+                        anchors.horizontalCenter: parent.horizontalCenter
+
+                        ThemeOption {
+                            themeName: "Cyberpunk"
+                            description: "Neon Future"
+                            isActive: theme?.name === "Cyberpunk"
+                            onClicked: {
+                                if (theme && theme.load) {
+                                    theme.load("Cyberpunk")
+                                }
+                            }
+                        }
+
+                        ThemeOption {
+                            themeName: "RetroVFD"
+                            description: "Classic Display"
+                            isActive: theme?.name === "RetroVFD"
+                            onClicked: {
+                                if (theme && theme.load) {
+                                    theme.load("RetroVFD")
+                                }
                             }
                         }
                     }
@@ -186,67 +194,172 @@ Item {
             }
 
             // BLUETOOTH MENU
-            Column {
+            Flickable {
                 visible: currentMenu === 2
-                anchors.centerIn: parent
-                spacing: 20
-                width: parent.width - 40
-
-                SettingToggle {
-                    title: "Auto-Connect"
-                    description: "Automatically connect to last device"
-                    isOn: appSettings.autoConnectBluetooth
-                    onToggled: appSettings.autoConnectBluetooth = !appSettings.autoConnectBluetooth
-                }
-
-                Rectangle {
-                    width: parent.width
-                    height: 1
-                    color: Qt.rgba(primaryCol.r, primaryCol.g, primaryCol.b, 0.2)
-                }
+                anchors.fill: parent
+                contentHeight: bluetoothColumn.height
+                contentWidth: parent.width
+                clip: true
 
                 Column {
+                    id: bluetoothColumn
                     width: parent.width
-                    spacing: 12
+                    spacing: 16
 
-                    Text {
-                        text: "Paired Devices"
-                        color: primaryCol
-                        font.pixelSize: fontSize + 2
-                        font.family: fontFamily
-                        font.weight: Font.Bold
-                    }
+                    // Header controls
+                    Row {
+                        width: parent.width
+                        spacing: 12
 
-                    Text {
-                        text: appSettings.lastBluetoothDevice || "No devices paired"
-                        color: textCol
-                        font.pixelSize: fontSize
-                        font.family: fontFamily
-                        opacity: 0.7
-                    }
-
-                    SettingButton {
-                        text: "Scan for Devices"
-                        onClicked: console.log("Scanning for Bluetooth devices...")
-                    }
-
-                    SettingButton {
-                        text: "Forget All Devices"
-                        destructive: true
-                        onClicked: {
-                            appSettings.lastBluetoothDevice = ""
-                            console.log("All devices forgotten")
+                        SettingButton {
+                            width: (parent.width - 12) / 2
+                            text: bluetoothManager.isScanning ? "Stop Scan" : "Scan for Devices"
+                            onClicked: {
+                                if (bluetoothManager.isScanning) {
+                                    bluetoothManager.stopScan()
+                                } else {
+                                    bluetoothManager.startScan()
+                                }
+                            }
                         }
+
+                        SettingButton {
+                            width: (parent.width - 12) / 2
+                            text: "Refresh List"
+                            onClicked: bluetoothManager.refreshDeviceList()
+                        }
+                    }
+
+                    SettingToggle {
+                        title: "Auto-Connect"
+                        description: "Automatically connect to last device"
+                        isOn: appSettings.autoConnectBluetooth
+                        onToggled: appSettings.autoConnectBluetooth = !appSettings.autoConnectBluetooth
+                    }
+
+                    Rectangle {
+                        width: parent.width
+                        height: 1
+                        color: Qt.rgba(primaryCol.r, primaryCol.g, primaryCol.b, 0.2)
+                    }
+
+                    // Status header
+                    Row {
+                        width: parent.width
+                        spacing: 8
+
+                        Text {
+                            text: bluetoothManager.isScanning ? "🔍 Scanning..." : "📡 Devices"
+                            color: primaryCol
+                            font.pixelSize: fontSize + 2
+                            font.family: fontFamily
+                            font.weight: Font.Bold
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+
+                        Text {
+                            text: "(" + bluetoothManager.deviceCount + ")"
+                            color: textCol
+                            font.pixelSize: fontSize
+                            font.family: fontFamily
+                            opacity: 0.6
+                            anchors.verticalCenter: parent.verticalCenter
+
+                            Component.onCompleted: {
+                                console.log("BT Settings: Device count =", bluetoothManager.deviceCount)
+                                console.log("BT Settings: Model valid =", bluetoothManager.deviceModel !== null)
+                            }
+                        }
+
+                        // Scanning animation
+                        Rectangle {
+                            visible: bluetoothManager.isScanning
+                            width: 12
+                            height: 12
+                            radius: 6
+                            color: primaryCol
+                            anchors.verticalCenter: parent.verticalCenter
+
+                            SequentialAnimation on opacity {
+                                running: bluetoothManager.isScanning
+                                loops: Animation.Infinite
+                                NumberAnimation { from: 1.0; to: 0.2; duration: 800 }
+                                NumberAnimation { from: 0.2; to: 1.0; duration: 800 }
+                            }
+                        }
+                    }
+
+                    // Device List
+                    Rectangle {
+                        width: parent.width
+                        height: deviceListColumn.height + 16
+                        color: Qt.rgba(0, 0, 0, 0.2)
+                        border.color: Qt.rgba(primaryCol.r, primaryCol.g, primaryCol.b, 0.3)
+                        border.width: 1
+                        radius: 8
+
+                        Column {
+                            id: deviceListColumn
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.top: parent.top
+                            anchors.margins: 8
+                            spacing: 8
+
+                            Repeater {
+                                model: bluetoothManager.deviceModel
+
+                                BluetoothDeviceItem {
+                                    width: deviceListColumn.width
+                                    deviceName: model.deviceName
+                                    deviceAddress: model.deviceAddress
+                                    isPaired: model.isPaired
+                                    isConnected: model.isConnected
+                                    signalStrength: model.signalStrength
+                                }
+                            }
+
+                            Text {
+                                visible: bluetoothManager.deviceCount === 0
+                                width: parent.width
+                                height: 100
+                                text: bluetoothManager.isScanning ? "Scanning..." : "No devices found\nTap 'Scan for Devices' to search"
+                                color: textCol
+                                font.pixelSize: fontSize
+                                font.family: fontFamily
+                                opacity: 0.5
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                            }
+                        }
+                    }
+
+                    // Status message
+                    Text {
+                        width: parent.width
+                        text: bluetoothManager.statusMessage
+                        color: textCol
+                        font.pixelSize: fontSize - 2
+                        font.family: fontFamily
+                        opacity: 0.6
+                        elide: Text.ElideRight
                     }
                 }
             }
 
             // VOICE ASSISTANT MENU
-            Column {
+            Flickable {
                 visible: currentMenu === 3
-                anchors.centerIn: parent
-                spacing: 20
-                width: parent.width - 40
+                anchors.fill: parent
+                contentHeight: voiceColumn.height
+                clip: true
+
+                Column {
+                    id: voiceColumn
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.top: parent.top
+                    spacing: 20
+                    width: parent.width - 40
 
                 SettingToggle {
                     title: "Auto-Read Messages"
@@ -361,14 +474,22 @@ Item {
                         }
                     }
                 }
+                }
             }
 
             // TIME & DATE MENU
-            Column {
+            Flickable {
                 visible: currentMenu === 4
-                anchors.centerIn: parent
-                spacing: 20
-                width: parent.width - 40
+                anchors.fill: parent
+                contentHeight: timeColumn.height
+                clip: true
+
+                Column {
+                    id: timeColumn
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.top: parent.top
+                    spacing: 20
+                    width: parent.width - 40
 
                 SettingToggle {
                     title: "24-Hour Format"
@@ -411,14 +532,22 @@ Item {
                         }
                     }
                 }
+                }
             }
 
             // ABOUT MENU
-            Column {
+            Flickable {
                 visible: currentMenu === 5
-                anchors.centerIn: parent
-                spacing: 20
-                width: parent.width - 40
+                anchors.fill: parent
+                contentHeight: aboutColumn.height
+                clip: true
+
+                Column {
+                    id: aboutColumn
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.top: parent.top
+                    spacing: 20
+                    width: parent.width - 40
 
                 Rectangle {
                     width: 120
@@ -470,14 +599,22 @@ Item {
                     opacity: 0.5
                     anchors.horizontalCenter: parent.horizontalCenter
                 }
+                }
             }
 
             // ADVANCED MENU
-            Column {
+            Flickable {
                 visible: currentMenu === 6
-                anchors.centerIn: parent
-                spacing: 20
-                width: parent.width - 40
+                anchors.fill: parent
+                contentHeight: advancedColumn.height
+                clip: true
+
+                Column {
+                    id: advancedColumn
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.top: parent.top
+                    spacing: 20
+                    width: parent.width - 40
 
                 Text {
                     text: "⚠️ Advanced Settings"
@@ -519,6 +656,7 @@ Item {
                     InfoRow { label: "Theme"; value: theme?.name ?? "Unknown" }
                     InfoRow { label: "Text-to-Speech"; value: voiceAssistant.hasTextToSpeech ? "Available" : "Not Available" }
                     InfoRow { label: "Media Connected"; value: mediaController.isConnected ? "Yes" : "No" }
+                }
                 }
             }
         }
@@ -746,6 +884,194 @@ Item {
             color: textCol
             font.pixelSize: fontSize
             font.family: fontFamily
+        }
+    }
+
+    // Bluetooth Device Item Component
+    component BluetoothDeviceItem: Rectangle {
+        height: 80
+        color: isConnected ? Qt.rgba(primaryCol.r, primaryCol.g, primaryCol.b, 0.15) : Qt.rgba(0, 0, 0, 0.3)
+        border.color: isConnected ? primaryCol : Qt.rgba(primaryCol.r, primaryCol.g, primaryCol.b, 0.4)
+        border.width: isConnected ? 2 : 1
+        radius: 8
+
+        property string deviceName: ""
+        property string deviceAddress: ""
+        property bool isPaired: false
+        property bool isConnected: false
+        property int signalStrength: -100
+
+        Row {
+            anchors.fill: parent
+            anchors.margins: 12
+            spacing: 12
+
+            // Device icon
+            Rectangle {
+                width: 56
+                height: 56
+                radius: 28
+                color: Qt.rgba(primaryCol.r, primaryCol.g, primaryCol.b, 0.2)
+                border.color: primaryCol
+                border.width: 2
+                anchors.verticalCenter: parent.verticalCenter
+
+                Text {
+                    anchors.centerIn: parent
+                    text: isPaired ? "📱" : "🔍"
+                    font.pixelSize: 28
+                }
+
+                // Connection indicator
+                Rectangle {
+                    visible: isConnected
+                    width: 16
+                    height: 16
+                    radius: 8
+                    color: "#00ff00"
+                    border.color: "white"
+                    border.width: 2
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.margins: -4
+
+                    SequentialAnimation on opacity {
+                        running: isConnected
+                        loops: Animation.Infinite
+                        NumberAnimation { from: 1.0; to: 0.3; duration: 1000 }
+                        NumberAnimation { from: 0.3; to: 1.0; duration: 1000 }
+                    }
+                }
+            }
+
+            // Device info
+            Column {
+                width: parent.width - 200
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 4
+
+                Text {
+                    text: deviceName
+                    color: isConnected ? primaryCol : textCol
+                    font.pixelSize: fontSize + 2
+                    font.family: fontFamily
+                    font.weight: Font.Bold
+                    elide: Text.ElideRight
+                    width: parent.width
+                }
+
+                Text {
+                    text: deviceAddress
+                    color: textCol
+                    font.pixelSize: fontSize - 3
+                    font.family: fontFamily
+                    opacity: 0.6
+                }
+
+                Row {
+                    spacing: 8
+
+                    Text {
+                        text: isConnected ? "● Connected" : (isPaired ? "● Paired" : "○ Not Paired")
+                        color: isConnected ? "#00ff00" : (isPaired ? primaryCol : textCol)
+                        font.pixelSize: fontSize - 2
+                        font.family: fontFamily
+                        opacity: 0.8
+                    }
+
+                    // Signal strength indicator
+                    Row {
+                        spacing: 2
+                        visible: signalStrength > -100
+                        anchors.verticalCenter: parent.verticalCenter
+
+                        Repeater {
+                            model: 4
+                            Rectangle {
+                                width: 3
+                                height: 4 + (index * 3)
+                                color: signalStrength > (-90 + index * 10) ? primaryCol : Qt.rgba(textCol.r, textCol.g, textCol.b, 0.3)
+                                radius: 1
+                                anchors.bottom: parent.bottom
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Action buttons
+            Column {
+                width: 100
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 6
+
+                Rectangle {
+                    width: parent.width
+                    height: 28
+                    color: Qt.rgba(primaryCol.r, primaryCol.g, primaryCol.b, 0.3)
+                    border.color: primaryCol
+                    border.width: 1
+                    radius: 6
+                    visible: isPaired
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: isConnected ? "Disconnect" : "Connect"
+                        color: primaryCol
+                        font.pixelSize: fontSize - 3
+                        font.family: fontFamily
+                        font.weight: Font.Bold
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: {
+                            if (isConnected) {
+                                bluetoothManager.disconnectDevice(deviceAddress)
+                                // Also disconnect from MediaController if this was the media device
+                                if (mediaController.isConnected) {
+                                    mediaController.disconnect()
+                                }
+                            } else {
+                                bluetoothManager.connectToDevice(deviceAddress)
+                                // Also connect MediaController for music control
+                                mediaController.connectToDevice(deviceAddress)
+                                // Save as last device
+                                appSettings.lastBluetoothDevice = deviceName
+                            }
+                        }
+                    }
+                }
+
+                Rectangle {
+                    width: parent.width
+                    height: 28
+                    color: isPaired ? Qt.rgba(1, 0, 0, 0.2) : Qt.rgba(primaryCol.r, primaryCol.g, primaryCol.b, 0.3)
+                    border.color: isPaired ? "#ff0000" : primaryCol
+                    border.width: 1
+                    radius: 6
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: isPaired ? "Unpair" : "Pair"
+                        color: isPaired ? "#ff0000" : primaryCol
+                        font.pixelSize: fontSize - 3
+                        font.family: fontFamily
+                        font.weight: Font.Bold
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: {
+                            if (isPaired) {
+                                bluetoothManager.unpairDevice(deviceAddress)
+                            } else {
+                                bluetoothManager.pairDevice(deviceAddress)
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }

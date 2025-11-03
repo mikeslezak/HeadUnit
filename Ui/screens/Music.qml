@@ -82,7 +82,7 @@ Item {
 
                     Rectangle {
                         anchors.horizontalCenter: parent.horizontalCenter
-                        width: 120
+                        width: 180
                         height: 24
                         color: "transparent"
                         border.color: primaryCol
@@ -111,7 +111,11 @@ Item {
                             }
 
                             Text {
-                                text: mediaController.isPlaying ? "NOW PLAYING" : "PAUSED"
+                                text: {
+                                    var source = mediaController.activeApp ? mediaController.activeApp.toUpperCase() : "";
+                                    var status = mediaController.isPlaying ? "PLAYING" : "PAUSED";
+                                    return source ? source + " • " + status : status;
+                                }
                                 color: primaryCol
                                 font.pixelSize: 10
                                 font.family: fontFamily
@@ -124,10 +128,14 @@ Item {
             }
 
             // Right: Track Info + Controls
-            Column {
+            Item {
                 width: parent.width - 320
                 height: parent.height
-                spacing: 16
+
+                Column {
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: parent.width
+                    spacing: 8
 
                 Row {
                     width: parent.width
@@ -165,6 +173,27 @@ Item {
                             opacity: 0.6
                             elide: Text.ElideRight
                             visible: mediaController.album !== ""
+                        }
+
+                        // Source app badge
+                        Rectangle {
+                            width: sourceText.width + 16
+                            height: 20
+                            color: Qt.rgba(0, 0, 0, 0.4)
+                            border.color: primaryCol
+                            border.width: 1
+                            radius: 10
+                            visible: mediaController.isConnected && mediaController.activeApp !== ""
+
+                            Text {
+                                id: sourceText
+                                anchors.centerIn: parent
+                                text: "via " + (mediaController.activeApp || "Phone")
+                                color: primaryCol
+                                font.pixelSize: fontSize - 5
+                                font.family: fontFamily
+                                font.weight: Font.Medium
+                            }
                         }
                     }
 
@@ -247,8 +276,6 @@ Item {
                     }
                 }
 
-                Item { height: 10 }
-
                 Row {
                     anchors.horizontalCenter: parent.horizontalCenter
                     spacing: 24
@@ -310,6 +337,7 @@ Item {
                         enabled: mediaController.isConnected
                         onClicked: mediaController.next()
                     }
+                }
                 }
             }
         }
@@ -416,11 +444,18 @@ Item {
     }
 
     Component.onCompleted: {
-        console.log("Music screen loaded with Tidal-style layout")
+        console.log("Music screen loaded")
 
-        // Auto-connect in mock mode for testing
-        if (!mediaController.isConnected) {
-            mediaController.connectToDevice("80:96:98:C8:69:17")
+        // Auto-connect to the first connected Bluetooth device
+        if (!mediaController.isConnected && bluetoothManager) {
+            var connectedAddress = bluetoothManager.getFirstConnectedDeviceAddress()
+
+            if (connectedAddress !== "") {
+                console.log("Music: Auto-connecting to device:", connectedAddress)
+                mediaController.connectToDevice(connectedAddress)
+            } else {
+                console.log("Music: No connected Bluetooth device found")
+            }
         }
     }
 }

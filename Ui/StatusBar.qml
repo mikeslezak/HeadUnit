@@ -12,12 +12,36 @@ Item {
     readonly property string fontFamily: theme?.typography?.fontFamily ?? "Noto Sans"
     readonly property int fontSize: theme?.typography?.fontSize ? Number(theme.typography.fontSize) : 16
 
-    // Mock data (would come from real sensors/GPS/Bluetooth in production)
+    // Real data from Bluetooth and sensors
     property int temperature: 22
     property int heading: 0
-    property int phoneSignal: 4  // 0-5 bars
-    property int phoneBattery: 85  // 0-100%
+    property int phoneSignal: bluetoothManager ? bluetoothManager.cellularSignal : 0
+    property int phoneBattery: notificationManager ? notificationManager.phoneBatteryLevel : -1
+    property bool isCharging: bluetoothManager ? bluetoothManager.isConnectedDeviceCharging() : false
     property string currentTime: "12:00"
+    property string carrier: bluetoothManager ? bluetoothManager.carrierName : ""
+
+    // Update Bluetooth status when signal changes
+    Connections {
+        target: bluetoothManager
+        function onCellularSignalChanged() {
+            phoneSignal = bluetoothManager.cellularSignal
+        }
+        function onCarrierNameChanged() {
+            carrier = bluetoothManager.carrierName
+        }
+        function onDeviceCountChanged() {
+            isCharging = bluetoothManager.isConnectedDeviceCharging()
+        }
+    }
+
+    // Update phone battery from NotificationManager
+    Connections {
+        target: notificationManager
+        function onPhoneBatteryLevelChanged() {
+            phoneBattery = notificationManager.phoneBatteryLevel
+        }
+    }
 
     // Update time every minute
     Timer {
@@ -36,7 +60,7 @@ Item {
         }
     }
 
-    // Update mock sensor data periodically
+    // Update sensor data periodically (temperature and heading remain mock for now)
     Timer {
         interval: 5000
         running: true
@@ -44,10 +68,7 @@ Item {
         onTriggered: {
             temperature = 18 + Math.floor(Math.random() * 10)
             heading = (heading + Math.floor(Math.random() * 30) - 15 + 360) % 360
-            phoneSignal = Math.max(0, Math.min(5, phoneSignal + Math.floor(Math.random() * 3) - 1))
-            if (Math.random() > 0.7) {
-                phoneBattery = Math.max(10, phoneBattery - 1)
-            }
+            // Phone signal and battery now come from real Bluetooth data
         }
     }
 
@@ -157,6 +178,7 @@ Item {
         Row {
             spacing: 4
             anchors.verticalCenter: parent.verticalCenter
+            visible: phoneBattery >= 0  // Only show if battery info is available
 
             Rectangle {
                 width: 20
@@ -172,7 +194,7 @@ Item {
                     anchors.top: parent.top
                     anchors.bottom: parent.bottom
                     anchors.margins: 1.5
-                    width: Math.max(1, (parent.width - 3) * (phoneBattery / 100))
+                    width: Math.max(1, (parent.width - 3) * (Math.max(0, phoneBattery) / 100))
                     color: getBatteryColor()
                     radius: 0.5
                 }
@@ -185,6 +207,16 @@ Item {
                     color: getBatteryColor()
                     radius: 0.5
                 }
+
+                // Charging indicator (lightning bolt)
+                Text {
+                    visible: isCharging
+                    anchors.centerIn: parent
+                    text: "⚡"
+                    color: "#ffff00"
+                    font.pixelSize: 8
+                    font.weight: Font.Bold
+                }
             }
 
             Text {
@@ -196,6 +228,17 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
             }
         }
+
+        // Show message when battery not available
+        Text {
+            visible: phoneBattery < 0
+            text: "No Device"
+            color: textCol
+            font.pixelSize: fontSize - 5
+            font.family: fontFamily
+            opacity: 0.5
+            anchors.verticalCenter: parent.verticalCenter
+        }
     }
 
     function getCardinalDirection() {
@@ -205,6 +248,7 @@ Item {
     }
 
     function getBatteryColor() {
+        if (phoneBattery < 0) return textCol  // No battery info
         if (phoneBattery <= 20) return "#ff0000"
         if (phoneBattery <= 50) return "#ffaa00"
         return primaryCol

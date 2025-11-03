@@ -63,21 +63,9 @@ Item {
             }
         }
 
-        // Drop shadow effect
-        layer.enabled: true
-        layer.effect: Item {
-            ShaderEffect {
-                property variant source
-                fragmentShader: "
-                    varying highp vec2 qt_TexCoord0;
-                    uniform sampler2D source;
-                    uniform lowp float qt_Opacity;
-                    void main() {
-                        gl_FragColor = texture2D(source, qt_TexCoord0) * qt_Opacity;
-                    }
-                "
-            }
-        }
+        // Drop shadow effect (disabled - Qt 6 requires precompiled shaders)
+        // layer.enabled: true
+        // layer.effect: MultiEffect { shadowEnabled: true; shadowBlur: 0.3 }
 
         // Click to dismiss
         MouseArea {
