@@ -33,6 +33,9 @@ install_manifest.txt
 .vscode/
 .idea/
 
+# Secrets
+.env
+
 # OS specific
 .DS_Store
 Thumbs.db

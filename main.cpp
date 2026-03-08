@@ -6,10 +6,14 @@
 #include <QDebug>
 #include "MediaController.h"
 #include "VoiceAssistant.h"
+#include "PicovoiceManager.h"
+#include "ClaudeClient.h"
+#include "GoogleTTS.h"
 #include "NotificationManager.h"
 #include "BluetoothManager.h"
 #include "ContactManager.h"
 #include "MessageManager.h"
+#include "VoiceCommandHandler.h"
 
 void myMessageHandler(QtMsgType type, const QMessageLogContext &context, const QString &msg) {
     QByteArray localMsg = msg.toLocal8Bit();
@@ -51,20 +55,79 @@ int main(int argc, char *argv[])
     // Create all controllers
     MediaController mediaController;
     VoiceAssistant voiceAssistant;
+    PicovoiceManager picovoiceManager;
+    ClaudeClient claudeClient;
+    GoogleTTS googleTTS;
     NotificationManager notificationManager;
     BluetoothManager bluetoothManager;
     ContactManager contactManager;
     MessageManager messageManager;
+    VoiceCommandHandler voiceCommandHandler;
+
+    // Set API keys from environment variables (loaded via .env)
+    googleTTS.setApiKey(qEnvironmentVariable("GOOGLE_API_KEY"));
+    picovoiceManager.setAccessKey(qEnvironmentVariable("PICOVOICE_ACCESS_KEY"));
+    picovoiceManager.setGoogleApiKey(qEnvironmentVariable("GOOGLE_API_KEY"));
+
+    // Set default TTS preferences (can be changed in Settings)
+    googleTTS.setVoiceName("en-US-Neural2-F");  // Female US English neural voice
+    googleTTS.setSpeakingRate(1.0);  // Normal speed
+    googleTTS.setPitch(0.0);  // Normal pitch
+
+    // Connect wake word detector to QML Claude UI (handled in Main.qml via Connections)
+    // Note: The wake word signal will be connected to QML to trigger the Claude AI interface
+    // The wakeWordDetected signal is exposed via setContextProperty below
 
     QQmlApplicationEngine engine;
+
+    // Set up VoiceCommandHandler dependencies
+    voiceCommandHandler.setContactManager(&contactManager);
+    voiceCommandHandler.setMessageManager(&messageManager);
+    voiceCommandHandler.setBluetoothManager(&bluetoothManager);
+    voiceCommandHandler.setGoogleTTS(&googleTTS);
+
+    // Set up BluetoothManager dependencies
+    bluetoothManager.setContactManager(&contactManager);
+
+    // Connect PicovoiceManager signals to handlers
+    // Wake word detected -> triggers QML UI (handled in Main.qml)
+    // Transcription ready -> send to Claude AI (using lambda to add empty systemContext)
+    QObject::connect(&picovoiceManager, &PicovoiceManager::transcriptionReady,
+                     [&claudeClient](const QString &text) {
+                         claudeClient.sendMessage(text, QString());  // Empty systemContext
+                     });
+
+    // Provide Claude with contact list for intelligent name matching
+    // Also provide to PicovoiceManager for Google STT speech context hints
+    // Update contacts when sync completes
+    QObject::connect(&contactManager, &ContactManager::syncCompleted,
+                     [&claudeClient, &contactManager, &picovoiceManager](int /*count*/) {
+                         QStringList names = contactManager.getAllContactNames();
+                         claudeClient.setContactNames(names);
+                         picovoiceManager.setSpeechContextHints(names);
+                     });
+
+    // Also set initial contacts if already loaded from cache
+    QStringList cachedNames = contactManager.getAllContactNames();
+    if (!cachedNames.isEmpty()) {
+        claudeClient.setContactNames(cachedNames);
+        picovoiceManager.setSpeechContextHints(cachedNames);
+    }
+
+    // Note: Claude response -> Google TTS is handled in Main.qml onResponseReceived
+    // to coordinate with UI state changes (avoiding duplicate speak() calls)
 
     // Expose all controllers to QML
     engine.rootContext()->setContextProperty("mediaController", &mediaController);
     engine.rootContext()->setContextProperty("voiceAssistant", &voiceAssistant);
+    engine.rootContext()->setContextProperty("picovoiceManager", &picovoiceManager);
+    engine.rootContext()->setContextProperty("claudeClient", &claudeClient);
+    engine.rootContext()->setContextProperty("googleTTS", &googleTTS);
     engine.rootContext()->setContextProperty("notificationManager", &notificationManager);
     engine.rootContext()->setContextProperty("bluetoothManager", &bluetoothManager);
     engine.rootContext()->setContextProperty("contactManager", &contactManager);
     engine.rootContext()->setContextProperty("messageManager", &messageManager);
+    engine.rootContext()->setContextProperty("voiceCommandHandler", &voiceCommandHandler);
 
     // Load QML - version compatible approach
 #if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
@@ -91,10 +154,17 @@ int main(int argc, char *argv[])
     qDebug() << "Controllers initialized:";
     qDebug() << "  - Media:         " << &mediaController;
     qDebug() << "  - Voice:         " << &voiceAssistant;
+    qDebug() << "  - Picovoice:     " << &picovoiceManager;
+    qDebug() << "  - Claude AI:     " << &claudeClient;
     qDebug() << "  - Notifications: " << &notificationManager;
     qDebug() << "  - Bluetooth:     " << &bluetoothManager;
     qDebug() << "  - Contacts:      " << &contactManager;
     qDebug() << "  - Messages:      " << &messageManager;
+    qDebug() << "  - VoiceCommands: " << &voiceCommandHandler;
+
+    // Start unified voice pipeline (wake word + STT + noise suppression)
+    qDebug() << "Starting Picovoice unified voice pipeline...";
+    picovoiceManager.start();
 
     return app.exec();
 }
