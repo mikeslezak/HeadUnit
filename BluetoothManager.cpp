@@ -1,6 +1,8 @@
 #include "BluetoothManager.h"
+#include "ContactManager.h"
 #include <QDebug>
 #include <QRandomGenerator>
+#include <QRegularExpression>
 
 #ifndef Q_OS_WIN
 #include <QDBusConnection>
@@ -156,13 +158,22 @@ BluetoothManager::BluetoothManager(QObject *parent)
     , m_adapterPath("/org/bluez/hci0")
     , m_cellularSignal(0)
     , m_carrierName("")
+    , m_hasActiveCall(false)
+    , m_activeCallName("")
+    , m_activeCallNumber("")
+    , m_activeCallState("")
+    , m_activeCallPath("")
+    , m_activeCallDuration(0)
+    , m_isCallMuted(false)
     , m_deviceModel(new BluetoothDeviceModel(this))
     , m_scanTimer(new QTimer(this))
     , m_ofonoUpdateTimer(new QTimer(this))
     , m_batteryCheckTimer(new QTimer(this))
+    , m_callDurationTimer(new QTimer(this))
 #ifndef Q_OS_WIN
     , m_adapterInterface(nullptr)
 #endif
+    , m_contactManager(nullptr)
 {
 #ifdef Q_OS_WIN
     m_mockMode = true;
@@ -190,10 +201,16 @@ BluetoothManager::BluetoothManager(QObject *parent)
     m_ofonoUpdateTimer->setInterval(10000); // 10 seconds
     m_ofonoUpdateTimer->start();
 
-    // Setup battery check timer (update every 30 seconds)
-    connect(m_batteryCheckTimer, &QTimer::timeout, this, &BluetoothManager::checkBatteryLevels);
-    m_batteryCheckTimer->setInterval(30000); // 30 seconds
-    m_batteryCheckTimer->start();
+    // Setup call duration timer (update every second when call is active)
+    connect(m_callDurationTimer, &QTimer::timeout, this, &BluetoothManager::updateCallDuration);
+    m_callDurationTimer->setInterval(1000); // 1 second
+
+    // NOTE: Battery1 polling disabled - Battery1 interface doesn't exist for iPhones
+    // Battery reading is now handled by NotificationManager via BLE Battery Service
+    // Keeping this code for reference only (may work for other Bluetooth devices)
+    // connect(m_batteryCheckTimer, &QTimer::timeout, this, &BluetoothManager::checkBatteryLevels);
+    // m_batteryCheckTimer->setInterval(30000); // 30 seconds
+    // m_batteryCheckTimer->start();
 }
 
 BluetoothManager::~BluetoothManager()
@@ -212,6 +229,12 @@ void BluetoothManager::setStatusMessage(const QString &msg)
         emit statusMessageChanged();
         qDebug() << "BluetoothManager:" << msg;
     }
+}
+
+void BluetoothManager::setContactManager(ContactManager* contactManager)
+{
+    m_contactManager = contactManager;
+    qDebug() << "BluetoothManager: ContactManager set";
 }
 
 // ========================================================================
@@ -299,6 +322,54 @@ void BluetoothManager::setupDBusMonitoring()
         this,
         SLOT(onPropertiesChanged(QString,QVariantMap,QStringList))
     );
+
+    // Set up oFono call monitoring for incoming calls
+    QDBusInterface ofonoManager(
+        "org.ofono",
+        "/",
+        "org.ofono.Manager",
+        QDBusConnection::systemBus()
+    );
+
+    if (ofonoManager.isValid()) {
+        // Get first modem
+        QDBusReply<QDBusArgument> reply = ofonoManager.call("GetModems");
+        if (reply.isValid()) {
+            QDBusArgument arg = reply.value();
+            arg.beginArray();
+            if (!arg.atEnd()) {
+                QString modemPath;
+                arg.beginStructure();
+                arg >> modemPath;
+                arg.endStructure();
+                arg.endArray();
+
+                qDebug() << "BluetoothManager: Monitoring oFono calls on modem:" << modemPath;
+
+                // Monitor for incoming calls (CallAdded signal)
+                QDBusConnection::systemBus().connect(
+                    "org.ofono",
+                    modemPath,
+                    "org.ofono.VoiceCallManager",
+                    "CallAdded",
+                    this,
+                    SLOT(onCallAdded(QDBusObjectPath,QVariantMap))
+                );
+
+                // Monitor for call removal (CallRemoved signal)
+                QDBusConnection::systemBus().connect(
+                    "org.ofono",
+                    modemPath,
+                    "org.ofono.VoiceCallManager",
+                    "CallRemoved",
+                    this,
+                    SLOT(onCallRemoved(QDBusObjectPath))
+                );
+            } else {
+                arg.endArray();
+            }
+        }
+    }
 
     qDebug() << "BluetoothManager: DBus monitoring setup complete";
 }
@@ -748,6 +819,10 @@ void BluetoothManager::connectToDevice(const QString &address)
         qDebug() << "BluetoothManager: Connection initiated";
         setStatusMessage("Connecting...");
         // The connection status will be updated via PropertiesChanged signal
+        // Also refresh after 1 second to ensure UI updates
+        QTimer::singleShot(1000, this, [this]() {
+            refreshDeviceList();
+        });
     }
 #endif
 }
@@ -794,6 +869,10 @@ void BluetoothManager::disconnectDevice(const QString &address)
     } else {
         qDebug() << "BluetoothManager: Disconnect initiated";
         setStatusMessage("Disconnecting...");
+        // Also refresh after 1 second to ensure UI updates
+        QTimer::singleShot(1000, this, [this]() {
+            refreshDeviceList();
+        });
     }
 #endif
 }
@@ -1447,46 +1526,46 @@ void BluetoothManager::dialNumber(const QString &phoneNumber)
         QDBusConnection::systemBus()
     );
 
-    if (!ofonoManager.isValid()) {
-        qWarning() << "BluetoothManager: oFono not available:" << ofonoManager.lastError().message();
-        qDebug() << "BluetoothManager: Attempting fallback via Bluetooth HFP";
-
-        // Fallback: Try using BlueZ HFP directly
-        QString deviceAddress = getFirstConnectedDeviceAddress();
-        if (deviceAddress.isEmpty()) {
-            qWarning() << "BluetoothManager: No connected device for phone call";
-            return;
-        }
-
-        qDebug() << "BluetoothManager: Dialing via connected device:" << deviceAddress;
-        qDebug() << "BluetoothManager: Note - actual call routing depends on phone integration";
-        return;
-    }
-
     // Get modems from oFono
-    QDBusReply<QDBusArgument> reply = ofonoManager.call("GetModems");
-    if (!reply.isValid()) {
-        qWarning() << "BluetoothManager: Failed to get modems:" << reply.error().message();
+    QString modemPath;
+    if (!ofonoManager.isValid()) {
+        qWarning() << "BluetoothManager: oFono Manager interface not available:" << ofonoManager.lastError().message();
+        setStatusMessage("Telephony service unavailable");
         return;
     }
 
-    // Parse modem list
-    QDBusArgument arg = reply.value();
+    QDBusMessage reply = ofonoManager.call("GetModems");
+    if (reply.type() == QDBusMessage::ErrorMessage) {
+        qWarning() << "BluetoothManager: Failed to get oFono modems:" << reply.errorMessage();
+        setStatusMessage("No phone modems found");
+        return;
+    }
+
+    // Parse modem array - GetModems returns array of (object_path, properties) structs
+    const QDBusArgument arg = reply.arguments().at(0).value<QDBusArgument>();
     arg.beginArray();
 
-    QString modemPath;
     while (!arg.atEnd()) {
         arg.beginStructure();
         arg >> modemPath;
-        arg.beginMap();
-        arg.endMap();
+
+        // Skip properties map - we don't need it
+        QVariantMap properties;
+        arg >> properties;
+
         arg.endStructure();
-        break;  // Use first modem
+
+        // Use the first modem we find
+        if (!modemPath.isEmpty()) {
+            qDebug() << "BluetoothManager: Found oFono modem:" << modemPath;
+            break;
+        }
     }
     arg.endArray();
 
     if (modemPath.isEmpty()) {
-        qWarning() << "BluetoothManager: No modems found";
+        qWarning() << "BluetoothManager: No oFono modems found - is phone connected via Bluetooth HFP?";
+        setStatusMessage("No phone connected");
         return;
     }
 
@@ -1502,15 +1581,50 @@ void BluetoothManager::dialNumber(const QString &phoneNumber)
 
     if (!vcm.isValid()) {
         qWarning() << "BluetoothManager: VoiceCallManager not available:" << vcm.lastError().message();
+        setStatusMessage("Telephony unavailable");
         return;
     }
 
-    // Dial the number
-    QDBusReply<QDBusObjectPath> dialReply = vcm.call("Dial", phoneNumber, "");
+    // Clean phone number - oFono only accepts digits and +
+    // Strip formatting characters like parentheses, spaces, dashes
+    QString cleanNumber = phoneNumber;
+    cleanNumber.remove(QRegularExpression("[^0-9+]"));
+
+    qDebug() << "BluetoothManager: Cleaned number:" << cleanNumber << "(from" << phoneNumber << ")";
+
+    // Dial the number - second parameter is "hide caller ID" (empty = default)
+    QDBusReply<QDBusObjectPath> dialReply = vcm.call("Dial", cleanNumber, "");
 
     if (dialReply.isValid()) {
-        qDebug() << "BluetoothManager: Call initiated successfully to" << phoneNumber;
-        qDebug() << "BluetoothManager: Call path:" << dialReply.value().path();
+        QString callPath = dialReply.value().path();
+        qDebug() << "BluetoothManager: Call initiated successfully to" << cleanNumber;
+        qDebug() << "BluetoothManager: Call object path:" << callPath;
+
+        // Set up call state tracking
+        m_activeCallPath = callPath;
+        m_activeCallNumber = phoneNumber;  // Use original formatted number
+        m_activeCallName = "";  // Will be filled in by caller ID or contact lookup
+        m_activeCallState = "dialing";
+        m_activeCallDuration = 0;
+        m_callStartTime = QDateTime::currentDateTime();
+        m_hasActiveCall = true;
+
+        // Start call duration timer
+        m_callDurationTimer->start();
+
+        // Notify QML
+        emit activeCallChanged();
+
+        // Subscribe to call property changes (oFono-specific PropertyChanged signal)
+        QDBusConnection::systemBus().connect(
+            "org.ofono",
+            callPath,
+            "org.ofono.VoiceCall",
+            "PropertyChanged",
+            this,
+            SLOT(onCallPropertyChanged(QString,QDBusVariant))
+        );
+
         setStatusMessage("Calling " + phoneNumber);
     } else {
         qWarning() << "BluetoothManager: Dial failed:" << dialReply.error().message();
@@ -1527,95 +1641,36 @@ void BluetoothManager::answerCall()
 #else
     qDebug() << "BluetoothManager: Attempting to answer call";
 
-    QDBusInterface ofonoManager(
+    // Check if we have an active call path stored
+    if (m_activeCallPath.isEmpty()) {
+        qWarning() << "BluetoothManager: No active call to answer";
+        return;
+    }
+
+    qDebug() << "BluetoothManager: Answering call:" << m_activeCallPath;
+
+    // Create D-Bus interface for the active call
+    QDBusInterface callIface(
         "org.ofono",
-        "/",
-        "org.ofono.Manager",
+        m_activeCallPath,
+        "org.ofono.VoiceCall",
         QDBusConnection::systemBus()
     );
 
-    if (!ofonoManager.isValid()) {
-        qWarning() << "BluetoothManager: oFono not available";
+    if (!callIface.isValid()) {
+        qWarning() << "BluetoothManager: VoiceCall interface not available:" << callIface.lastError().message();
         return;
     }
 
-    // Get modems
-    QDBusReply<QDBusArgument> reply = ofonoManager.call("GetModems");
-    if (!reply.isValid()) {
-        qWarning() << "BluetoothManager: Failed to get modems";
-        return;
+    // Call the Answer method
+    QDBusReply<void> answerReply = callIface.call("Answer");
+    if (answerReply.isValid()) {
+        qDebug() << "BluetoothManager: Call answered successfully";
+        setStatusMessage("Call answered");
+    } else {
+        qWarning() << "BluetoothManager: Answer failed:" << answerReply.error().message();
+        setStatusMessage("Failed to answer call");
     }
-
-    QDBusArgument arg = reply.value();
-    arg.beginArray();
-
-    QString modemPath;
-    while (!arg.atEnd()) {
-        arg.beginStructure();
-        arg >> modemPath;
-        arg.beginMap();
-        arg.endMap();
-        arg.endStructure();
-        break;
-    }
-    arg.endArray();
-
-    if (modemPath.isEmpty()) {
-        qWarning() << "BluetoothManager: No modems found";
-        return;
-    }
-
-    // Get active calls
-    QDBusInterface vcm(
-        "org.ofono",
-        modemPath,
-        "org.ofono.VoiceCallManager",
-        QDBusConnection::systemBus()
-    );
-
-    if (!vcm.isValid()) {
-        qWarning() << "BluetoothManager: VoiceCallManager not available";
-        return;
-    }
-
-    QDBusReply<QDBusArgument> callsReply = vcm.call("GetCalls");
-    if (!callsReply.isValid()) {
-        qWarning() << "BluetoothManager: Failed to get calls";
-        return;
-    }
-
-    // Find incoming call
-    QDBusArgument callsArg = callsReply.value();
-    callsArg.beginArray();
-
-    while (!callsArg.atEnd()) {
-        callsArg.beginStructure();
-        QDBusObjectPath callPath;
-        callsArg >> callPath;
-        callsArg.beginMap();
-        callsArg.endMap();
-        callsArg.endStructure();
-
-        // Answer this call
-        QDBusInterface callIface(
-            "org.ofono",
-            callPath.path(),
-            "org.ofono.VoiceCall",
-            QDBusConnection::systemBus()
-        );
-
-        if (callIface.isValid()) {
-            QDBusReply<void> answerReply = callIface.call("Answer");
-            if (answerReply.isValid()) {
-                qDebug() << "BluetoothManager: Call answered";
-                setStatusMessage("Call answered");
-            } else {
-                qWarning() << "BluetoothManager: Answer failed:" << answerReply.error().message();
-            }
-        }
-        break;  // Answer first call
-    }
-    callsArg.endArray();
 #endif
 }
 
@@ -1627,6 +1682,45 @@ void BluetoothManager::hangupCall()
 #else
     qDebug() << "BluetoothManager: Attempting to hang up call";
 
+    // If we have an active call path, use the VoiceCall Hangup method directly
+    if (!m_activeCallPath.isEmpty()) {
+        qDebug() << "BluetoothManager: Hanging up call:" << m_activeCallPath;
+
+        QDBusInterface voiceCall(
+            "org.ofono",
+            m_activeCallPath,
+            "org.ofono.VoiceCall",
+            QDBusConnection::systemBus()
+        );
+
+        if (!voiceCall.isValid()) {
+            qWarning() << "BluetoothManager: VoiceCall interface not available";
+            return;
+        }
+
+        QDBusReply<void> hangupReply = voiceCall.call("Hangup");
+        if (hangupReply.isValid()) {
+            qDebug() << "BluetoothManager: Call hung up successfully";
+
+            // Manually clear call state since oFono removes the object immediately
+            // and we won't receive a PropertiesChanged signal
+            m_hasActiveCall = false;
+            m_activeCallPath.clear();
+            m_activeCallNumber.clear();
+            m_activeCallName.clear();
+            m_activeCallState.clear();
+            m_activeCallDuration = 0;
+            m_callDurationTimer->stop();
+
+            emit activeCallChanged();
+            setStatusMessage("Call ended");
+        } else {
+            qWarning() << "BluetoothManager: Hangup failed:" << hangupReply.error().message();
+        }
+        return;
+    }
+
+    // Fallback: if no active call path, try HangupAll on VoiceCallManager
     QDBusInterface ofonoManager(
         "org.ofono",
         "/",
@@ -1680,10 +1774,95 @@ void BluetoothManager::hangupCall()
 
     QDBusReply<void> hangupReply = vcm.call("HangupAll");
     if (hangupReply.isValid()) {
-        qDebug() << "BluetoothManager: Call hung up";
+        qDebug() << "BluetoothManager: All calls hung up";
         setStatusMessage("Call ended");
     } else {
-        qWarning() << "BluetoothManager: Hangup failed:" << hangupReply.error().message();
+        qWarning() << "BluetoothManager: HangupAll failed:" << hangupReply.error().message();
+    }
+#endif
+}
+
+/**
+ * Toggle microphone mute during active call
+ *
+ * NOTE: This implementation may not work on all systems. The oFono D-Bus interface
+ * for mute control varies by implementation. Some systems do not properly expose
+ * the "Muted" property via org.ofono.VoiceCall or org.ofono.CallVolume interfaces.
+ *
+ * Known limitations:
+ * - org.ofono.CallVolume.GetProperties may not be implemented despite being advertised
+ * - org.ofono.Handsfree interface may not expose mute state
+ * - Systems without PulseAudio cannot use audio-layer mute control
+ * - HFP AT+CMUT command may not be exposed via D-Bus
+ *
+ * If mute doesn't work on your system, you may need to:
+ * 1. Control mute at the PulseAudio level (pactl set-source-mute)
+ * 2. Use a different oFono interface if available
+ * 3. Implement mute via direct AT command interface if exposed
+ */
+void BluetoothManager::toggleMute()
+{
+#ifdef Q_OS_WIN
+    qDebug() << "BluetoothManager: Mock toggle mute";
+    m_isCallMuted = !m_isCallMuted;
+    emit callMutedChanged();
+#else
+    if (m_activeCallPath.isEmpty()) {
+        qWarning() << "BluetoothManager: No active call to mute/unmute";
+        return;
+    }
+
+    qDebug() << "BluetoothManager: Toggling mute for call:" << m_activeCallPath;
+
+    // IMPLEMENTATION NOTE: This uses org.freedesktop.DBus.Properties interface
+    // to access the "Muted" property on the VoiceCall object. This may not work
+    // on all oFono implementations. See function documentation for alternatives.
+
+    QDBusInterface voiceCall(
+        "org.ofono",
+        m_activeCallPath,
+        "org.freedesktop.DBus.Properties",
+        QDBusConnection::systemBus()
+    );
+
+    if (!voiceCall.isValid()) {
+        qWarning() << "BluetoothManager: VoiceCall properties interface not available";
+        qWarning() << "  System limitation: oFono mute interface not properly exposed via D-Bus";
+
+        // Toggle local state for UI feedback even if actual mute fails
+        m_isCallMuted = !m_isCallMuted;
+        emit callMutedChanged();
+        return;
+    }
+
+    // Get current mute state
+    QDBusReply<QVariant> muteReply = voiceCall.call("Get", "org.ofono.VoiceCall", "Muted");
+    if (!muteReply.isValid()) {
+        qWarning() << "BluetoothManager: Failed to get mute state:" << muteReply.error().message();
+        qWarning() << "  System limitation: oFono does not expose Muted property on this system";
+
+        // Toggle local state for UI feedback even if actual mute fails
+        m_isCallMuted = !m_isCallMuted;
+        emit callMutedChanged();
+        return;
+    }
+
+    bool currentMuteState = muteReply.value().toBool();
+    bool newMuteState = !currentMuteState;
+
+    // Set new mute state
+    QDBusReply<void> setReply = voiceCall.call("Set", "org.ofono.VoiceCall", "Muted", QVariant::fromValue(QDBusVariant(newMuteState)));
+    if (setReply.isValid()) {
+        m_isCallMuted = newMuteState;
+        emit callMutedChanged();
+        qDebug() << "BluetoothManager: Call" << (newMuteState ? "muted" : "unmuted");
+    } else {
+        qWarning() << "BluetoothManager: Failed to toggle mute:" << setReply.error().message();
+        qWarning() << "  System limitation: oFono SetProperty not working on this system";
+
+        // Toggle local state for UI feedback even if actual mute fails
+        m_isCallMuted = !m_isCallMuted;
+        emit callMutedChanged();
     }
 #endif
 }
@@ -1752,4 +1931,133 @@ void BluetoothManager::sendDTMF(const QString &tones)
         }
     }
 #endif
+}
+
+// ========================================================================
+// CALL STATE MONITORING
+// ========================================================================
+
+void BluetoothManager::onCallPropertyChanged(const QString &propertyName, const QDBusVariant &value)
+{
+    qDebug() << "BluetoothManager: Call property changed:" << propertyName << "=" << value.variant();
+
+    // Handle State property changes
+    if (propertyName == "State") {
+        QString newState = value.variant().toString();
+        m_activeCallState = newState;
+        qDebug() << "BluetoothManager: Call state changed to:" << newState;
+
+        // Start duration timer when call becomes active
+        if (newState == "active" && !m_callDurationTimer->isActive()) {
+            m_callStartTime = QDateTime::currentDateTime();  // Reset start time when answered
+            m_activeCallDuration = 0;  // Reset duration counter
+            m_callDurationTimer->start();
+            qDebug() << "BluetoothManager: Call answered, starting timer";
+        }
+
+        // Clear call info when call disconnects
+        if (newState == "disconnected") {
+            qDebug() << "BluetoothManager: Call disconnected, clearing call state";
+            m_hasActiveCall = false;
+            m_activeCallPath.clear();
+            m_activeCallNumber.clear();
+            m_activeCallName.clear();
+            m_activeCallState.clear();
+            m_activeCallDuration = 0;
+            m_callDurationTimer->stop();
+        }
+
+        emit activeCallChanged();
+    }
+
+    // Handle LineIdentification property changes
+    if (propertyName == "LineIdentification") {
+        QString callerName = value.variant().toString();
+        if (!callerName.isEmpty()) {
+            m_activeCallName = callerName;
+            emit activeCallChanged();
+        }
+    }
+}
+
+void BluetoothManager::updateCallDuration()
+{
+    if (m_hasActiveCall) {
+        m_activeCallDuration = m_callStartTime.secsTo(QDateTime::currentDateTime());
+        emit activeCallChanged();
+    }
+}
+
+void BluetoothManager::onCallAdded(const QDBusObjectPath &path, const QVariantMap &properties)
+{
+    QString callPath = path.path();
+    qDebug() << "BluetoothManager: Call added:" << callPath;
+    qDebug() << "BluetoothManager: Call properties:" << properties;
+
+    // Extract call details from properties
+    QString state = properties.value("State").toString();
+    QString lineId = properties.value("LineIdentification").toString();
+
+    qDebug() << "BluetoothManager: Call state:" << state;
+    qDebug() << "BluetoothManager: Caller ID:" << lineId;
+
+    // Set up call tracking
+    m_activeCallPath = callPath;
+    m_activeCallNumber = lineId;  // Phone number of caller
+    m_activeCallName = "";  // Will try to match with contacts later if needed
+    m_activeCallState = state;
+    m_activeCallDuration = 0;
+    m_callStartTime = QDateTime::currentDateTime();
+    m_hasActiveCall = true;
+
+    // Try to lookup contact name
+    if (m_contactManager) {
+        QString contactName = m_contactManager->findContactNameByNumber(lineId);
+        if (!contactName.isEmpty()) {
+            m_activeCallName = contactName;
+            qDebug() << "BluetoothManager: Resolved contact name:" << contactName;
+        }
+    }
+
+    // Subscribe to property changes for this call (oFono-specific PropertyChanged signal)
+    QDBusConnection::systemBus().connect(
+        "org.ofono",
+        callPath,
+        "org.ofono.VoiceCall",
+        "PropertyChanged",
+        this,
+        SLOT(onCallPropertyChanged(QString,QDBusVariant))
+    );
+
+    // Notify QML
+    emit activeCallChanged();
+
+    // Set status message based on call state
+    if (state == "incoming") {
+        setStatusMessage("Incoming call from " + lineId);
+        qDebug() << "BluetoothManager: INCOMING CALL detected - UI should show incoming call overlay";
+    } else if (state == "dialing") {
+        setStatusMessage("Calling " + lineId);
+    }
+}
+
+void BluetoothManager::onCallRemoved(const QDBusObjectPath &path)
+{
+    QString callPath = path.path();
+    qDebug() << "BluetoothManager: Call removed:" << callPath;
+
+    // If this is our active call, clear the state
+    if (m_activeCallPath == callPath) {
+        qDebug() << "BluetoothManager: Active call ended";
+        m_hasActiveCall = false;
+        m_activeCallPath.clear();
+        m_activeCallNumber.clear();
+        m_activeCallName.clear();
+        m_activeCallState.clear();
+        m_activeCallDuration = 0;
+        m_callDurationTimer->stop();
+
+        setStatusMessage("Call ended");
+        emit activeCallChanged();
+    }
 }

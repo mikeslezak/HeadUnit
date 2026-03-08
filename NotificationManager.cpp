@@ -36,10 +36,12 @@ NotificationManager::NotificationManager(QObject *parent)
     , m_showPreviews(true)
     , m_autoDismissAfter(30)  // 30 seconds default
     , m_dismissTimer(new QTimer(this))
+    , m_batteryRefreshTimer(new QTimer(this))
     , m_phoneBatteryLevel(-1)
 #ifndef Q_OS_WIN
     , m_bleController(nullptr)
     , m_ancsService(nullptr)
+    , m_batteryService(nullptr)
 #endif
 {
     // Default quick replies
@@ -57,6 +59,11 @@ NotificationManager::NotificationManager(QObject *parent)
     m_dismissTimer->setInterval(1000);  // Check every second
     connect(m_dismissTimer, &QTimer::timeout,
             this, &NotificationManager::onNotificationTimeout);
+
+    // Setup battery refresh timer (refresh every 60 seconds)
+    m_batteryRefreshTimer->setInterval(60000);  // 60 seconds
+    connect(m_batteryRefreshTimer, &QTimer::timeout,
+            this, &NotificationManager::refreshBatteryLevel);
 
     // Load saved settings
     loadSettings();
@@ -879,30 +886,50 @@ void NotificationManager::onServiceDiscovered(const QBluetoothUuid &uuid)
     else if (uuid == BATTERY_SERVICE_UUID) {
         qDebug() << "NotificationManager: Battery Service discovered!";
 
-        QLowEnergyService *batteryService = m_bleController->createServiceObject(BATTERY_SERVICE_UUID, this);
+        m_batteryService = m_bleController->createServiceObject(BATTERY_SERVICE_UUID, this);
 
-        if (!batteryService) {
+        if (!m_batteryService) {
             qWarning() << "NotificationManager: Failed to create Battery service object";
             return;
         }
 
-        connect(batteryService, &QLowEnergyService::stateChanged,
-                this, [this, batteryService](QLowEnergyService::ServiceState state) {
+        connect(m_batteryService, &QLowEnergyService::stateChanged,
+                this, [this](QLowEnergyService::ServiceState state) {
                     if (state == QLowEnergyService::RemoteServiceDiscovered) {
                         qDebug() << "NotificationManager: Battery service details discovered";
 
-                        QLowEnergyCharacteristic batteryChar = batteryService->characteristic(BATTERY_LEVEL_CHAR_UUID);
+                        m_batteryLevelChar = m_batteryService->characteristic(BATTERY_LEVEL_CHAR_UUID);
 
-                        if (batteryChar.isValid()) {
+                        if (m_batteryLevelChar.isValid()) {
                             qDebug() << "NotificationManager: Reading battery level characteristic...";
-                            batteryService->readCharacteristic(batteryChar);
+                            m_batteryService->readCharacteristic(m_batteryLevelChar);
+
+                            // Start periodic battery refresh timer
+                            m_batteryRefreshTimer->start();
+                            qDebug() << "NotificationManager: Battery refresh timer started (60s interval)";
+
+                            // Enable notifications for battery level updates
+                            if (m_batteryLevelChar.properties() & QLowEnergyCharacteristic::Notify) {
+                                QLowEnergyDescriptor batteryDesc = m_batteryLevelChar.descriptor(
+                                    QBluetoothUuid::DescriptorType::ClientCharacteristicConfiguration);
+
+                                if (batteryDesc.isValid()) {
+                                    qDebug() << "NotificationManager: Enabling battery level notifications";
+                                    m_batteryService->writeDescriptor(batteryDesc, QByteArray::fromHex("0100"));
+                                } else {
+                                    qDebug() << "NotificationManager: Battery notification descriptor not found";
+                                }
+                            } else {
+                                qDebug() << "NotificationManager: Battery characteristic does not support notifications";
+                            }
                         } else {
                             qWarning() << "NotificationManager: Battery level characteristic not found";
                         }
                     }
                 });
 
-        connect(batteryService, &QLowEnergyService::characteristicRead,
+        // Handle battery characteristic reads
+        connect(m_batteryService, &QLowEnergyService::characteristicRead,
                 this, [this](const QLowEnergyCharacteristic &characteristic, const QByteArray &value) {
                     if (characteristic.uuid() == BATTERY_LEVEL_CHAR_UUID && !value.isEmpty()) {
                         int batteryLevel = static_cast<quint8>(value[0]);
@@ -914,7 +941,20 @@ void NotificationManager::onServiceDiscovered(const QBluetoothUuid &uuid)
                     }
                 });
 
-        batteryService->discoverDetails();
+        // Handle battery characteristic notifications (updates)
+        connect(m_batteryService, &QLowEnergyService::characteristicChanged,
+                this, [this](const QLowEnergyCharacteristic &characteristic, const QByteArray &value) {
+                    if (characteristic.uuid() == BATTERY_LEVEL_CHAR_UUID && !value.isEmpty()) {
+                        int batteryLevel = static_cast<quint8>(value[0]);
+                        qDebug() << "NotificationManager: Battery level updated:" << batteryLevel << "%";
+
+                        // Update battery level and notify QML
+                        m_phoneBatteryLevel = batteryLevel;
+                        emit phoneBatteryLevelChanged();
+                    }
+                });
+
+        m_batteryService->discoverDetails();
     }
 }
 
@@ -1017,6 +1057,20 @@ void NotificationManager::sendAncsCommand(quint8 command, const QString &notific
     m_ancsService->writeCharacteristic(m_controlPoint, packet);
 
     qDebug() << "Sent ANCS command:" << command << "for UID:" << uid;
+}
+
+/**
+ * REFRESH BATTERY LEVEL
+ * Periodically re-read battery level from iPhone via BLE
+ */
+void NotificationManager::refreshBatteryLevel()
+{
+    if (m_batteryService && m_batteryLevelChar.isValid()) {
+        qDebug() << "NotificationManager: Refreshing battery level...";
+        m_batteryService->readCharacteristic(m_batteryLevelChar);
+    } else {
+        qDebug() << "NotificationManager: Cannot refresh battery - service not available";
+    }
 }
 
 #endif

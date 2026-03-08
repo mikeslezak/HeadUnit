@@ -6,12 +6,16 @@
 #include <QAbstractListModel>
 #include <QList>
 #include <QTimer>
+#include <QProcess>
+#include <QDateTime>
 
 #ifndef Q_OS_WIN
 #include <QDBusConnection>
 #include <QDBusInterface>
 #include <QDBusObjectPath>
 #endif
+
+class ContactManager;
 
 /**
  * BluetoothDevice - Represents a Bluetooth device
@@ -93,6 +97,12 @@ class BluetoothManager : public QObject
     Q_PROPERTY(QString statusMessage READ statusMessage NOTIFY statusMessageChanged)
     Q_PROPERTY(int cellularSignal READ cellularSignal NOTIFY cellularSignalChanged)
     Q_PROPERTY(QString carrierName READ carrierName NOTIFY carrierNameChanged)
+    Q_PROPERTY(bool hasActiveCall READ hasActiveCall NOTIFY activeCallChanged)
+    Q_PROPERTY(QString activeCallName READ activeCallName NOTIFY activeCallChanged)
+    Q_PROPERTY(QString activeCallNumber READ activeCallNumber NOTIFY activeCallChanged)
+    Q_PROPERTY(QString activeCallState READ activeCallState NOTIFY activeCallChanged)
+    Q_PROPERTY(int activeCallDuration READ activeCallDuration NOTIFY activeCallChanged)
+    Q_PROPERTY(bool isCallMuted READ isCallMuted NOTIFY callMutedChanged)
 
 public:
     explicit BluetoothManager(QObject *parent = nullptr);
@@ -107,6 +117,12 @@ public:
     QString statusMessage() const { return m_statusMessage; }
     int cellularSignal() const { return m_cellularSignal; }
     QString carrierName() const { return m_carrierName; }
+    bool hasActiveCall() const { return m_hasActiveCall; }
+    QString activeCallName() const { return m_activeCallName; }
+    QString activeCallNumber() const { return m_activeCallNumber; }
+    QString activeCallState() const { return m_activeCallState; }
+    int activeCallDuration() const { return m_activeCallDuration; }
+    bool isCallMuted() const { return m_isCallMuted; }
 
 public slots:
     // Scanning
@@ -124,6 +140,7 @@ public slots:
     // Adapter management
     void setAdapterPower(bool powered);
     void refreshDeviceList();
+    void setContactManager(ContactManager* contactManager);
 
     // Get device info
     Q_INVOKABLE QString getDeviceName(const QString &address);
@@ -140,6 +157,7 @@ public slots:
     Q_INVOKABLE void answerCall();
     Q_INVOKABLE void hangupCall();
     Q_INVOKABLE void sendDTMF(const QString &tones);
+    Q_INVOKABLE void toggleMute();
 
 signals:
     void scanningChanged();
@@ -156,11 +174,15 @@ signals:
     void devicePaired(const QString &address);
     void deviceUnpaired(const QString &address);
     void error(const QString &message);
+    void activeCallChanged();
+    void callMutedChanged();
 
 private slots:
     void onScanTimeout();
     void updateOfonoSignal();
     void checkBatteryLevels();
+    void onCallPropertyChanged(const QString &propertyName, const QDBusVariant &value);
+    void updateCallDuration();
 
 #ifndef Q_OS_WIN
     void onInterfacesAdded(const QDBusObjectPath &path, const QVariantMap &interfaces);
@@ -168,6 +190,8 @@ private slots:
     void onPropertiesChanged(const QString &interface,
                             const QVariantMap &changedProperties,
                             const QStringList &invalidatedProperties);
+    void onCallAdded(const QDBusObjectPath &path, const QVariantMap &properties);
+    void onCallRemoved(const QDBusObjectPath &path);
 #endif
 
 private:
@@ -197,15 +221,27 @@ private:
     QString m_carrierName;
     QList<int> m_batteryHistory;  // Track last few battery readings to detect charging
 
+    // Call state tracking
+    bool m_hasActiveCall;
+    QString m_activeCallName;
+    QString m_activeCallNumber;
+    QString m_activeCallState;
+    QString m_activeCallPath;  // DBus object path for the active call
+    int m_activeCallDuration;  // Call duration in seconds
+    QDateTime m_callStartTime;
+    bool m_isCallMuted;
+
     BluetoothDeviceModel *m_deviceModel;
     QTimer *m_scanTimer;
     QTimer *m_ofonoUpdateTimer;
     QTimer *m_batteryCheckTimer;
+    QTimer *m_callDurationTimer;
 
 #ifndef Q_OS_WIN
     QDBusInterface *m_adapterInterface;
 #endif
 
+    ContactManager* m_contactManager;
     bool m_mockMode;
 };
 

@@ -195,6 +195,7 @@ private:
 
     QTimer *m_dismissTimer;
     QMap<QString, QTimer*> m_snoozeTimers;
+    QTimer *m_batteryRefreshTimer;
 
     int m_phoneBatteryLevel;  // -1 if unavailable, 0-100 otherwise
 
@@ -211,9 +212,13 @@ private:
 
     QLowEnergyController *m_bleController;
     QLowEnergyService *m_ancsService;
+    QLowEnergyService *m_batteryService;
     QLowEnergyCharacteristic m_notificationSource;
     QLowEnergyCharacteristic m_controlPoint;
     QLowEnergyCharacteristic m_dataSource;
+    QLowEnergyCharacteristic m_batteryLevelChar;
+
+    void refreshBatteryLevel();
 #endif
 };
 

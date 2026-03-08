@@ -274,27 +274,69 @@ void ContactManager::clearContacts()
 QVariantList ContactManager::searchContacts(const QString &query)
 {
     QVariantList results;
+    QVariantList exactMatches;
+    QVariantList wordBoundaryMatches;
+    QVariantList partialMatches;
 
     if (query.isEmpty()) {
         return results;
     }
 
-    QString lowerQuery = query.toLower();
+    QString lowerQuery = query.toLower().trimmed();
 
     for (int i = 0; i < m_contactModel->rowCount(); ++i) {
         QModelIndex idx = m_contactModel->index(i);
         QString name = m_contactModel->data(idx, ContactModel::NameRole).toString();
         QString phone = m_contactModel->data(idx, ContactModel::PhoneNumberRole).toString();
+        QString lowerName = name.toLower();
 
-        if (name.toLower().contains(lowerQuery) || phone.contains(query)) {
+        // Check if phone number matches
+        bool phoneMatch = phone.contains(query);
+
+        // Check for exact name match (case-insensitive)
+        bool exactMatch = lowerName == lowerQuery;
+
+        // Check for word boundary match (starts with query or has query after space)
+        bool wordMatch = false;
+        if (!exactMatch) {
+            // Split name into words and check if any word starts with query
+            QStringList words = lowerName.split(' ', Qt::SkipEmptyParts);
+            for (const QString &word : words) {
+                if (word.startsWith(lowerQuery)) {
+                    wordMatch = true;
+                    break;
+                }
+            }
+        }
+
+        // Check for partial match (contains query)
+        bool partialMatch = !exactMatch && !wordMatch && lowerName.contains(lowerQuery);
+
+        if (exactMatch || wordMatch || partialMatch || phoneMatch) {
             QVariantMap contact;
             contact["id"] = m_contactModel->data(idx, ContactModel::IdRole);
             contact["name"] = name;
             contact["phoneNumber"] = phone;
             contact["email"] = m_contactModel->data(idx, ContactModel::EmailRole);
-            results.append(contact);
+
+            // Prioritize results: exact > word boundary > partial > phone
+            if (exactMatch) {
+                exactMatches.append(contact);
+            } else if (wordMatch) {
+                wordBoundaryMatches.append(contact);
+            } else if (phoneMatch) {
+                // Phone matches go in word boundary tier (high priority)
+                wordBoundaryMatches.append(contact);
+            } else {
+                partialMatches.append(contact);
+            }
         }
     }
+
+    // Return results in priority order
+    results.append(exactMatches);
+    results.append(wordBoundaryMatches);
+    results.append(partialMatches);
 
     return results;
 }
@@ -350,6 +392,61 @@ void ContactManager::messageContact(const QString &id)
         qDebug() << "ContactManager: Messaging" << contact->name << "at" << contact->phoneNumber;
         // TODO: Integrate with messaging functionality
     }
+}
+
+QStringList ContactManager::getAllContactNames()
+{
+    QStringList names;
+    int count = m_contactModel->rowCount();
+    names.reserve(count);
+
+    for (int i = 0; i < count; ++i) {
+        QModelIndex idx = m_contactModel->index(i);
+        QString name = m_contactModel->data(idx, ContactModel::NameRole).toString();
+        if (!name.isEmpty()) {
+            names.append(name);
+        }
+    }
+
+    return names;
+}
+
+QString ContactManager::findContactNameByNumber(const QString &phoneNumber)
+{
+    // Strip formatting from search number (remove spaces, dashes, parentheses, plus signs)
+    QString cleanSearch = phoneNumber;
+    cleanSearch.remove(QRegularExpression("[\\s\\-\\(\\)\\+]"));
+
+    // Search through all contacts using the model's public interface
+    int contactCount = m_contactModel->rowCount();
+    for (int i = 0; i < contactCount; ++i) {
+        QModelIndex index = m_contactModel->index(i, 0);
+
+        QString name = m_contactModel->data(index, ContactModel::NameRole).toString();
+        QString number1 = m_contactModel->data(index, ContactModel::PhoneNumberRole).toString();
+        QString number2 = m_contactModel->data(index, ContactModel::PhoneNumber2Role).toString();
+
+        QString cleanNumber1 = number1;
+        cleanNumber1.remove(QRegularExpression("[\\s\\-\\(\\)\\+]"));
+
+        QString cleanNumber2 = number2;
+        cleanNumber2.remove(QRegularExpression("[\\s\\-\\(\\)\\+]"));
+
+        // Check if cleaned numbers match (last 10 digits for North American numbers)
+        if (cleanSearch.length() >= 10 && cleanNumber1.length() >= 10) {
+            if (cleanSearch.right(10) == cleanNumber1.right(10)) {
+                return name;
+            }
+        }
+
+        if (cleanSearch.length() >= 10 && cleanNumber2.length() >= 10) {
+            if (cleanSearch.right(10) == cleanNumber2.right(10)) {
+                return name;
+            }
+        }
+    }
+
+    return "";  // Not found
 }
 
 // ========== Private Slots ==========

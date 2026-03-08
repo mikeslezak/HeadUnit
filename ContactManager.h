@@ -112,10 +112,14 @@ public slots:
     Q_INVOKABLE QVariantList searchContacts(const QString &query);
     Q_INVOKABLE QVariantMap getContact(const QString &id);
     Q_INVOKABLE QStringList getAlphabeticalSections();
+    Q_INVOKABLE QString findContactNameByNumber(const QString &phoneNumber);
 
     // Actions
     Q_INVOKABLE void callContact(const QString &id);
     Q_INVOKABLE void messageContact(const QString &id);
+
+    // Context for AI assistant
+    Q_INVOKABLE QStringList getAllContactNames();
 
 signals:
     void contactCountChanged();
