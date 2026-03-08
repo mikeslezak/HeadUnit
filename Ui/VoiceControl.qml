@@ -59,10 +59,50 @@ Rectangle {
             }
         }
 
+        // Test input field (temporary - for testing without microphone)
+        Rectangle {
+            anchors.horizontalCenter: parent.horizontalCenter
+            width: 500
+            height: 50
+            radius: 8
+            color: Qt.rgba(0, 0, 0, 0.5)
+            border.color: primaryCol
+            border.width: 2
+
+            TextInput {
+                id: testCommandInput
+                anchors.fill: parent
+                anchors.margins: 12
+                color: textCol
+                font.pixelSize: fontSize + 2
+                font.family: fontFamily
+                verticalAlignment: TextInput.AlignVCenter
+                selectByMouse: true
+
+                Text {
+                    anchors.centerIn: parent
+                    text: "Type command here (e.g., 'call mom')"
+                    color: Qt.rgba(textCol.r, textCol.g, textCol.b, 0.5)
+                    font.pixelSize: fontSize
+                    font.family: fontFamily
+                    visible: testCommandInput.text.length === 0
+                }
+
+                Keys.onReturnPressed: {
+                    if (testCommandInput.text.length > 0) {
+                        console.log("Test command:", testCommandInput.text)
+                        // Send to Claude for processing
+                        claudeClient.sendMessage(testCommandInput.text)
+                        testCommandInput.text = ""
+                    }
+                }
+            }
+        }
+
         // Status text
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
-            text: voiceAssistant.isListening ? "Listening..." : "Voice Assistant"
+            text: voiceAssistant.isListening ? "Listening..." : "Voice Assistant (Test Mode)"
             color: primaryCol
             font.pixelSize: fontSize + 10
             font.family: fontFamily

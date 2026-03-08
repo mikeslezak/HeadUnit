@@ -12,6 +12,8 @@ find_package(Qt6 6.2 REQUIRED COMPONENTS
     WebChannel
     Bluetooth
     DBus
+    Multimedia
+    Network
 )
 
 # TextToSpeech is optional - only use if available
@@ -26,19 +28,33 @@ qt_add_executable(appHeadUnit
     main.cpp
     MediaController.cpp
     VoiceAssistant.cpp
+    WakeWordDetector.cpp
+    PicovoiceManager.cpp
+    ClaudeClient.cpp
+    GoogleSpeechRecognizer.cpp
+    GoogleTTS.cpp
+    GoogleSTT.cpp
     NotificationManager.cpp
     BluetoothManager.cpp
     ContactManager.cpp
     MessageManager.cpp
+    VoiceCommandHandler.cpp
 )
 
 target_sources(appHeadUnit PRIVATE
     MediaController.h
     VoiceAssistant.h
+    WakeWordDetector.h
+    PicovoiceManager.h
+    ClaudeClient.h
+    GoogleSpeechRecognizer.h
+    GoogleTTS.h
+    GoogleSTT.h
     NotificationManager.h
     BluetoothManager.h
     ContactManager.h
     MessageManager.h
+    VoiceCommandHandler.h
 )
 
 qt_add_qml_module(appHeadUnit
@@ -59,6 +75,10 @@ qt_add_qml_module(appHeadUnit
         Ui/NotificationPanel.qml
         Ui/NotificationBanner.qml
         Ui/VoiceControl.qml
+        Ui/ClaudeIndicator.qml
+        Ui/ActiveCallOverlay.qml
+        Ui/IncomingCallOverlay.qml
+        Ui/MiniPlayer.qml
         Ui/screens/Home.qml
         Ui/screens/Music.qml
         Ui/screens/Maps.qml
@@ -122,6 +142,29 @@ qt_add_qml_module(appHeadUnit
         themes/RetroVFD/icons/weather_vfd.svg
 )
 
+# Picovoice SDK paths
+set(PICOVOICE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external")
+set(PORCUPINE_DIR "${PICOVOICE_DIR}/porcupine")
+set(LEOPARD_DIR "${PICOVOICE_DIR}/leopard")
+set(RHINO_DIR "${PICOVOICE_DIR}/rhino")
+set(KOALA_DIR "${PICOVOICE_DIR}/koala")
+
+# Include directories for all Picovoice SDKs
+target_include_directories(appHeadUnit PRIVATE
+    "${PORCUPINE_DIR}/include"
+    "${LEOPARD_DIR}/include"
+    "${RHINO_DIR}/include"
+    "${KOALA_DIR}/include"
+)
+
+# Link Picovoice libraries (cortex-a72 for Jetson Tegra, compatible with Cortex-A78AE)
+target_link_libraries(appHeadUnit PRIVATE
+    "${PORCUPINE_DIR}/lib/raspberry-pi/cortex-a72-aarch64/libpv_porcupine.so"
+    "${LEOPARD_DIR}/lib/libpv_leopard.so"
+    "${RHINO_DIR}/lib/libpv_rhino.so"
+    "${KOALA_DIR}/lib/libpv_koala.so"
+)
+
 target_link_libraries(appHeadUnit PRIVATE
     Qt6::Quick
     Qt6::Svg
@@ -129,6 +172,8 @@ target_link_libraries(appHeadUnit PRIVATE
     Qt6::WebChannel
     Qt6::Bluetooth
     Qt6::DBus
+    Qt6::Multimedia
+    Qt6::Network
 )
 
 # Link TextToSpeech only if available
