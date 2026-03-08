@@ -14,8 +14,8 @@ Item {
     readonly property string fontFamily: theme?.typography?.fontFamily ?? "Noto Sans"
 
     property string phoneNumber: ""
-    property bool isInCall: false
-    property string callStatus: "Ready"
+    property bool isInCall: bluetoothManager ? bluetoothManager.hasActiveCall : false
+    property string callStatus: getCallStatus()
 
     Rectangle {
         anchors.fill: parent
@@ -240,8 +240,6 @@ Item {
                             onClicked: {
                                 if (phoneNumber.length > 0) {
                                     console.log("Initiating call to:", phoneNumber)
-                                    isInCall = true
-                                    callStatus = "Calling " + phoneNumber + "..."
                                     if (bluetoothManager) {
                                         bluetoothManager.dialNumber(phoneNumber)
                                     }
@@ -289,8 +287,6 @@ Item {
                             hoverEnabled: true
                             onClicked: {
                                 console.log("Ending call")
-                                isInCall = false
-                                callStatus = "Call ended"
                                 if (bluetoothManager) {
                                     bluetoothManager.hangupCall()
                                 }
@@ -300,5 +296,27 @@ Item {
                 }
             }
         }
+    }
+
+    // Helper function to get call status message
+    function getCallStatus() {
+        if (!bluetoothManager) return "No Bluetooth"
+
+        if (bluetoothManager.hasActiveCall) {
+            var state = bluetoothManager.activeCallState
+            var number = bluetoothManager.activeCallNumber
+
+            if (state === "incoming") {
+                return "Incoming call from " + (number || "Unknown")
+            } else if (state === "dialing" || state === "alerting") {
+                return "Calling " + (number || "Unknown") + "..."
+            } else if (state === "active") {
+                return "In call with " + (number || "Unknown")
+            } else {
+                return "Call in progress"
+            }
+        }
+
+        return "Ready"
     }
 }

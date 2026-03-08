@@ -34,52 +34,124 @@ QtObject {
     function load(themeId) {
         var url = Qt.resolvedUrl("themes/" + themeId + "/tokens.json")
         console.log("Theme load ->", url)
+
+        // Use XMLHttpRequest with synchronous mode for qrc URLs
         var req = new XMLHttpRequest()
-        req.open("GET", url)
-        req.onreadystatechange = function () {
-            if (req.readyState !== XMLHttpRequest.DONE) return
-            console.log("Theme status =", req.status)
-            if (req.status !== 0 && req.status !== 200) {
-                console.warn("Theme HTTP error:", req.status)
+        req.open("GET", url, false)  // synchronous for qrc://
+        try {
+            req.send()
+            console.log("Theme status =", req.status, "readyState =", req.readyState)
+
+            var s = req.responseText || ""
+            console.log("Theme response length:", s.length)
+
+            if (!s || s.length === 0) {
+                console.warn("Theme: Empty response, trying alternative load")
+                // Fallback: try loading hardcoded default
+                loadDefaultTheme(themeId)
                 return
             }
-            try {
-                var s = req.responseText || ""
-                if (!s || s.length === 0) {
-                    console.warn("Theme: Empty response")
-                    return
-                }
 
-                // Remove BOM if present
-                if (s.length && s.charCodeAt(0) === 0xFEFF) {
-                    s = s.slice(1)
-                }
+            // Remove BOM if present
+            if (s.length && s.charCodeAt(0) === 0xFEFF) {
+                s = s.slice(1)
+            }
 
-                var parsed = JSON.parse(s)
+            var parsed = JSON.parse(s)
 
-                // Validate parsed data
-                if (!parsed || typeof parsed !== 'object') {
-                    console.warn("Theme: Invalid JSON structure")
-                    return
-                }
+            // Validate parsed data
+            if (!parsed || typeof parsed !== 'object') {
+                console.warn("Theme: Invalid JSON structure")
+                loadDefaultTheme(themeId)
+                return
+            }
 
-                root._t = parsed
-                root.name = themeId
-                root.prefs.theme = themeId
+            root._t = parsed
+            root.name = themeId
+            root.prefs.theme = themeId
 
-                // Load custom font if specified
-                if (parsed.typography && parsed.typography.fontFile) {
-                    loadCustomFont(themeId, parsed.typography.fontFile)
-                }
+            // Load custom font if specified
+            if (parsed.typography && parsed.typography.fontFile) {
+                loadCustomFont(themeId, parsed.typography.fontFile)
+            }
 
-                root.rev++
-                console.log("Theme loaded successfully:", themeId)
-                root.themeChanged()
-            } catch (e) {
-                console.warn("Theme parse error:", e, "Response:", req.responseText)
+            root.rev++
+            console.log("Theme loaded successfully:", themeId)
+            root.themeChanged()
+        } catch (e) {
+            console.warn("Theme load error:", e)
+            loadDefaultTheme(themeId)
+        }
+    }
+
+    function loadDefaultTheme(themeId) {
+        console.log("Loading hardcoded default theme for:", themeId)
+        // Hardcoded Cyberpunk theme as fallback
+        var defaultTheme = {
+            "palette": {
+                "bg": "#0a0a0f",
+                "text": "#39ff14",
+                "primary": "#00f0ff",
+                "accent": "#ff00ff"
+            },
+            "typography": {
+                "fontFamily": "Orbitron",
+                "fontFile": "fonts/Orbitron-Regular.ttf",
+                "fontSize": 24
+            },
+            "layout": {
+                "pageMargin": 18,
+                "gap": 15
+            },
+            "button": {
+                "width": 360,
+                "height": 66,
+                "radius": 15,
+                "bg": "#00141a",
+                "fg": "#39ff14",
+                "border": "#00f0ff",
+                "borderWidth": 2
+            },
+            "navbar": {
+                "width": 138,
+                "pad": 18,
+                "iconSize": 84,
+                "text": "#00f0ff",
+                "bg": "#0a0a0f"
+            },
+            "icons": {
+                "home": "icons/home_cyber.png",
+                "music": "icons/music_cyber.png",
+                "maps": "icons/maps_cyber.png",
+                "settings": "icons/settings_cyber.png",
+                "phone": "icons/phone_cyber.png"
+            },
+            "splash": {
+                "logo": "logo.svg",
+                "bg": "#000000",
+                "color": "#00f0ff",
+                "glow": "#00f0ff66",
+                "primaryText": "CHEVROLET",
+                "secondaryText": "AMERICA'S HEARTBEAT",
+                "logoSize": 330,
+                "titleSize": 60,
+                "subtitleSize": 27,
+                "holdDuration": 2500,
+                "fadeOutDuration": 1200
             }
         }
-        req.send()
+
+        root._t = defaultTheme
+        root.name = themeId
+        root.prefs.theme = themeId
+
+        if (defaultTheme.typography && defaultTheme.typography.fontFile) {
+            loadCustomFont(themeId, defaultTheme.typography.fontFile)
+        }
+
+        root.rev++
+        console.log("Default theme applied:", themeId)
+        root.themeChanged()
     }
 
     function loadCustomFont(themeId, fontFile) {

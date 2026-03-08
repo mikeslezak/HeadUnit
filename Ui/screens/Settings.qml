@@ -6,6 +6,7 @@ Item {
     id: root
     anchors.fill: parent
     property var theme: null
+    property var appSettings: null  // Passed from Main.qml (changed from required to optional with default)
 
     readonly property color bgCol: theme?.palette?.bg ?? "#0a0a0f"
     readonly property color textCol: theme?.palette?.text ?? "#39ff14"
@@ -16,13 +17,29 @@ Item {
 
     property int currentMenu: 0  // 0=Main, 1=Display, 2=Bluetooth, 3=Voice, 4=Time, 5=About
 
-    Settings {
-        id: appSettings
-        property bool autoReadMessages: true
-        property int voiceVolume: 80
-        property bool use24HourFormat: false
-        property bool autoConnectBluetooth: true
-        property string lastBluetoothDevice: ""
+    // Auto-refresh device list when connection state changes
+    Connections {
+        target: bluetoothManager
+
+        function onDeviceConnected(address) {
+            console.log("Settings: Device connected, refreshing list:", address)
+            bluetoothManager.refreshDeviceList()
+        }
+
+        function onDeviceDisconnected(address) {
+            console.log("Settings: Device disconnected, refreshing list:", address)
+            bluetoothManager.refreshDeviceList()
+        }
+
+        function onDevicePaired(address) {
+            console.log("Settings: Device paired, refreshing list:", address)
+            bluetoothManager.refreshDeviceList()
+        }
+
+        function onDeviceUnpaired(address) {
+            console.log("Settings: Device unpaired, refreshing list:", address)
+            bluetoothManager.refreshDeviceList()
+        }
     }
 
     Rectangle {
@@ -96,8 +113,8 @@ Item {
                 anchors.centerIn: parent
                 columns: 3
                 rows: 2
-                columnSpacing: 16
-                rowSpacing: 16
+                columnSpacing: 24
+                rowSpacing: 24
 
                 SettingCard {
                     title: "Display"
@@ -233,8 +250,10 @@ Item {
                     SettingToggle {
                         title: "Auto-Connect"
                         description: "Automatically connect to last device"
-                        isOn: appSettings.autoConnectBluetooth
-                        onToggled: appSettings.autoConnectBluetooth = !appSettings.autoConnectBluetooth
+                        isOn: appSettings?.autoConnectBluetooth ?? true
+                        onToggled: {
+                            if (appSettings) appSettings.autoConnectBluetooth = !appSettings.autoConnectBluetooth
+                        }
                     }
 
                     Rectangle {
@@ -292,7 +311,7 @@ Item {
                     // Device List
                     Rectangle {
                         width: parent.width
-                        height: deviceListColumn.height + 16
+                        height: deviceListColumn.height + 24
                         color: Qt.rgba(0, 0, 0, 0.2)
                         border.color: Qt.rgba(primaryCol.r, primaryCol.g, primaryCol.b, 0.3)
                         border.width: 1
@@ -303,8 +322,8 @@ Item {
                             anchors.left: parent.left
                             anchors.right: parent.right
                             anchors.top: parent.top
-                            anchors.margins: 8
-                            spacing: 8
+                            anchors.margins: 12
+                            spacing: 12
 
                             Repeater {
                                 model: bluetoothManager.deviceModel
@@ -364,10 +383,12 @@ Item {
                 SettingToggle {
                     title: "Auto-Read Messages"
                     description: "Read incoming messages aloud while driving"
-                    isOn: appSettings.autoReadMessages
+                    isOn: appSettings?.autoReadMessages ?? true
                     onToggled: {
-                        appSettings.autoReadMessages = !appSettings.autoReadMessages
-                        voiceAssistant.setAutoReadMessages(appSettings.autoReadMessages)
+                        if (appSettings) {
+                            appSettings.autoReadMessages = !appSettings.autoReadMessages
+                            voiceAssistant.setAutoReadMessages(appSettings.autoReadMessages)
+                        }
                     }
                 }
 
@@ -408,7 +429,7 @@ Item {
                             anchors.verticalCenter: parent.verticalCenter
 
                             Rectangle {
-                                width: parent.width * (appSettings.voiceVolume / 100)
+                                width: parent.width * ((appSettings?.voiceVolume ?? 80) / 100)
                                 height: parent.height
                                 color: primaryCol
                                 radius: 4
@@ -417,14 +438,16 @@ Item {
                             MouseArea {
                                 anchors.fill: parent
                                 onClicked: {
-                                    appSettings.voiceVolume = Math.floor((mouse.x / width) * 100)
-                                    voiceAssistant.setVoiceVolume(appSettings.voiceVolume)
+                                    if (appSettings) {
+                                        appSettings.voiceVolume = Math.floor((mouse.x / width) * 100)
+                                        voiceAssistant.setVoiceVolume(appSettings.voiceVolume)
+                                    }
                                 }
                             }
                         }
 
                         Text {
-                            text: appSettings.voiceVolume + "%"
+                            text: (appSettings?.voiceVolume ?? 80) + "%"
                             color: textCol
                             font.pixelSize: fontSize
                             font.family: fontFamily
@@ -474,6 +497,202 @@ Item {
                         }
                     }
                 }
+
+                Rectangle {
+                    width: parent.width
+                    height: 1
+                    color: Qt.rgba(primaryCol.r, primaryCol.g, primaryCol.b, 0.2)
+                }
+
+                Text {
+                    text: "Google TTS Settings"
+                    color: primaryCol
+                    font.pixelSize: fontSize + 2
+                    font.family: fontFamily
+                    font.weight: Font.Bold
+                }
+
+                // Voice Selection
+                Column {
+                    width: parent.width
+                    spacing: 8
+
+                    Text {
+                        text: "Voice Type"
+                        color: textCol
+                        font.pixelSize: fontSize
+                        font.family: fontFamily
+                        opacity: 0.8
+                    }
+
+                    Row {
+                        spacing: 12
+                        width: parent.width
+
+                        VoiceButton {
+                            text: "Female (US)"
+                            voiceName: "en-US-Neural2-F"
+                            isActive: (appSettings?.ttsVoice ?? "en-US-Neural2-F") === "en-US-Neural2-F"
+                        }
+
+                        VoiceButton {
+                            text: "Male (US)"
+                            voiceName: "en-US-Neural2-J"
+                            isActive: (appSettings?.ttsVoice ?? "en-US-Neural2-F") === "en-US-Neural2-J"
+                        }
+                    }
+
+                    Row {
+                        spacing: 12
+                        width: parent.width
+
+                        VoiceButton {
+                            text: "Female (UK)"
+                            voiceName: "en-GB-Neural2-A"
+                            isActive: (appSettings?.ttsVoice ?? "en-US-Neural2-F") === "en-GB-Neural2-A"
+                        }
+
+                        VoiceButton {
+                            text: "Male (UK)"
+                            voiceName: "en-GB-Neural2-B"
+                            isActive: (appSettings?.ttsVoice ?? "en-US-Neural2-F") === "en-GB-Neural2-B"
+                        }
+                    }
+                }
+
+                // Speaking Rate
+                Column {
+                    width: parent.width
+                    spacing: 8
+
+                    Text {
+                        text: "Speaking Speed"
+                        color: textCol
+                        font.pixelSize: fontSize
+                        font.family: fontFamily
+                        opacity: 0.8
+                    }
+
+                    Row {
+                        spacing: 12
+                        width: parent.width
+
+                        Text {
+                            text: "🐢"
+                            font.pixelSize: 20
+                            color: primaryCol
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+
+                        Rectangle {
+                            width: parent.width - 120
+                            height: 8
+                            color: Qt.rgba(primaryCol.r, primaryCol.g, primaryCol.b, 0.2)
+                            radius: 4
+                            anchors.verticalCenter: parent.verticalCenter
+
+                            Rectangle {
+                                width: parent.width * ((appSettings?.ttsSpeakingRate ?? 1.0) - 0.5) / 1.5
+                                height: parent.height
+                                color: primaryCol
+                                radius: 4
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: {
+                                    if (appSettings) {
+                                        var rate = 0.5 + (mouse.x / width) * 1.5
+                                        appSettings.ttsSpeakingRate = Math.round(rate * 10) / 10
+                                        googleTTS.setSpeakingRate(appSettings.ttsSpeakingRate)
+                                    }
+                                }
+                            }
+                        }
+
+                        Text {
+                            text: "🐇"
+                            font.pixelSize: 20
+                            color: primaryCol
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+
+                        Text {
+                            text: (appSettings?.ttsSpeakingRate ?? 1.0).toFixed(1) + "x"
+                            color: textCol
+                            font.pixelSize: fontSize
+                            font.family: fontFamily
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+                    }
+                }
+
+                // Pitch
+                Column {
+                    width: parent.width
+                    spacing: 8
+
+                    Text {
+                        text: "Voice Pitch"
+                        color: textCol
+                        font.pixelSize: fontSize
+                        font.family: fontFamily
+                        opacity: 0.8
+                    }
+
+                    Row {
+                        spacing: 12
+                        width: parent.width
+
+                        Text {
+                            text: "🔽"
+                            font.pixelSize: 20
+                            color: primaryCol
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+
+                        Rectangle {
+                            width: parent.width - 120
+                            height: 8
+                            color: Qt.rgba(primaryCol.r, primaryCol.g, primaryCol.b, 0.2)
+                            radius: 4
+                            anchors.verticalCenter: parent.verticalCenter
+
+                            Rectangle {
+                                width: parent.width * ((appSettings?.ttsPitch ?? 0.0) + 10.0) / 20.0
+                                height: parent.height
+                                color: primaryCol
+                                radius: 4
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: {
+                                    if (appSettings) {
+                                        var pitch = -10.0 + (mouse.x / width) * 20.0
+                                        appSettings.ttsPitch = Math.round(pitch)
+                                        googleTTS.setPitch(appSettings.ttsPitch)
+                                    }
+                                }
+                            }
+                        }
+
+                        Text {
+                            text: "🔼"
+                            font.pixelSize: 20
+                            color: primaryCol
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+
+                        Text {
+                            text: (appSettings?.ttsPitch ?? 0.0) > 0 ? "+" + (appSettings?.ttsPitch ?? 0).toString() : (appSettings?.ttsPitch ?? 0).toString()
+                            color: textCol
+                            font.pixelSize: fontSize
+                            font.family: fontFamily
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+                    }
+                }
                 }
             }
 
@@ -494,8 +713,10 @@ Item {
                 SettingToggle {
                     title: "24-Hour Format"
                     description: "Use 24-hour time format"
-                    isOn: appSettings.use24HourFormat
-                    onToggled: appSettings.use24HourFormat = !appSettings.use24HourFormat
+                    isOn: appSettings?.use24HourFormat ?? false
+                    onToggled: {
+                        if (appSettings) appSettings.use24HourFormat = !appSettings.use24HourFormat
+                    }
                 }
 
                 Rectangle {
@@ -517,7 +738,7 @@ Item {
                     }
 
                     Text {
-                        text: Qt.formatDateTime(new Date(), appSettings.use24HourFormat ? "HH:mm:ss" : "h:mm:ss AP")
+                        text: Qt.formatDateTime(new Date(), (appSettings?.use24HourFormat ?? false) ? "HH:mm:ss" : "h:mm:ss AP")
                         color: textCol
                         font.pixelSize: fontSize + 4
                         font.family: fontFamily
@@ -528,7 +749,7 @@ Item {
                             interval: 1000
                             running: currentMenu === 4
                             repeat: true
-                            onTriggered: parent.text = Qt.formatDateTime(new Date(), appSettings.use24HourFormat ? "HH:mm:ss" : "h:mm:ss AP")
+                            onTriggered: parent.text = Qt.formatDateTime(new Date(), (appSettings?.use24HourFormat ?? false) ? "HH:mm:ss" : "h:mm:ss AP")
                         }
                     }
                 }
@@ -863,6 +1084,39 @@ Item {
         }
     }
 
+    // Voice Button Component
+    component VoiceButton: Rectangle {
+        width: (parent.width - 12) / 2
+        height: 48
+        color: isActive ? Qt.rgba(primaryCol.r, primaryCol.g, primaryCol.b, 0.3) : Qt.rgba(0, 0, 0, 0.3)
+        border.color: isActive ? primaryCol : Qt.rgba(primaryCol.r, primaryCol.g, primaryCol.b, 0.5)
+        border.width: isActive ? 2 : 1
+        radius: 8
+
+        property string text: ""
+        property string voiceName: ""
+        property bool isActive: false
+
+        Text {
+            anchors.centerIn: parent
+            text: parent.text
+            color: isActive ? primaryCol : textCol
+            font.pixelSize: fontSize
+            font.family: fontFamily
+            font.weight: isActive ? Font.Bold : Font.Normal
+        }
+
+        MouseArea {
+            anchors.fill: parent
+            onClicked: {
+                if (appSettings) {
+                    appSettings.ttsVoice = voiceName
+                    googleTTS.setVoiceName(voiceName)
+                }
+            }
+        }
+    }
+
     // Info Row Component
     component InfoRow: Row {
         width: parent.width
@@ -889,7 +1143,7 @@ Item {
 
     // Bluetooth Device Item Component
     component BluetoothDeviceItem: Rectangle {
-        height: 80
+        height: 100
         color: isConnected ? Qt.rgba(primaryCol.r, primaryCol.g, primaryCol.b, 0.15) : Qt.rgba(0, 0, 0, 0.3)
         border.color: isConnected ? primaryCol : Qt.rgba(primaryCol.r, primaryCol.g, primaryCol.b, 0.4)
         border.width: isConnected ? 2 : 1
@@ -903,14 +1157,14 @@ Item {
 
         Row {
             anchors.fill: parent
-            anchors.margins: 12
-            spacing: 12
+            anchors.margins: 16
+            spacing: 16
 
             // Device icon
             Rectangle {
-                width: 56
-                height: 56
-                radius: 28
+                width: 48
+                height: 48
+                radius: 24
                 color: Qt.rgba(primaryCol.r, primaryCol.g, primaryCol.b, 0.2)
                 border.color: primaryCol
                 border.width: 2
@@ -946,128 +1200,90 @@ Item {
 
             // Device info
             Column {
-                width: parent.width - 200
+                width: parent.width - 270
                 anchors.verticalCenter: parent.verticalCenter
-                spacing: 4
+                spacing: 6
 
                 Text {
                     text: deviceName
                     color: isConnected ? primaryCol : textCol
-                    font.pixelSize: fontSize + 2
+                    font.pixelSize: fontSize + 3
                     font.family: fontFamily
                     font.weight: Font.Bold
                     elide: Text.ElideRight
                     width: parent.width
                 }
 
+                // Only show MAC address for unpaired devices
                 Text {
+                    visible: !isPaired
                     text: deviceAddress
                     color: textCol
-                    font.pixelSize: fontSize - 3
+                    font.pixelSize: fontSize - 2
                     font.family: fontFamily
-                    opacity: 0.6
+                    opacity: 0.5
                 }
 
                 Row {
-                    spacing: 8
+                    spacing: 10
 
                     Text {
                         text: isConnected ? "● Connected" : (isPaired ? "● Paired" : "○ Not Paired")
                         color: isConnected ? "#00ff00" : (isPaired ? primaryCol : textCol)
-                        font.pixelSize: fontSize - 2
+                        font.pixelSize: fontSize - 1
                         font.family: fontFamily
-                        opacity: 0.8
+                        opacity: 0.9
                     }
 
-                    // Signal strength indicator
-                    Row {
-                        spacing: 2
-                        visible: signalStrength > -100
+                    // Simplified signal strength (only for paired devices)
+                    Text {
+                        visible: isPaired && signalStrength > -100
+                        text: signalStrength > -70 ? "📶" : signalStrength > -80 ? "📶" : "📶"
+                        font.pixelSize: fontSize - 1
+                        opacity: signalStrength > -70 ? 1.0 : signalStrength > -80 ? 0.7 : 0.4
                         anchors.verticalCenter: parent.verticalCenter
-
-                        Repeater {
-                            model: 4
-                            Rectangle {
-                                width: 3
-                                height: 4 + (index * 3)
-                                color: signalStrength > (-90 + index * 10) ? primaryCol : Qt.rgba(textCol.r, textCol.g, textCol.b, 0.3)
-                                radius: 1
-                                anchors.bottom: parent.bottom
-                            }
-                        }
                     }
                 }
             }
 
-            // Action buttons
-            Column {
-                width: 100
+            // Single smart action button
+            Rectangle {
+                width: 180
+                height: 48
                 anchors.verticalCenter: parent.verticalCenter
-                spacing: 6
+                color: isConnected ? Qt.rgba(1, 0, 0, 0.2) : Qt.rgba(primaryCol.r, primaryCol.g, primaryCol.b, 0.3)
+                border.color: isConnected ? "#ff6b6b" : primaryCol
+                border.width: 2
+                radius: 8
 
-                Rectangle {
-                    width: parent.width
-                    height: 28
-                    color: Qt.rgba(primaryCol.r, primaryCol.g, primaryCol.b, 0.3)
-                    border.color: primaryCol
-                    border.width: 1
-                    radius: 6
-                    visible: isPaired
+                property string buttonText: isConnected ? "Disconnect" : (isPaired ? "Connect" : "Pair")
 
-                    Text {
-                        anchors.centerIn: parent
-                        text: isConnected ? "Disconnect" : "Connect"
-                        color: primaryCol
-                        font.pixelSize: fontSize - 3
-                        font.family: fontFamily
-                        font.weight: Font.Bold
-                    }
-
-                    MouseArea {
-                        anchors.fill: parent
-                        onClicked: {
-                            if (isConnected) {
-                                bluetoothManager.disconnectDevice(deviceAddress)
-                                // Also disconnect from MediaController if this was the media device
-                                if (mediaController.isConnected) {
-                                    mediaController.disconnect()
-                                }
-                            } else {
-                                bluetoothManager.connectToDevice(deviceAddress)
-                                // Also connect MediaController for music control
-                                mediaController.connectToDevice(deviceAddress)
-                                // Save as last device
-                                appSettings.lastBluetoothDevice = deviceName
-                            }
-                        }
-                    }
+                Text {
+                    anchors.centerIn: parent
+                    anchors.margins: 10
+                    text: parent.buttonText
+                    color: isConnected ? "#ff6b6b" : primaryCol
+                    font.pixelSize: fontSize - 1
+                    font.family: fontFamily
+                    font.weight: Font.Bold
+                    horizontalAlignment: Text.AlignHCenter
+                    width: parent.width - 20
                 }
 
-                Rectangle {
-                    width: parent.width
-                    height: 28
-                    color: isPaired ? Qt.rgba(1, 0, 0, 0.2) : Qt.rgba(primaryCol.r, primaryCol.g, primaryCol.b, 0.3)
-                    border.color: isPaired ? "#ff0000" : primaryCol
-                    border.width: 1
-                    radius: 6
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: isPaired ? "Unpair" : "Pair"
-                        color: isPaired ? "#ff0000" : primaryCol
-                        font.pixelSize: fontSize - 3
-                        font.family: fontFamily
-                        font.weight: Font.Bold
-                    }
-
-                    MouseArea {
-                        anchors.fill: parent
-                        onClicked: {
-                            if (isPaired) {
-                                bluetoothManager.unpairDevice(deviceAddress)
-                            } else {
-                                bluetoothManager.pairDevice(deviceAddress)
+                MouseArea {
+                    anchors.fill: parent
+                    onClicked: {
+                        if (isConnected) {
+                            bluetoothManager.disconnectDevice(deviceAddress)
+                            if (mediaController.isConnected) {
+                                mediaController.disconnect()
                             }
+                        } else if (isPaired) {
+                            bluetoothManager.connectToDevice(deviceAddress)
+                            mediaController.connectToDevice(deviceAddress)
+                            if (appSettings) appSettings.lastBluetoothDevice = deviceName
+                        } else {
+                            bluetoothManager.pairDevice(deviceAddress)
                         }
                     }
                 }

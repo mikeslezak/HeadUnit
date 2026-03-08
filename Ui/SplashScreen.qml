@@ -12,6 +12,14 @@ Rectangle {
     property string animText: ""
     property bool themeReady: false
 
+    // Explicitly start animation when theme is ready
+    onThemeReadyChanged: {
+        if (themeReady && !animTimer.running) {
+            console.log("Splash: themeReady changed to true, starting animTimer")
+            animTimer.start()
+        }
+    }
+
     // Theme tokens with comprehensive fallbacks
     readonly property color splashBg: theme?.splash?.bg ?? "#000000"
     readonly property color splashColor: theme?.splash?.color ?? "#00d9d9"
@@ -21,9 +29,9 @@ Rectangle {
     // Logo animation: "breathe", "pulse", "glow", "static", or "none"
     readonly property string logoAnim: theme?.splash?.logoAnim ?? "breathe"
 
-    // Text to display (can be different per theme)
-    readonly property string primaryText: theme?.splash?.primaryText ?? "CHEVROLET"
-    readonly property string secondaryText: theme?.splash?.secondaryText ?? "DELCO ELECTRONICS"
+    // Text to display (can be different per theme) - renamed to avoid id collision
+    readonly property string splashPrimaryText: theme?.splash?.primaryText ?? "CHEVROLET"
+    readonly property string splashSecondaryText: theme?.splash?.secondaryText ?? "DELCO ELECTRONICS"
 
     // Sizing
     readonly property int logoSize: Number(theme?.splash?.logoSize ?? 250)
@@ -249,8 +257,8 @@ Rectangle {
             id: primaryTextContainer
             anchors.horizontalCenter: parent.horizontalCenter
             y: 200
-            width: primaryText.width
-            height: primaryText.height
+            width: primaryTextLabel.width
+            height: primaryTextLabel.height
             opacity: root.animText.length > 0 ? 1.0 : 0
 
             property real breatheAmount: 1.0
@@ -272,7 +280,7 @@ Rectangle {
             }
 
             Text {
-                id: primaryText
+                id: primaryTextLabel
                 anchors.centerIn: parent
                 text: root.animText
                 color: root.splashColor
@@ -293,9 +301,9 @@ Rectangle {
 
         // Blinking cursor
         Text {
-            visible: root.animText.length > 0 && root.animText.length < root.primaryText.length
+            visible: root.animText.length > 0 && root.animText.length < root.splashPrimaryText.length
             anchors.horizontalCenter: parent.horizontalCenter
-            x: primaryTextContainer.x + primaryText.width + 4
+            x: primaryTextContainer.x + primaryTextLabel.width + 4
             y: primaryTextContainer.y
             text: "_"
             color: root.splashColor
@@ -314,8 +322,8 @@ Rectangle {
             id: secondaryTextContainer
             anchors.horizontalCenter: parent.horizontalCenter
             y: 280
-            width: secondaryText.width
-            height: secondaryText.height
+            width: secondaryTextLabel.width
+            height: secondaryTextLabel.height
             opacity: 0
 
             property real breatheAmount: 1.0
@@ -336,9 +344,9 @@ Rectangle {
             }
 
             Text {
-                id: secondaryText
+                id: secondaryTextLabel
                 anchors.centerIn: parent
-                text: root.secondaryText
+                text: root.splashSecondaryText
                 color: root.splashColor
                 font.family: root.splashFont
                 font.pixelSize: root.subtitleSize
@@ -371,13 +379,18 @@ Rectangle {
         id: animTimer
         interval: root.charDuration
         repeat: true
-        running: root.themeReady
+        running: false  // Explicitly started via onThemeReadyChanged
+
+        onRunningChanged: {
+            console.log("Splash: animTimer running =", running)
+        }
 
         onTriggered: {
             if (root.stage === 0) {
-                if (root.animText.length < root.primaryText.length) {
-                    root.animText = root.primaryText.substring(0, root.animText.length + 1)
+                if (root.animText.length < root.splashPrimaryText.length) {
+                    root.animText = root.splashPrimaryText.substring(0, root.animText.length + 1)
                 } else {
+                    console.log("Splash: Text animation complete, starting secondary timer")
                     root.stage = 1
                     animTimer.stop()
                     secondaryTimer.start()
@@ -391,6 +404,7 @@ Rectangle {
         id: secondaryTimer
         interval: 200
         onTriggered: {
+            console.log("Splash: Secondary timer triggered, showing subtitle and starting hold")
             secondaryTextContainer.opacity = 1.0
             holdTimer.start()
         }
@@ -401,6 +415,7 @@ Rectangle {
         id: holdTimer
         interval: root.holdDuration
         onTriggered: {
+            console.log("Splash: Hold timer triggered, starting fade out")
             scanlinePulse.stop()
             scanlineFadeOut.start()
             fadeOut.start()

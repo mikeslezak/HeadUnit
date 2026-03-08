@@ -12,8 +12,8 @@ Item {
     readonly property color textCol: (theme && theme.palette && theme.palette.text) ? theme.palette.text : "white"
     readonly property color primaryCol: (theme && theme.palette && theme.palette.primary) ? theme.palette.primary : "#00f0ff"
     readonly property string fontFamily: (theme && theme.typography && theme.typography.fontFamily) ? theme.typography.fontFamily : "Noto Sans"
-    readonly property int fontSize: (theme && theme.typography && theme.typography.fontSize) ? Number(theme.typography.fontSize) : 16
-    readonly property int iconSize: 56
+    readonly property int fontSize: (theme && theme.typography && theme.typography.fontSize) ? Number(theme.typography.fontSize) : 24
+    readonly property int iconSize: 84
 
     Rectangle {
         anchors.fill: parent
@@ -24,8 +24,8 @@ Item {
             anchors.centerIn: parent
             columns: 3
             rows: 2
-            columnSpacing: 40
-            rowSpacing: 40
+            columnSpacing: 60
+            rowSpacing: 60
 
             // Row 1
             // Maps
@@ -75,8 +75,8 @@ Item {
 
     // Reusable App Icon Component
     component AppIcon: Item {
-        width: 100
-        height: 110
+        width: 150
+        height: 165
 
         required property string appKey
         required property string appName
@@ -84,13 +84,13 @@ Item {
 
         Column {
             anchors.centerIn: parent
-            spacing: 12
+            spacing: 18
 
             Rectangle {
-                width: root.iconSize + 16
-                height: root.iconSize + 16
+                width: root.iconSize + 24
+                height: root.iconSize + 24
                 color: "transparent"
-                radius: 14
+                radius: 21
                 anchors.horizontalCenter: parent.horizontalCenter
 
                 Image {

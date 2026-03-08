@@ -15,33 +15,14 @@ Item {
     // Real data from Bluetooth and sensors
     property int temperature: 22
     property int heading: 0
-    property int phoneSignal: bluetoothManager ? bluetoothManager.cellularSignal : 0
-    property int phoneBattery: notificationManager ? notificationManager.phoneBatteryLevel : -1
-    property bool isCharging: bluetoothManager ? bluetoothManager.isConnectedDeviceCharging() : false
+
+    // Use direct property bindings for reactive updates
+    readonly property int phoneSignal: bluetoothManager?.cellularSignal ?? 0
+    readonly property int phoneBattery: notificationManager?.phoneBatteryLevel ?? -1
+    readonly property bool isCharging: bluetoothManager?.isConnectedDeviceCharging() ?? false
+    readonly property string carrier: bluetoothManager?.carrierName ?? ""
+
     property string currentTime: "12:00"
-    property string carrier: bluetoothManager ? bluetoothManager.carrierName : ""
-
-    // Update Bluetooth status when signal changes
-    Connections {
-        target: bluetoothManager
-        function onCellularSignalChanged() {
-            phoneSignal = bluetoothManager.cellularSignal
-        }
-        function onCarrierNameChanged() {
-            carrier = bluetoothManager.carrierName
-        }
-        function onDeviceCountChanged() {
-            isCharging = bluetoothManager.isConnectedDeviceCharging()
-        }
-    }
-
-    // Update phone battery from NotificationManager
-    Connections {
-        target: notificationManager
-        function onPhoneBatteryLevelChanged() {
-            phoneBattery = notificationManager.phoneBatteryLevel
-        }
-    }
 
     // Update time every minute
     Timer {
@@ -86,13 +67,13 @@ Item {
 
     Row {
         anchors.fill: parent
-        spacing: 20
+        spacing: 24
 
         // Time
         Text {
             text: currentTime
             color: textCol
-            font.pixelSize: fontSize - 2
+            font.pixelSize: fontSize - 1
             font.family: fontFamily
             font.weight: Font.Medium
             anchors.verticalCenter: parent.verticalCenter
@@ -151,14 +132,14 @@ Item {
 
         // Phone Signal
         Row {
-            spacing: 2
+            spacing: 3
             anchors.verticalCenter: parent.verticalCenter
 
             Repeater {
                 model: 4
                 Rectangle {
-                    width: 3
-                    height: 4 + (index * 2.5)
+                    width: 4
+                    height: 5 + (index * 3)
                     color: index < phoneSignal ?
                         primaryCol : Qt.rgba(textCol.r, textCol.g, textCol.b, 0.2)
                     radius: 1
@@ -176,36 +157,36 @@ Item {
 
         // Phone Battery
         Row {
-            spacing: 4
+            spacing: 6
             anchors.verticalCenter: parent.verticalCenter
             visible: phoneBattery >= 0  // Only show if battery info is available
 
             Rectangle {
-                width: 20
-                height: 10
+                width: 24
+                height: 12
                 color: "transparent"
                 border.color: getBatteryColor()
-                border.width: 1
-                radius: 1
+                border.width: 1.5
+                radius: 2
                 anchors.verticalCenter: parent.verticalCenter
 
                 Rectangle {
                     anchors.left: parent.left
                     anchors.top: parent.top
                     anchors.bottom: parent.bottom
-                    anchors.margins: 1.5
-                    width: Math.max(1, (parent.width - 3) * (Math.max(0, phoneBattery) / 100))
+                    anchors.margins: 2
+                    width: Math.max(1, (parent.width - 4) * (Math.max(0, phoneBattery) / 100))
                     color: getBatteryColor()
-                    radius: 0.5
+                    radius: 1
                 }
 
                 Rectangle {
                     anchors.left: parent.right
                     anchors.verticalCenter: parent.verticalCenter
                     width: 2
-                    height: 5
+                    height: 6
                     color: getBatteryColor()
-                    radius: 0.5
+                    radius: 1
                 }
 
                 // Charging indicator (lightning bolt)
@@ -214,7 +195,7 @@ Item {
                     anchors.centerIn: parent
                     text: "⚡"
                     color: "#ffff00"
-                    font.pixelSize: 8
+                    font.pixelSize: 10
                     font.weight: Font.Bold
                 }
             }
@@ -222,7 +203,7 @@ Item {
             Text {
                 text: phoneBattery + "%"
                 color: getBatteryColor()
-                font.pixelSize: fontSize - 5
+                font.pixelSize: fontSize - 4
                 font.family: fontFamily
                 opacity: 0.8
                 anchors.verticalCenter: parent.verticalCenter

@@ -1,22 +1,36 @@
 import QtQuick 2.15
 import QtQuick.Window 2.15
 import QtQuick.Effects
+import QtCore
 import "Ui"
 
 Window {
     id: mainWindow
-    width: 1280
-    height: 400
-    minimumWidth: 1280
-    maximumWidth: 1280
-    minimumHeight: 400
-    maximumHeight: 400
+    width: 1560
+    height: 720
+    minimumWidth: 1560
+    maximumWidth: 1560
+    minimumHeight: 720
+    maximumHeight: 720
     visible: true
     title: "HeadUnit"
     visibility: Window.FullScreen
     color:"#000000"
 
     Theme { id: theme }
+
+    // Shared app settings (accessible from all screens)
+    Settings {
+        id: appSettings
+        property bool autoReadMessages: true
+        property int voiceVolume: 80
+        property bool use24HourFormat: false
+        property bool autoConnectBluetooth: true
+        property string lastBluetoothDevice: ""
+        property string ttsVoice: "en-US-Neural2-F"
+        property double ttsSpeakingRate: 1.0
+        property double ttsPitch: 0.0
+    }
 
     property QtObject appPrefs: QtObject {
         property var settings: Qt.createQmlObject('import QtCore; Settings { }', mainWindow)
@@ -75,6 +89,163 @@ Window {
         function onCommandRecognized(command) {
             console.log("Voice command:", command)
             voiceControlLoader.active = false
+        }
+    }
+
+    // PicovoiceManager Connections - Unified Voice Pipeline
+    Connections {
+        target: picovoiceManager
+
+        function onWakeWordDetected(keyword) {
+            console.log("Wake word detected via PicovoiceManager:", keyword, "- Activating Claude AI")
+
+            // CRITICAL: Stop any ongoing TTS playback immediately to prevent audio conflicts
+            if (googleTTS.isSpeaking) {
+                console.log("Stopping TTS playback before processing new wake word")
+                googleTTS.stop()
+            }
+
+            // Cancel any pending hide timer
+            hideClaudeTimer.stop()
+
+            // Activate Claude indicator (same as long-press home button)
+            claudeIndicatorLoader.active = true
+
+            // Wait for loader to complete before showing
+            if (claudeIndicatorLoader.item) {
+                claudeIndicatorLoader.item.show()
+                claudeIndicatorLoader.item.setState("listening")
+            }
+
+            // Play a short "ready" voice prompt to indicate we're listening
+            // Use a random phrase for personality variety
+            var readyPhrases = ["Yes?", "What's up?", "I'm here", "Go ahead", "Listening"]
+            var randomIndex = Math.floor(Math.random() * readyPhrases.length)
+            var readyPhrase = readyPhrases[randomIndex]
+            console.log("Playing ready prompt:", readyPhrase)
+            googleTTS.speak(readyPhrase)
+
+            // Note: PicovoiceManager is now in WaitingForReadyPrompt state
+            // It will transition to listening mode when onReadyPromptFinished() is called
+            // This is triggered by googleTTS.speechFinished signal (see Connections below)
+        }
+
+        function onIntentDetected(intent, slots) {
+            console.log("Intent detected:", intent, "Slots:", JSON.stringify(slots))
+
+            // Quick command recognized - hide indicator after brief display
+            if (claudeIndicatorLoader.item) {
+                claudeIndicatorLoader.item.setState("processing")
+            }
+
+            // Intent is handled by VoiceCommandHandler (already connected in main.cpp)
+            // Auto-hide after 2 seconds for quick commands
+            hideClaudeTimer.start()
+        }
+
+        function onTranscriptionReady(text) {
+            console.log("Speech transcription from Leopard:", text)
+
+            // Update Claude indicator to show we're processing with AI
+            if (claudeIndicatorLoader.item) {
+                claudeIndicatorLoader.item.setState("processing")
+            }
+
+            // Transcription is sent to Claude AI (already connected in main.cpp)
+            // Claude will respond, which is handled by claudeClient connections below
+        }
+
+        function onError(message) {
+            console.log("PicovoiceManager error:", message)
+            if (claudeIndicatorLoader.item) {
+                claudeIndicatorLoader.item.hide()
+            }
+            showNotification("Voice Error: " + message, "error")
+        }
+    }
+
+    // Google TTS Connections - for ready prompt completion
+    Connections {
+        target: googleTTS
+
+        function onSpeechFinished() {
+            // Notify PicovoiceManager that the ready prompt has finished
+            // so it can start listening for the command
+            console.log("TTS speech finished, notifying PicovoiceManager")
+            picovoiceManager.onReadyPromptFinished()
+        }
+    }
+
+    // Claude Client Connections
+    Connections {
+        target: claudeClient
+
+        function onProcessingChanged() {
+            if (claudeIndicatorLoader.item) {
+                if (claudeClient.isProcessing) {
+                    claudeIndicatorLoader.item.setState("processing")
+                } else {
+                    // If not processing anymore, hide after a delay
+                    hideClaudeTimer.start()
+                }
+            }
+        }
+
+        function onResponseReceived(response, toolCalls) {
+            console.log("Claude response:", response)
+            if (claudeIndicatorLoader.item) {
+                claudeIndicatorLoader.item.setState("speaking")
+            }
+
+            // Process voice commands from response
+            voiceCommandHandler.processClaudeResponse(response)
+
+            // Speak Claude's response using Google TTS
+            googleTTS.speak(response)
+
+            // Hide indicator after speaking (3 seconds for now, will be based on speech length later)
+            hideClaudeTimer.start()
+        }
+
+        function onError(message) {
+            console.log("Claude error:", message)
+            if (claudeIndicatorLoader.item) {
+                claudeIndicatorLoader.item.hide()
+            }
+            showNotification("Claude Error: " + message, "error")
+        }
+    }
+
+    // Voice Command Handler Connections
+    Connections {
+        target: voiceCommandHandler
+
+        function onConfirmationRequested(action, details) {
+            console.log("Voice command confirmation requested:", action, details)
+            voiceConfirmationDialog.action = action
+            voiceConfirmationDialog.details = details
+            voiceConfirmationDialog.visible = true
+        }
+
+        function onCommandExecuted(action, details) {
+            console.log("Voice command executed:", action, details)
+        }
+
+        function onCommandFailed(action, error) {
+            console.log("Voice command failed:", action, error)
+            showNotification("Command failed: " + error, "error")
+        }
+    }
+
+    // Timer to hide Claude indicator after response
+    Timer {
+        id: hideClaudeTimer
+        interval: 3000
+        repeat: false
+        onTriggered: {
+            if (claudeIndicatorLoader.item) {
+                claudeIndicatorLoader.item.hide()
+            }
         }
     }
 
@@ -175,26 +346,61 @@ Window {
             if (connectedAddress !== "") {
                 console.log("Device already connected, setting up services:", connectedAddress)
                 setupDeviceServices(connectedAddress)
-            } else {
-                // No connected device, check for paired devices and initiate connection
+            } else if (appSettings.autoConnectBluetooth) {
+                // Auto-connect is enabled, check for paired devices
                 var pairedAddress = bluetoothManager.getFirstPairedDeviceAddress()
                 if (pairedAddress !== "") {
-                    console.log("Found paired device, initiating connection:", pairedAddress)
+                    console.log("Auto-connect enabled: connecting to paired device:", pairedAddress)
                     bluetoothManager.connectToDevice(pairedAddress)
                     // Wait for deviceConnected signal (handled below)
                 } else {
-                    console.log("No paired Bluetooth device found for auto-connect")
+                    console.log("Auto-connect enabled but no paired device found")
                 }
+            } else {
+                console.log("Auto-connect disabled in settings")
             }
         }
     }
 
-    // Handle successful Bluetooth connection
+    // Handle Bluetooth events
     Connections {
         target: bluetoothManager
+
         function onDeviceConnected(address) {
             console.log("Device connected successfully:", address)
+            var deviceName = bluetoothManager.getDeviceName(address)
+            showNotification("Connected to " + deviceName, "success")
             setupDeviceServices(address)
+        }
+
+        function onDeviceDisconnected(address) {
+            var deviceName = bluetoothManager.getDeviceName(address)
+            showNotification(deviceName + " disconnected", "info")
+        }
+
+        function onDevicePaired(address) {
+            var deviceName = bluetoothManager.getDeviceName(address)
+            showNotification(deviceName + " paired successfully", "success")
+        }
+
+        function onError(message) {
+            showNotification(message, "error")
+        }
+
+        function onActiveCallChanged() {
+            console.log("Call state changed - hasActiveCall:", bluetoothManager.hasActiveCall)
+
+            if (bluetoothManager.hasActiveCall) {
+                // Call started - pause music
+                console.log("Call started - pausing music")
+                mediaController.pause()
+            } else {
+                // Call ended - resume music (only if we were on a music source)
+                console.log("Call ended - resuming music")
+                if (activeAudioSource === "music" || activeAudioSource === "spotify") {
+                    mediaController.play()
+                }
+            }
         }
     }
 
@@ -204,6 +410,17 @@ Window {
         mediaController.connectToDevice(address)
         notificationManager.connectToDevice(address, "ios")
         voiceAssistant.connectToPhone(address)
+    }
+
+    // Show system notification
+    function showNotification(message, type) {
+        var notification = {
+            appName: "Bluetooth",
+            title: type === "success" ? "✓" : type === "error" ? "✕" : "ⓘ",
+            message: message,
+            priority: type === "error" ? 3 : 1
+        }
+        notificationBanner.showNotification(notification)
     }
 
     // Timer to wait for voice connection
@@ -295,15 +512,15 @@ Window {
                 }
 
                 onHomeLongPressed: {
-                    console.log("Voice assistant activated via home button long press")
+                    console.log("Claude AI activated via home button long press")
 
-                    if (!voiceAssistant.isConnected) {
-                        console.log("Voice assistant not connected, connecting first...")
-                        voiceAssistant.connectToPhone("00:00:00:00:00:00")
-                        connectionWaitTimer.start()
-                    } else {
-                        voiceControlLoader.active = true
-                        voiceAssistant.activateAssistant()
+                    // Activate Claude indicator
+                    claudeIndicatorLoader.active = true
+
+                    // Wait for loader to complete before showing
+                    if (claudeIndicatorLoader.item) {
+                        claudeIndicatorLoader.item.show()
+                        claudeIndicatorLoader.item.setState("listening")
                     }
                 }
             }
@@ -326,7 +543,7 @@ Window {
                 }
             }
 
-            // Voice Control Overlay
+            // Voice Control Overlay (for phone-based assistant)
             Loader {
                 id: voiceControlLoader
                 anchors.fill: parent
@@ -342,6 +559,145 @@ Window {
                         voiceAssistant.stopListening()
                     })
                     console.log("VoiceControl loaded")
+                }
+            }
+
+            // Claude AI Indicator Overlay
+            Loader {
+                id: claudeIndicatorLoader
+                anchors.fill: parent
+                active: false
+                asynchronous: false  // Synchronous so theme is set before show()
+                source: "Ui/ClaudeIndicator.qml"
+                z: 1001  // Above voice control
+
+                onLoaded: {
+                    item.theme = theme
+                    item.closeRequested.connect(function() {
+                        claudeIndicatorLoader.active = false
+                        claudeClient.cancelRequest()
+                    })
+                    console.log("ClaudeIndicator loaded with theme:", theme.name)
+                }
+            }
+
+            // Active Call Overlay
+            Loader {
+                id: activeCallOverlayLoader
+                anchors.fill: parent
+                active: true  // Always loaded, visibility controlled by bluetoothManager.hasActiveCall
+                asynchronous: true
+                source: "Ui/ActiveCallOverlay.qml"
+                z: 1003  // Above everything except confirmation dialogs
+
+                onLoaded: {
+                    item.bluetoothManager = bluetoothManager
+                    item.theme = theme
+                    console.log("ActiveCallOverlay loaded")
+                }
+            }
+
+            // Incoming Call Overlay
+            Loader {
+                id: incomingCallOverlayLoader
+                anchors.fill: parent
+                active: true  // Always loaded, visibility controlled by activeCallState
+                asynchronous: true
+                source: "Ui/IncomingCallOverlay.qml"
+                z: 1004  // Above active call overlay
+
+                onLoaded: {
+                    item.bluetoothManager = bluetoothManager
+                    item.theme = theme
+                    console.log("IncomingCallOverlay loaded")
+                }
+            }
+
+            // Voice Command Confirmation Dialog
+            Rectangle {
+                id: voiceConfirmationDialog
+                anchors.centerIn: parent
+                width: 500
+                height: 200
+                radius: 12
+                color: Qt.rgba(0, 0, 0, 0.95)
+                border.color: theme.palette.primary
+                border.width: 2
+                visible: false
+                z: 1002  // Above everything else
+
+                property string action: ""
+                property string details: ""
+
+                Column {
+                    anchors.centerIn: parent
+                    spacing: 20
+
+                    Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        text: voiceConfirmationDialog.details
+                        color: theme.palette.text
+                        font.pixelSize: 18
+                        font.family: theme.typography.fontFamily
+                        width: 450
+                        wrapMode: Text.WordWrap
+                        horizontalAlignment: Text.AlignHCenter
+                    }
+
+                    Row {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        spacing: 20
+
+                        Rectangle {
+                            width: 120
+                            height: 50
+                            radius: 8
+                            color: "transparent"
+                            border.color: theme.palette.primary
+                            border.width: 2
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: "Yes, Send"
+                                color: theme.palette.primary
+                                font.pixelSize: 16
+                                font.family: theme.typography.fontFamily
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: {
+                                    voiceCommandHandler.confirmAction()
+                                    voiceConfirmationDialog.visible = false
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            width: 120
+                            height: 50
+                            radius: 8
+                            color: "transparent"
+                            border.color: theme.palette.accent
+                            border.width: 2
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: "Cancel"
+                                color: theme.palette.accent
+                                font.pixelSize: 16
+                                font.family: theme.typography.fontFamily
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: {
+                                    voiceCommandHandler.cancelAction()
+                                    voiceConfirmationDialog.visible = false
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
@@ -383,7 +739,7 @@ Window {
         top: statusBar.bottom
         topMargin: 0      // ← Reset to 0, statusBar.bottom already positions it correctly
         bottom: parent.bottom
-        bottomMargin: 0   // ← Reset to 0
+        bottomMargin: 100   // ← Space for mini player
     }
 
                 Loader {
@@ -408,7 +764,10 @@ Window {
                     active: false
                     asynchronous: true
                     source: "Ui/screens/Settings.qml"
-                    onLoaded: { item.theme = theme }
+                    onLoaded: {
+                        item.theme = theme
+                        item.appSettings = appSettings
+                    }
                 }
 
                 Loader {
@@ -538,6 +897,18 @@ Window {
                     source: "Ui/screens/Weather.qml"
                     onLoaded: { item.theme = theme }
                 }
+            }
+
+            // Mini Player - Bottom Bar
+            MiniPlayer {
+                id: miniPlayer
+                theme: rootPage.theme
+                anchors {
+                    left: navBar.right
+                    right: parent.right
+                    bottom: parent.bottom
+                }
+                z: 997  // Above screens, below overlays
             }
         }
     }

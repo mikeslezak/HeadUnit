@@ -100,6 +100,9 @@ Item {
         url: "qrc:/HeadUnit/assets/html/map_view.html"
         webChannel: channel
 
+        // Use mobile user agent to get mobile Google Maps interface
+        profile.httpUserAgent: "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+
         settings.localContentCanAccessRemoteUrls: true
         settings.javascriptEnabled: true
         settings.accelerated2dCanvasEnabled: false
