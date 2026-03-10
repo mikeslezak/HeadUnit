@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Spotify logo: three curved lines -->
+  <circle cx="32" cy="32" r="26" fill="none" stroke="#E0E0E0" stroke-width="2.5"/>
+  <path d="M18,24 Q32,16 46,24" stroke="#E0E0E0" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <path d="M20,32 Q32,26 44,32" stroke="#E0E0E0" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <path d="M22,40 Q32,35 42,40" stroke="#E0E0E0" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+</svg>

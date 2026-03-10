@@ -133,6 +133,8 @@ signals:
     void syncFailed(const QString &error);
 
     void contactAdded(const QString &id);
+    void callRequested(const QString &phoneNumber, const QString &contactName);
+    void messageRequested(const QString &phoneNumber, const QString &contactName);
     void error(const QString &message);
 
 private slots:

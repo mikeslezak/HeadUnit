@@ -24,6 +24,7 @@ class PicovoiceManager : public QObject
     Q_OBJECT
     Q_PROPERTY(bool isRunning READ isRunning NOTIFY runningChanged)
     Q_PROPERTY(bool isInitialized READ isInitialized NOTIFY initializedChanged)
+    Q_PROPERTY(bool wakeWordAvailable READ wakeWordAvailable NOTIFY wakeWordAvailableChanged)
     Q_PROPERTY(QString statusMessage READ statusMessage NOTIFY statusMessageChanged)
     Q_PROPERTY(float sensitivity READ sensitivity WRITE setSensitivity NOTIFY sensitivityChanged)
     Q_PROPERTY(QString wakeWord READ wakeWord WRITE setWakeWord NOTIFY wakeWordChanged)
@@ -38,6 +39,7 @@ public:
     Q_INVOKABLE void pause();
     Q_INVOKABLE void resume();
     Q_INVOKABLE void onReadyPromptFinished();  // Call after TTS prompt completes
+    Q_INVOKABLE void manualActivate();          // Button-triggered activation (no wake word needed)
 
     // Configuration methods
     void setAccessKey(const QString &key);
@@ -50,6 +52,7 @@ public:
     // Getters
     bool isRunning() const { return m_isRunning; }
     bool isInitialized() const { return m_isInitialized; }
+    bool wakeWordAvailable() const { return m_wakeWordAvailable; }
     QString statusMessage() const { return m_statusMessage; }
     float sensitivity() const { return m_sensitivity; }
     QString wakeWord() const { return m_wakeWord; }
@@ -62,6 +65,7 @@ signals:
     void statusMessageChanged();
     void runningChanged();
     void initializedChanged();
+    void wakeWordAvailableChanged();
     void sensitivityChanged();
     void wakeWordChanged();
 
@@ -112,7 +116,11 @@ private:
     bool m_isRunning;
     bool m_isPaused;
     bool m_isInitialized;
+    bool m_wakeWordAvailable;
     QString m_statusMessage;
+
+    // Reusable frame buffer (avoids per-frame allocation)
+    QVector<int16_t> m_processedFrame;
 
     // Speech buffer for Leopard (when Rhino doesn't understand)
     QVector<int16_t> m_speechBuffer;
@@ -150,6 +158,7 @@ private:
     void finalizeLeopardTranscription();
 
     // Helper methods
+    static QString basePath();
     QString getModelPath(const QString &component) const;
     QString getKeywordPath() const;
     void setStatusMessage(const QString &msg);

@@ -1,17 +1,14 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
+import HeadUnit
 
 Item {
     id: root
     property var theme: null
+    property var bluetoothManager: null
     signal callActive(bool isActive)
 
-    readonly property color textCol: theme?.palette?.text ?? "#39ff14"
-    readonly property color primaryCol: theme?.palette?.primary ?? "#00f0ff"
-    readonly property color bgCol: theme?.palette?.bg ?? "#0a0a0f"
-    readonly property color cardBgCol: theme?.palette?.cardBg ?? "#1a1a1f"
-    readonly property string fontFamily: theme?.typography?.fontFamily ?? "Noto Sans"
 
     property string phoneNumber: ""
     property bool isInCall: bluetoothManager ? bluetoothManager.hasActiveCall : false
@@ -19,7 +16,7 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        color: bgCol
+        color: ThemeValues.bgCol
 
         // HORIZONTAL SPLIT LAYOUT
         Row {
@@ -30,8 +27,8 @@ Item {
             Rectangle {
                 width: 500
                 height: parent.height
-                color: Qt.rgba(cardBgCol.r, cardBgCol.g, cardBgCol.b, 0.2)
-                border.color: Qt.rgba(primaryCol.r, primaryCol.g, primaryCol.b, 0.2)
+                color: Qt.rgba(ThemeValues.cardBgCol.r, ThemeValues.cardBgCol.g, ThemeValues.cardBgCol.b, 0.2)
+                border.color: Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.2)
                 border.width: 1
 
                 Column {
@@ -66,10 +63,10 @@ Item {
                             Rectangle {
                                 width: (parent.width - 12) / 3
                                 height: (parent.height - 18) / 4
-                                color: dialMouseArea.pressed ? Qt.rgba(primaryCol.r, primaryCol.g, primaryCol.b, 0.3) :
-                                       dialMouseArea.containsMouse ? Qt.rgba(primaryCol.r, primaryCol.g, primaryCol.b, 0.2) :
-                                       Qt.rgba(cardBgCol.r, cardBgCol.g, cardBgCol.b, 0.4)
-                                border.color: Qt.rgba(primaryCol.r, primaryCol.g, primaryCol.b, 0.6)
+                                color: dialMouseArea.pressed ? Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.3) :
+                                       dialMouseArea.containsMouse ? Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.2) :
+                                       Qt.rgba(ThemeValues.cardBgCol.r, ThemeValues.cardBgCol.g, ThemeValues.cardBgCol.b, 0.4)
+                                border.color: Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.6)
                                 border.width: 1
                                 radius: 6
 
@@ -82,18 +79,18 @@ Item {
                                     Text {
                                         anchors.horizontalCenter: parent.horizontalCenter
                                         text: modelData.num
-                                        color: textCol
+                                        color: ThemeValues.textCol
                                         font.pixelSize: 28
-                                        font.family: fontFamily
+                                        font.family: ThemeValues.fontFamily
                                         font.weight: Font.Bold
                                     }
 
                                     Text {
                                         anchors.horizontalCenter: parent.horizontalCenter
                                         text: modelData.let
-                                        color: Qt.rgba(textCol.r, textCol.g, textCol.b, 0.5)
+                                        color: Qt.rgba(ThemeValues.textCol.r, ThemeValues.textCol.g, ThemeValues.textCol.b, 0.5)
                                         font.pixelSize: 9
-                                        font.family: fontFamily
+                                        font.family: ThemeValues.fontFamily
                                         visible: modelData.let !== ""
                                     }
                                 }
@@ -130,8 +127,8 @@ Item {
                     Rectangle {
                         width: parent.width
                         height: 100
-                        color: Qt.rgba(cardBgCol.r, cardBgCol.g, cardBgCol.b, 0.5)
-                        border.color: Qt.rgba(primaryCol.r, primaryCol.g, primaryCol.b, 0.7)
+                        color: Qt.rgba(ThemeValues.cardBgCol.r, ThemeValues.cardBgCol.g, ThemeValues.cardBgCol.b, 0.5)
+                        border.color: Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.7)
                         border.width: 2
                         radius: 10
 
@@ -143,18 +140,18 @@ Item {
                             Text {
                                 anchors.horizontalCenter: parent.horizontalCenter
                                 text: "Phone Number"
-                                color: Qt.rgba(textCol.r, textCol.g, textCol.b, 0.5)
+                                color: Qt.rgba(ThemeValues.textCol.r, ThemeValues.textCol.g, ThemeValues.textCol.b, 0.5)
                                 font.pixelSize: 12
-                                font.family: fontFamily
+                                font.family: ThemeValues.fontFamily
                             }
 
                             Text {
                                 anchors.horizontalCenter: parent.horizontalCenter
                                 width: parent.width
                                 text: phoneNumber || "Enter number..."
-                                color: phoneNumber ? textCol : Qt.rgba(textCol.r, textCol.g, textCol.b, 0.3)
+                                color: phoneNumber ? ThemeValues.textCol : Qt.rgba(ThemeValues.textCol.r, ThemeValues.textCol.g, ThemeValues.textCol.b, 0.3)
                                 font.pixelSize: 36
-                                font.family: fontFamily
+                                font.family: ThemeValues.fontFamily
                                 font.weight: Font.Bold
                                 horizontalAlignment: Text.AlignHCenter
                                 elide: Text.ElideRight
@@ -166,10 +163,10 @@ Item {
                     Rectangle {
                         width: parent.width
                         height: 45
-                        color: backspaceMouseArea.pressed ? Qt.rgba(primaryCol.r, primaryCol.g, primaryCol.b, 0.3) :
-                               backspaceMouseArea.containsMouse ? Qt.rgba(primaryCol.r, primaryCol.g, primaryCol.b, 0.2) :
-                               Qt.rgba(cardBgCol.r, cardBgCol.g, cardBgCol.b, 0.4)
-                        border.color: Qt.rgba(primaryCol.r, primaryCol.g, primaryCol.b, 0.6)
+                        color: backspaceMouseArea.pressed ? Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.3) :
+                               backspaceMouseArea.containsMouse ? Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.2) :
+                               Qt.rgba(ThemeValues.cardBgCol.r, ThemeValues.cardBgCol.g, ThemeValues.cardBgCol.b, 0.4)
+                        border.color: Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.6)
                         border.width: 1
                         radius: 6
                         enabled: phoneNumber.length > 0
@@ -179,9 +176,9 @@ Item {
                         Text {
                             anchors.centerIn: parent
                             text: "⌫ Backspace"
-                            color: phoneNumber.length > 0 ? textCol : Qt.rgba(textCol.r, textCol.g, textCol.b, 0.3)
+                            color: phoneNumber.length > 0 ? ThemeValues.textCol : Qt.rgba(ThemeValues.textCol.r, ThemeValues.textCol.g, ThemeValues.textCol.b, 0.3)
                             font.pixelSize: 16
-                            font.family: fontFamily
+                            font.family: ThemeValues.fontFamily
                             font.weight: Font.Medium
                         }
 
@@ -203,10 +200,10 @@ Item {
                         width: parent.width
                         height: 70
                         visible: !isInCall
-                        color: callMouseArea.pressed ? Qt.rgba(0, 0.9, 0, 0.4) :
-                               callMouseArea.containsMouse ? Qt.rgba(0, 0.9, 0, 0.3) :
-                               Qt.rgba(0, 0.8, 0, 0.25)
-                        border.color: phoneNumber.length > 0 ? Qt.rgba(0, 1, 0, 0.8) : Qt.rgba(0, 1, 0, 0.4)
+                        color: callMouseArea.pressed ? Qt.rgba(ThemeValues.successCol.r, ThemeValues.successCol.g, ThemeValues.successCol.b, 0.4) :
+                               callMouseArea.containsMouse ? Qt.rgba(ThemeValues.successCol.r, ThemeValues.successCol.g, ThemeValues.successCol.b, 0.3) :
+                               Qt.rgba(ThemeValues.successCol.r, ThemeValues.successCol.g, ThemeValues.successCol.b, 0.25)
+                        border.color: phoneNumber.length > 0 ? Qt.rgba(ThemeValues.successCol.r, ThemeValues.successCol.g, ThemeValues.successCol.b, 0.8) : Qt.rgba(ThemeValues.successCol.r, ThemeValues.successCol.g, ThemeValues.successCol.b, 0.4)
                         border.width: 2
                         radius: 8
                         enabled: phoneNumber.length > 0
@@ -225,9 +222,9 @@ Item {
                             Text {
                                 anchors.verticalCenter: parent.verticalCenter
                                 text: "CALL"
-                                color: phoneNumber.length > 0 ? "#00ff00" : Qt.rgba(0, 1, 0, 0.4)
+                                color: phoneNumber.length > 0 ? ThemeValues.successCol : Qt.rgba(ThemeValues.successCol.r, ThemeValues.successCol.g, ThemeValues.successCol.b, 0.4)
                                 font.pixelSize: 28
-                                font.family: fontFamily
+                                font.family: ThemeValues.fontFamily
                                 font.weight: Font.Bold
                             }
                         }
@@ -253,10 +250,10 @@ Item {
                         width: parent.width
                         height: 70
                         visible: isInCall
-                        color: endCallMouseArea.pressed ? Qt.rgba(0.9, 0, 0, 0.4) :
-                               endCallMouseArea.containsMouse ? Qt.rgba(0.9, 0, 0, 0.3) :
-                               Qt.rgba(0.8, 0, 0, 0.25)
-                        border.color: Qt.rgba(1, 0, 0, 0.8)
+                        color: endCallMouseArea.pressed ? Qt.rgba(ThemeValues.errorCol.r, ThemeValues.errorCol.g, ThemeValues.errorCol.b, 0.4) :
+                               endCallMouseArea.containsMouse ? Qt.rgba(ThemeValues.errorCol.r, ThemeValues.errorCol.g, ThemeValues.errorCol.b, 0.3) :
+                               Qt.rgba(ThemeValues.errorCol.r, ThemeValues.errorCol.g, ThemeValues.errorCol.b, 0.25)
+                        border.color: Qt.rgba(ThemeValues.errorCol.r, ThemeValues.errorCol.g, ThemeValues.errorCol.b, 0.8)
                         border.width: 2
                         radius: 8
 
@@ -274,9 +271,9 @@ Item {
                             Text {
                                 anchors.verticalCenter: parent.verticalCenter
                                 text: "END CALL"
-                                color: "#ff0000"
+                                color: ThemeValues.errorCol
                                 font.pixelSize: 28
-                                font.family: fontFamily
+                                font.family: ThemeValues.fontFamily
                                 font.weight: Font.Bold
                             }
                         }

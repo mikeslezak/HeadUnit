@@ -1,11 +1,12 @@
 import QtQuick 2.15
 import QtQml 2.15
 import QtCore
-import Qt.labs.settings
+import Qt.labs.settings 1.0 as Labs
+import HeadUnit
 
 QtObject {
     id: root
-    property Settings prefs: Settings {
+    property Labs.Settings prefs: Labs.Settings {
         property string theme: "Cyberpunk"
     }
 
@@ -66,9 +67,9 @@ QtObject {
                 return
             }
 
-            root._t = parsed
             root.name = themeId
             root.prefs.theme = themeId
+            root._t = parsed
 
             // Load custom font if specified
             if (parsed.typography && parsed.typography.fontFile) {
@@ -76,6 +77,7 @@ QtObject {
             }
 
             root.rev++
+            ThemeValues.update(root)
             console.log("Theme loaded successfully:", themeId)
             root.themeChanged()
         } catch (e) {
@@ -141,15 +143,16 @@ QtObject {
             }
         }
 
-        root._t = defaultTheme
         root.name = themeId
         root.prefs.theme = themeId
+        root._t = defaultTheme
 
         if (defaultTheme.typography && defaultTheme.typography.fontFile) {
             loadCustomFont(themeId, defaultTheme.typography.fontFile)
         }
 
         root.rev++
+        ThemeValues.update(root)
         console.log("Default theme applied:", themeId)
         root.themeChanged()
     }
@@ -181,6 +184,7 @@ QtObject {
     }
 
     Component.onCompleted: {
+        console.log("Theme: prefs.theme =", prefs.theme, "name =", name)
         console.log("Theme: Starting to load", prefs.theme || name)
         load(prefs.theme || name)
     }

@@ -10,6 +10,8 @@ Rectangle {
   property string activeKey: "home"
   property var recentApps: []
 
+  signal appGridRequested()
+
   readonly property var allApps: ({
     "home":     { key: "home",     icon: "home" },
     "music":    { key: "music",    icon: "music" },
@@ -18,66 +20,20 @@ Rectangle {
     "phone":    { key: "phone",    icon: "phone" },
     "messages": { key: "messages", icon: "messages" },
     "contacts": { key: "contacts", icon: "contacts" },
-    "spotify":  { key: "spotify",  icon: "spotify" },
-    "radio":    { key: "radio",    icon: "radio" },
-    "podcasts": { key: "podcasts", icon: "podcasts" },
-    "climate":  { key: "climate",  icon: "climate" },
-    "vehicle":  { key: "vehicle",  icon: "vehicle" },
-    "camera":   { key: "camera",   icon: "camera" },
     "weather":  { key: "weather",  icon: "weather" }
   })
 
   // -------- Theme tokens with safe fallbacks --------
-  readonly property int _rev: theme ? theme.rev : 0
-  readonly property int _pad: {
-    if (theme && theme.navbar && theme.navbar.pad !== undefined) {
-      return Number(theme.navbar.pad)
-    }
-    return 8
-  }
-  readonly property int _iconSz: {
-    if (theme && theme.navbar && theme.navbar.iconSize !== undefined) {
-      return Number(theme.navbar.iconSize)
-    }
-    return 28
-  }
-  readonly property real _pressS: {
-    if (theme && theme.navbar && theme.navbar.pressScale !== undefined) {
-      return Number(theme.navbar.pressScale)
-    }
-    return 0.92
-  }
-  readonly property int _dur: {
-    if (theme && theme.motion && theme.motion.dur !== undefined) {
-      return Number(theme.motion.dur)
-    }
-    return 150
-  }
-  readonly property color _iconCol: {
-    if (theme && theme.navbar && theme.navbar.text) {
-      return theme.navbar.text
-    }
-    return "#FFFFFF"
-  }
-  readonly property color _accent: {
-    if (theme && theme.palette && theme.palette.primary) {
-      return theme.palette.primary
-    }
-    return "#00f0ff"
-  }
-  readonly property color _bg: {
-    if (theme && theme.navbar && theme.navbar.bg) {
-      return theme.navbar.bg
-    }
-    return "#000000"
-  }
+  readonly property int _rev: theme?.rev ?? 0
+  readonly property int _pad: theme?.navbar?.pad !== undefined ? Number(theme.navbar.pad) : 8
+  readonly property int _iconSz: theme?.navbar?.iconSize !== undefined ? Number(theme.navbar.iconSize) : 28
+  readonly property real _pressS: theme?.navbar?.pressScale !== undefined ? Number(theme.navbar.pressScale) : 0.92
+  readonly property int _dur: theme?.motion?.dur !== undefined ? Number(theme.motion.dur) : 150
+  readonly property color _iconCol: theme?.navbar?.text ?? "#FFFFFF"
+  readonly property color _accent: theme?.palette?.primary ?? "#00f0ff"
+  readonly property color _bg: theme?.navbar?.bg ?? "#000000"
 
-  width: {
-    if (theme && theme.navbar && theme.navbar.width !== undefined) {
-      return Number(theme.navbar.width)
-    }
-    return 70
-  }
+  width: theme?.navbar?.width !== undefined ? Number(theme.navbar.width) : 70
   height: parent ? parent.height : 430
   color: _bg
 
@@ -170,6 +126,56 @@ Rectangle {
             }
           }
         }
+      }
+    }
+  }
+
+  // -------- App Grid Button --------
+  Item {
+    id: gridSlot
+    anchors.bottom: homeSlot.top
+    anchors.horizontalCenter: parent.horizontalCenter
+    anchors.bottomMargin: _pad
+    width: root.width
+    height: root.slotSize
+
+    Rectangle {
+      id: gridButtonRect
+      anchors.centerIn: parent
+      width: root._iconSz + 12
+      height: root._iconSz + 12
+      color: "transparent"
+      radius: 8
+
+      property bool isPressed: false
+
+      opacity: isPressed ? 0.7 : 1.0
+      Behavior on opacity {
+        NumberAnimation { duration: root._dur }
+      }
+
+      // 2x2 dot grid icon
+      Grid {
+        anchors.centerIn: parent
+        columns: 2
+        spacing: 6
+
+        Repeater {
+          model: 4
+          Rectangle {
+            width: 6; height: 6
+            radius: 3
+            color: root._iconCol
+            opacity: 0.6
+          }
+        }
+      }
+
+      MouseArea {
+        anchors.fill: parent
+        onPressed: gridButtonRect.isPressed = true
+        onReleased: gridButtonRect.isPressed = false
+        onClicked: root.appGridRequested()
       }
     }
   }

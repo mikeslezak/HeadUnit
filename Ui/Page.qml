@@ -6,55 +6,19 @@ Item {
     clip: true
 
     // Theme tokens with safe fallbacks
-    readonly property color bgCol: {
-        if (theme && theme.palette && theme.palette.bg) {
-            return theme.palette.bg
-        }
-        return "#0a0a0f"
-    }
-    readonly property color textCol: {
-        if (theme && theme.palette && theme.palette.text) {
-            return theme.palette.text
-        }
-        return "white"
-    }
-    readonly property int marginPx: {
-        if (theme && theme.layout && theme.layout.pageMargin !== undefined) {
-            return Number(theme.layout.pageMargin)
-        }
-        return 0
-    }
+    readonly property color bgCol: theme?.palette?.bg ?? "#0a0a0f"
+    readonly property color textCol: theme?.palette?.text ?? "white"
+    readonly property int marginPx: theme?.layout?.pageMargin !== undefined
+        ? Number(theme.layout.pageMargin) : 0
 
-    readonly property string ovType: {
-        if (theme && theme.overlay && theme.overlay.type) {
-            return String(theme.overlay.type)
-        }
-        return "none"
-    }
-    readonly property real ovOpacity: {
-        if (theme && theme.overlay && theme.overlay.opacity !== undefined) {
-            return Number(theme.overlay.opacity)
-        }
-        return 0.14
-    }
-    readonly property color ovColor: {
-        if (theme && theme.overlay && theme.overlay.color) {
-            return theme.overlay.color
-        }
-        return (textCol === "white" ? "#ffffff" : textCol)
-    }
-    readonly property real ovSpacing: {
-        if (theme && theme.overlay && theme.overlay.spacing !== undefined) {
-            return Number(theme.overlay.spacing)
-        }
-        return 12
-    }
-    readonly property url ovImage: {
-        if (theme && theme.overlay && theme.overlay.image && theme.name) {
-            return "qrc:/qt/qml/HeadUnit/themes/" + theme.name + "/" + String(theme.overlay.image)
-        }
-        return ""
-    }
+    readonly property string ovType: theme?.overlay?.type ? String(theme.overlay.type) : "none"
+    readonly property real ovOpacity: theme?.overlay?.opacity !== undefined
+        ? Number(theme.overlay.opacity) : 0.14
+    readonly property color ovColor: theme?.overlay?.color ?? (textCol === "white" ? "#ffffff" : textCol)
+    readonly property real ovSpacing: theme?.overlay?.spacing !== undefined
+        ? Number(theme.overlay.spacing) : 12
+    readonly property url ovImage: theme?.overlay?.image && theme?.name
+        ? "qrc:/qt/qml/HeadUnit/themes/" + theme.name + "/" + String(theme.overlay.image) : ""
 
     // Background at the very back
     Rectangle {

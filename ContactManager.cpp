@@ -379,18 +379,22 @@ QStringList ContactManager::getAlphabeticalSections()
 void ContactManager::callContact(const QString &id)
 {
     Contact *contact = m_contactModel->findContact(id);
-    if (contact) {
-        qDebug() << "ContactManager: Calling" << contact->name << "at" << contact->phoneNumber;
-        // TODO: Integrate with phone call functionality
+    if (contact && !contact->phoneNumber.isEmpty()) {
+        qDebug() << "ContactManager: Call requested for" << contact->name << "at" << contact->phoneNumber;
+        emit callRequested(contact->phoneNumber, contact->name);
+    } else {
+        qWarning() << "ContactManager: Cannot call - contact not found or no phone number for id:" << id;
     }
 }
 
 void ContactManager::messageContact(const QString &id)
 {
     Contact *contact = m_contactModel->findContact(id);
-    if (contact) {
-        qDebug() << "ContactManager: Messaging" << contact->name << "at" << contact->phoneNumber;
-        // TODO: Integrate with messaging functionality
+    if (contact && !contact->phoneNumber.isEmpty()) {
+        qDebug() << "ContactManager: Message requested for" << contact->name << "at" << contact->phoneNumber;
+        emit messageRequested(contact->phoneNumber, contact->name);
+    } else {
+        qWarning() << "ContactManager: Cannot message - contact not found or no phone number for id:" << id;
     }
 }
 
@@ -414,8 +418,9 @@ QStringList ContactManager::getAllContactNames()
 QString ContactManager::findContactNameByNumber(const QString &phoneNumber)
 {
     // Strip formatting from search number (remove spaces, dashes, parentheses, plus signs)
+    static const QRegularExpression phoneCleanRegex("[\\s\\-\\(\\)\\+]");
     QString cleanSearch = phoneNumber;
-    cleanSearch.remove(QRegularExpression("[\\s\\-\\(\\)\\+]"));
+    cleanSearch.remove(phoneCleanRegex);
 
     // Search through all contacts using the model's public interface
     int contactCount = m_contactModel->rowCount();
@@ -427,10 +432,10 @@ QString ContactManager::findContactNameByNumber(const QString &phoneNumber)
         QString number2 = m_contactModel->data(index, ContactModel::PhoneNumber2Role).toString();
 
         QString cleanNumber1 = number1;
-        cleanNumber1.remove(QRegularExpression("[\\s\\-\\(\\)\\+]"));
+        cleanNumber1.remove(phoneCleanRegex);
 
         QString cleanNumber2 = number2;
-        cleanNumber2.remove(QRegularExpression("[\\s\\-\\(\\)\\+]"));
+        cleanNumber2.remove(phoneCleanRegex);
 
         // Check if cleaned numbers match (last 10 digits for North American numbers)
         if (cleanSearch.length() >= 10 && cleanNumber1.length() >= 10) {
@@ -585,6 +590,11 @@ QDBusInterface* ContactManager::createOBEXSession(const QString &deviceAddress)
         return nullptr;
     }
 
+    if (msg.arguments().isEmpty()) {
+        qWarning() << "ContactManager: CreateSession returned no arguments";
+        return nullptr;
+    }
+
     QString sessionPath = msg.arguments().at(0).value<QDBusObjectPath>().path();
     qDebug() << "ContactManager: OBEX session created:" << sessionPath;
 
@@ -613,8 +623,8 @@ void ContactManager::onTransferComplete(const QDBusObjectPath &transfer)
 
     m_syncTimeout->stop();
 
-    // Read the downloaded vCard file
-    QString filename = "/tmp/obex-transfer-XXXXXX.vcf";  // BlueZ typically saves here
+    // Read the downloaded vCard file (same path used in PullAll)
+    QString filename = "/tmp/contacts.vcf";
 
     QFile file(filename);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
@@ -727,7 +737,7 @@ void ContactManager::parseVCard(const QString &vcardData)
     m_contactModel->clear();
 
     // Split into individual vCards
-    QRegularExpression vcardRegex("BEGIN:VCARD.*?END:VCARD", QRegularExpression::DotMatchesEverythingOption);
+    static const QRegularExpression vcardRegex("BEGIN:VCARD.*?END:VCARD", QRegularExpression::DotMatchesEverythingOption);
     QRegularExpressionMatchIterator it = vcardRegex.globalMatch(vcardData);
 
     int count = 0;

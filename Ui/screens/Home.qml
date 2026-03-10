@@ -1,140 +1,76 @@
 import QtQuick 2.15
-import QtQuick.Controls 2.15
-import QtQuick.Effects
+import HeadUnit
 
 Item {
     id: root
     property var theme: null
+    property string mapboxToken: ""
 
     signal appSelected(string key)
 
-    readonly property color bgCol: (theme && theme.palette && theme.palette.bg) ? theme.palette.bg : "#0a0a0f"
-    readonly property color textCol: (theme && theme.palette && theme.palette.text) ? theme.palette.text : "white"
-    readonly property color primaryCol: (theme && theme.palette && theme.palette.primary) ? theme.palette.primary : "#00f0ff"
-    readonly property string fontFamily: (theme && theme.typography && theme.typography.fontFamily) ? theme.typography.fontFamily : "Noto Sans"
-    readonly property int fontSize: (theme && theme.typography && theme.typography.fontSize) ? Number(theme.typography.fontSize) : 24
-    readonly property int iconSize: 84
-
     Rectangle {
         anchors.fill: parent
-        color: bgCol
+        color: ThemeValues.bgCol
 
-        // Single page with all functional apps in a 3x2 grid
-        Grid {
-            anchors.centerIn: parent
-            columns: 3
-            rows: 2
-            columnSpacing: 60
-            rowSpacing: 60
-
-            // Row 1
-            // Maps
-            AppIcon {
-                appKey: "maps"
-                appName: "Maps"
-                iconKey: "maps"
+        // Dark map-like background (static — saves ~65% CPU vs live MapView)
+        Rectangle {
+            anchors.fill: parent
+            gradient: Gradient {
+                GradientStop { position: 0.0; color: Qt.rgba(0.06, 0.06, 0.10, 1.0) }
+                GradientStop { position: 0.5; color: Qt.rgba(0.08, 0.08, 0.12, 1.0) }
+                GradientStop { position: 1.0; color: Qt.rgba(0.05, 0.05, 0.08, 1.0) }
             }
 
-            // Phone
-            AppIcon {
-                appKey: "phone"
-                appName: "Phone"
-                iconKey: "phone"
-            }
-
-            // Messages
-            AppIcon {
-                appKey: "messages"
-                appName: "Messages"
-                iconKey: "messages"
-            }
-
-            // Row 2
-            // Music
-            AppIcon {
-                appKey: "music"
-                appName: "Music"
-                iconKey: "music"
-            }
-
-            // Contacts
-            AppIcon {
-                appKey: "contacts"
-                appName: "Contacts"
-                iconKey: "contacts"
-            }
-
-            // Settings
-            AppIcon {
-                appKey: "settings"
-                appName: "Settings"
-                iconKey: "settings"
+            // Subtle grid lines for map feel
+            Canvas {
+                anchors.fill: parent
+                opacity: 0.06
+                onPaint: {
+                    var ctx = getContext("2d")
+                    ctx.strokeStyle = ThemeValues.primaryCol.toString()
+                    ctx.lineWidth = 0.5
+                    var spacing = 60
+                    for (var x = 0; x < width; x += spacing) {
+                        ctx.beginPath()
+                        ctx.moveTo(x, 0)
+                        ctx.lineTo(x, height)
+                        ctx.stroke()
+                    }
+                    for (var y = 0; y < height; y += spacing) {
+                        ctx.beginPath()
+                        ctx.moveTo(0, y)
+                        ctx.lineTo(width, y)
+                        ctx.stroke()
+                    }
+                }
             }
         }
-    }
 
-    // Reusable App Icon Component
-    component AppIcon: Item {
-        width: 150
-        height: 165
-
-        required property string appKey
-        required property string appName
-        required property string iconKey
-
+        // "Tap to open Maps" hint
         Column {
             anchors.centerIn: parent
-            spacing: 18
+            spacing: 8
 
-            Rectangle {
-                width: root.iconSize + 24
-                height: root.iconSize + 24
-                color: "transparent"
-                radius: 21
+            Text {
                 anchors.horizontalCenter: parent.horizontalCenter
-
-                Image {
-                    anchors.centerIn: parent
-                    source: theme && theme.iconPath ? theme.iconPath(iconKey) : ""
-                    width: root.iconSize
-                    height: root.iconSize
-                    sourceSize.width: root.iconSize
-                    sourceSize.height: root.iconSize
-                    fillMode: Image.PreserveAspectFit
-                    smooth: true
-                    antialiasing: true
-                    visible: true
-                    cache: true
-                    asynchronous: false
-
-                }
+                text: "\uD83D\uDDFA"
+                font.pixelSize: 48
             }
 
             Text {
-                text: appName
-                color: textCol
-                font.pixelSize: fontSize
-                font.family: fontFamily
                 anchors.horizontalCenter: parent.horizontalCenter
+                text: "Tap to open Maps"
+                color: ThemeValues.textCol
+                font.pixelSize: ThemeValues.fontSize
+                font.family: ThemeValues.fontFamily
+                opacity: 0.4
             }
         }
 
-        transform: Scale {
-            id: appScale
-            origin.x: 50
-            origin.y: 55
-            xScale: 1
-            yScale: 1
-            Behavior on xScale { NumberAnimation { duration: 100 } }
-            Behavior on yScale { NumberAnimation { duration: 100 } }
-        }
-
+        // Tap to go to Maps screen
         MouseArea {
             anchors.fill: parent
-            anchors.margins: -10
-            onPressed: { appScale.xScale = 0.92; appScale.yScale = 0.92 }
-            onReleased: { appScale.xScale = 1; appScale.yScale = 1 }
-            onClicked: root.appSelected(appKey)
+            onClicked: root.appSelected("maps")
         }
     }
 }

@@ -2,8 +2,10 @@
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QCoreApplication>
-#include <QtWebEngineQuick/QtWebEngineQuick>
+#include <QQuickWindow>
 #include <QDebug>
+#include <QDir>
+#include <QUrl>
 #include "MediaController.h"
 #include "VoiceAssistant.h"
 #include "PicovoiceManager.h"
@@ -14,6 +16,11 @@
 #include "ContactManager.h"
 #include "MessageManager.h"
 #include "VoiceCommandHandler.h"
+#include "WeatherManager.h"
+#include "VehicleBusManager.h"
+#include "TidalClient.h"
+#include "SpotifyClient.h"
+#include "UpdateManager.h"
 
 void myMessageHandler(QtMsgType type, const QMessageLogContext &context, const QString &msg) {
     QByteArray localMsg = msg.toLocal8Bit();
@@ -40,16 +47,13 @@ int main(int argc, char *argv[])
 {
     qInstallMessageHandler(myMessageHandler);
     qputenv("QML_XHR_ALLOW_FILE_READ", "1");
-    qputenv("QTWEBENGINE_CHROMIUM_FLAGS", "--disable-gpu --disable-software-rasterizer --no-sandbox --single-process");
-
     QCoreApplication::setOrganizationName("TruckLabs");
     QCoreApplication::setOrganizationDomain("truck.app");
     QCoreApplication::setApplicationName("HeadUnit");
 
-    // CRITICAL FIX: Initialize WebEngine BEFORE QGuiApplication
-    QtWebEngineQuick::initialize();
-    
-    // NOW create the application
+    // Set OpenGL rendering backend for MapLibre native rendering
+    QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
+
     QGuiApplication app(argc, argv);
 
     // Create all controllers
@@ -63,6 +67,11 @@ int main(int argc, char *argv[])
     ContactManager contactManager;
     MessageManager messageManager;
     VoiceCommandHandler voiceCommandHandler;
+    WeatherManager weatherManager;
+    VehicleBusManager vehicleBusManager;
+    TidalClient tidalClient;
+    SpotifyClient spotifyClient;
+    UpdateManager updateManager;
 
     // Set API keys from environment variables (loaded via .env)
     googleTTS.setApiKey(qEnvironmentVariable("GOOGLE_API_KEY"));
@@ -128,6 +137,22 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("contactManager", &contactManager);
     engine.rootContext()->setContextProperty("messageManager", &messageManager);
     engine.rootContext()->setContextProperty("voiceCommandHandler", &voiceCommandHandler);
+    engine.rootContext()->setContextProperty("weatherManager", &weatherManager);
+    engine.rootContext()->setContextProperty("vehicleBusManager", &vehicleBusManager);
+    engine.rootContext()->setContextProperty("tidalClient", &tidalClient);
+    engine.rootContext()->setContextProperty("spotifyClient", &spotifyClient);
+    engine.rootContext()->setContextProperty("updateManager", &updateManager);
+
+    // Project root directory (for loading large assets like splash videos from filesystem)
+    QString projectDir = QCoreApplication::applicationDirPath() + "/..";
+    engine.rootContext()->setContextProperty("projectDir", QUrl::fromLocalFile(QDir(projectDir).canonicalPath() + "/"));
+
+    // Mapbox access token from environment
+    QString mapboxToken = qEnvironmentVariable("MAPBOX_TOKEN", "");
+    engine.rootContext()->setContextProperty("mapboxAccessToken", mapboxToken);
+    if (mapboxToken.isEmpty()) {
+        qWarning() << "MAPBOX_TOKEN not set - map will not load. Set it with: export MAPBOX_TOKEN=pk.your_token";
+    }
 
     // Load QML - version compatible approach
 #if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
@@ -161,6 +186,8 @@ int main(int argc, char *argv[])
     qDebug() << "  - Contacts:      " << &contactManager;
     qDebug() << "  - Messages:      " << &messageManager;
     qDebug() << "  - VoiceCommands: " << &voiceCommandHandler;
+    qDebug() << "  - VehicleBus:    " << &vehicleBusManager;
+    qDebug() << "  - TidalClient:   " << &tidalClient;
 
     // Start unified voice pipeline (wake word + STT + noise suppression)
     qDebug() << "Starting Picovoice unified voice pipeline...";

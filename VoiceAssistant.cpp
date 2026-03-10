@@ -1,5 +1,6 @@
 #include "VoiceAssistant.h"
 #include <QDebug>
+#include <QRegularExpression>
 #include <QSettings>
 
 /**
@@ -559,23 +560,23 @@ void VoiceAssistant::parseHFPResponse(const QString &response)
     qDebug() << "HFP response:" << response;
 
     if (response.contains("+BRSF")) {
-        // Phone features response
-        if (response.contains("Siri")) {
-            m_activeAssistant = "Siri";
-        } else if (response.contains("Google")) {
-            m_activeAssistant = "Google Assistant";
+        // +BRSF returns a numeric bitmask of supported features, not assistant names.
+        // Bit 5 (32) = Voice Recognition supported. We can't determine Siri vs Google
+        // from HFP alone, so just mark as available if voice recognition is supported.
+        static const QRegularExpression bitmaskRe(R"(\+BRSF:\s*(\d+))");
+        QRegularExpressionMatch match = bitmaskRe.match(response);
+        if (match.hasMatch()) {
+            int features = match.captured(1).toInt();
+            bool voiceRecognition = (features & (1 << 5)) != 0;
+            m_activeAssistant = voiceRecognition ? "Phone Assistant" : "none";
         } else {
-            m_activeAssistant = "Generic";
+            m_activeAssistant = "Phone Assistant";
         }
         emit activeAssistantChanged();
     }
     else if (response.contains("+BVRA")) {
         // Voice recognition state
-        if (response.contains("+BVRA:1")) {
-            m_isListening = true;
-        } else {
-            m_isListening = false;
-        }
+        m_isListening = response.contains("+BVRA:1");
         emit listeningChanged();
     }
 }

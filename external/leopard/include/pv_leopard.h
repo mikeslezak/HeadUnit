@@ -44,6 +44,7 @@ typedef struct pv_leopard pv_leopard_t;
 PV_API pv_status_t pv_leopard_init(
         const char *access_key,
         const char *model_path,
+        const char *device,
         bool enable_automatic_punctuation,
         bool enable_diarization,
         pv_leopard_t **object);

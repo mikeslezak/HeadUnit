@@ -6,11 +6,9 @@
       <rect x="30" y="30" width="26" height="26" rx="2" fill="#000"/>
       <rect x="70" y="30" width="26" height="26" rx="2" fill="#000"/>
       <rect x="30" y="70" width="26" height="26" rx="2" fill="#000"/>
-      
-<path d="M88 112 C120 100, 168 100, 184 112" fill="none" stroke="#000" stroke-width="10" stroke-linecap="square"/>
-<path d="M88 132 C122 122, 166 122, 180 132" fill="none" stroke="#000" stroke-width="10" stroke-linecap="square"/>
-<path d="M88 152 C126 144, 162 144, 176 152" fill="none" stroke="#000" stroke-width="10" stroke-linecap="square"/>
-
+      <path d="M88,108 Q128,88 168,108" stroke="#000" stroke-width="12" fill="none" stroke-linecap="round"/>
+      <path d="M96,136 Q128,120 160,136" stroke="#000" stroke-width="10" fill="none" stroke-linecap="round"/>
+      <path d="M104,162 Q128,150 152,162" stroke="#000" stroke-width="10" fill="none" stroke-linecap="round"/>
     </mask>
     <clipPath id="roundClip"><rect x="8" y="8" width="240" height="240" rx="22" ry="22"/></clipPath>
   </defs>

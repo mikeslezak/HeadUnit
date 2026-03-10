@@ -1,16 +1,14 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQml.Models 2.15
+import HeadUnit
 
 Item {
     id: root
     property var theme: null
+    property var bluetoothManager: null
+    property var contactManager: null
 
-    readonly property color textCol: theme?.palette?.text ?? "#39ff14"
-    readonly property color primaryCol: theme?.palette?.primary ?? "#00f0ff"
-    readonly property color bgCol: theme?.palette?.bg ?? "#0a0a0f"
-    readonly property color cardBgCol: theme?.palette?.cardBg ?? "#1a1a1f"
-    readonly property string fontFamily: theme?.typography?.fontFamily ?? "Noto Sans"
 
     // Filtered model for search
     DelegateModel {
@@ -63,10 +61,10 @@ Item {
             Rectangle {
                 anchors.fill: parent
                 anchors.margins: 5
-                color: contactMouseArea.pressed ? Qt.rgba(primaryCol.r, primaryCol.g, primaryCol.b, 0.2) :
-                       contactMouseArea.containsMouse ? Qt.rgba(primaryCol.r, primaryCol.g, primaryCol.b, 0.1) :
-                       Qt.rgba(cardBgCol.r, cardBgCol.g, cardBgCol.b, 0.5)
-                border.color: Qt.rgba(primaryCol.r, primaryCol.g, primaryCol.b, 0.3)
+                color: contactMouseArea.pressed ? Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.2) :
+                       contactMouseArea.containsMouse ? Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.1) :
+                       Qt.rgba(ThemeValues.cardBgCol.r, ThemeValues.cardBgCol.g, ThemeValues.cardBgCol.b, 0.5)
+                border.color: Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.3)
                 border.width: 1
                 radius: 4
 
@@ -82,17 +80,17 @@ Item {
                         width: 50
                         height: 50
                         anchors.verticalCenter: parent.verticalCenter
-                        color: Qt.rgba(primaryCol.r, primaryCol.g, primaryCol.b, 0.3)
-                        border.color: primaryCol
+                        color: Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.3)
+                        border.color: ThemeValues.primaryCol
                         border.width: 1
                         radius: 25
 
                         Text {
                             anchors.centerIn: parent
                             text: model.firstLetter
-                            color: primaryCol
+                            color: ThemeValues.primaryCol
                             font.pixelSize: 24
-                            font.family: fontFamily
+                            font.family: ThemeValues.fontFamily
                             font.weight: Font.Bold
                         }
                     }
@@ -105,9 +103,9 @@ Item {
 
                         Text {
                             text: model.name || "Unknown"
-                            color: textCol
+                            color: ThemeValues.textCol
                             font.pixelSize: 16
-                            font.family: fontFamily
+                            font.family: ThemeValues.fontFamily
                             font.weight: Font.Medium
                             elide: Text.ElideRight
                             width: parent.width
@@ -115,9 +113,9 @@ Item {
 
                         Text {
                             text: model.phoneNumber || "No number"
-                            color: Qt.rgba(textCol.r, textCol.g, textCol.b, 0.7)
+                            color: Qt.rgba(ThemeValues.textCol.r, ThemeValues.textCol.g, ThemeValues.textCol.b, 0.7)
                             font.pixelSize: 13
-                            font.family: fontFamily
+                            font.family: ThemeValues.fontFamily
                             elide: Text.ElideRight
                             width: parent.width
                         }
@@ -125,9 +123,9 @@ Item {
                         Text {
                             visible: model.email !== ""
                             text: model.email
-                            color: Qt.rgba(primaryCol.r, primaryCol.g, primaryCol.b, 0.8)
+                            color: Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.8)
                             font.pixelSize: 11
-                            font.family: fontFamily
+                            font.family: ThemeValues.fontFamily
                             elide: Text.ElideRight
                             width: parent.width
                         }
@@ -138,10 +136,10 @@ Item {
                         width: 50
                         height: 50
                         anchors.verticalCenter: parent.verticalCenter
-                        color: callMouseArea.pressed ? Qt.rgba(0, 1, 0, 0.3) :
-                               callMouseArea.containsMouse ? Qt.rgba(0, 1, 0, 0.2) :
-                               Qt.rgba(0, 1, 0, 0.1)
-                        border.color: "#00ff00"
+                        color: callMouseArea.pressed ? Qt.rgba(ThemeValues.successCol.r, ThemeValues.successCol.g, ThemeValues.successCol.b, 0.3) :
+                               callMouseArea.containsMouse ? Qt.rgba(ThemeValues.successCol.r, ThemeValues.successCol.g, ThemeValues.successCol.b, 0.2) :
+                               Qt.rgba(ThemeValues.successCol.r, ThemeValues.successCol.g, ThemeValues.successCol.b, 0.1)
+                        border.color: ThemeValues.successCol
                         border.width: 1
                         radius: 25
 
@@ -176,7 +174,7 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        color: bgCol
+        color: ThemeValues.bgCol
 
         Column {
             anchors.fill: parent
@@ -186,7 +184,7 @@ Item {
             Rectangle {
                 width: parent.width
                 height: 60
-                color: Qt.rgba(cardBgCol.r, cardBgCol.g, cardBgCol.b, 0.5)
+                color: Qt.rgba(ThemeValues.cardBgCol.r, ThemeValues.cardBgCol.g, ThemeValues.cardBgCol.b, 0.5)
 
                 Row {
                     anchors.fill: parent
@@ -199,7 +197,7 @@ Item {
                         height: 40
                         anchors.verticalCenter: parent.verticalCenter
                         color: Qt.rgba(0, 0, 0, 0.3)
-                        border.color: primaryCol
+                        border.color: ThemeValues.primaryCol
                         border.width: 1
                         radius: 4
 
@@ -208,9 +206,9 @@ Item {
                             anchors.fill: parent
                             anchors.margins: 10
                             anchors.rightMargin: searchField.text !== "" ? 35 : 10
-                            color: textCol
+                            color: ThemeValues.textCol
                             font.pixelSize: 14
-                            font.family: fontFamily
+                            font.family: ThemeValues.fontFamily
                             verticalAlignment: TextInput.AlignVCenter
                             selectByMouse: true
 
@@ -224,9 +222,9 @@ Item {
                             anchors.fill: parent
                             anchors.margins: 10
                             text: "Search contacts..."
-                            color: Qt.rgba(textCol.r, textCol.g, textCol.b, 0.4)
+                            color: Qt.rgba(ThemeValues.textCol.r, ThemeValues.textCol.g, ThemeValues.textCol.b, 0.4)
                             font.pixelSize: 14
-                            font.family: fontFamily
+                            font.family: ThemeValues.fontFamily
                             verticalAlignment: Text.AlignVCenter
                         }
 
@@ -238,17 +236,17 @@ Item {
                             anchors.right: parent.right
                             anchors.rightMargin: 8
                             anchors.verticalCenter: parent.verticalCenter
-                            color: clearMouseArea.pressed ? Qt.rgba(primaryCol.r, primaryCol.g, primaryCol.b, 0.3) :
-                                   clearMouseArea.containsMouse ? Qt.rgba(primaryCol.r, primaryCol.g, primaryCol.b, 0.2) :
+                            color: clearMouseArea.pressed ? Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.3) :
+                                   clearMouseArea.containsMouse ? Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.2) :
                                    "transparent"
                             radius: 12
 
                             Text {
                                 anchors.centerIn: parent
                                 text: "✕"
-                                color: primaryCol
+                                color: ThemeValues.primaryCol
                                 font.pixelSize: 16
-                                font.family: fontFamily
+                                font.family: ThemeValues.fontFamily
                             }
 
                             MouseArea {
@@ -267,17 +265,17 @@ Item {
                         width: 60
                         height: 40
                         anchors.verticalCenter: parent.verticalCenter
-                        color: contactManager && contactManager.isSyncing ? Qt.rgba(primaryCol.r, primaryCol.g, primaryCol.b, 0.2) : "transparent"
-                        border.color: primaryCol
+                        color: contactManager && contactManager.isSyncing ? Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.2) : "transparent"
+                        border.color: ThemeValues.primaryCol
                         border.width: 1
                         radius: 4
 
                         Text {
                             anchors.centerIn: parent
                             text: contactManager && contactManager.isSyncing ? "⟳" : "↻"
-                            color: primaryCol
+                            color: ThemeValues.primaryCol
                             font.pixelSize: 24
-                            font.family: fontFamily
+                            font.family: ThemeValues.fontFamily
 
                             RotationAnimation on rotation {
                                 running: contactManager && contactManager.isSyncing
@@ -323,9 +321,9 @@ Item {
                             return filtered + " of " + total + " contacts"
                         }
                     }
-                    color: Qt.rgba(textCol.r, textCol.g, textCol.b, 0.6)
+                    color: Qt.rgba(ThemeValues.textCol.r, ThemeValues.textCol.g, ThemeValues.textCol.b, 0.6)
                     font.pixelSize: 12
-                    font.family: fontFamily
+                    font.family: ThemeValues.fontFamily
                 }
 
                 Text {
@@ -333,9 +331,9 @@ Item {
                     anchors.rightMargin: 15
                     anchors.verticalCenter: parent.verticalCenter
                     text: contactManager ? contactManager.statusMessage : ""
-                    color: Qt.rgba(primaryCol.r, primaryCol.g, primaryCol.b, 0.8)
+                    color: Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.8)
                     font.pixelSize: 11
-                    font.family: fontFamily
+                    font.family: ThemeValues.fontFamily
                 }
             }
 
@@ -355,7 +353,7 @@ Item {
                     contentItem: Rectangle {
                         implicitWidth: 8
                         radius: 4
-                        color: Qt.rgba(primaryCol.r, primaryCol.g, primaryCol.b, 0.5)
+                        color: Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.5)
                     }
                 }
 
@@ -372,9 +370,9 @@ Item {
                             return "No contacts\n\nClick the sync button to download\ncontacts from your phone"
                         }
                     }
-                    color: Qt.rgba(textCol.r, textCol.g, textCol.b, 0.5)
+                    color: Qt.rgba(ThemeValues.textCol.r, ThemeValues.textCol.g, ThemeValues.textCol.b, 0.5)
                     font.pixelSize: 16
-                    font.family: fontFamily
+                    font.family: ThemeValues.fontFamily
                     horizontalAlignment: Text.AlignHCenter
                     lineHeight: 1.5
                 }

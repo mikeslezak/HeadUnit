@@ -1,11 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
-  <rect width="256" height="256" fill="none"/>
-  <g fill="#ffffff" stroke="#ffffff" stroke-width="0">
-    
-<!-- three retro arcs -->
-<path d="M72 116 q56-20 112 0" fill="none" stroke="#ffffff" stroke-width="12" stroke-linecap="round"/>
-<path d="M80 138 q48-16 96 0" fill="none" stroke="#ffffff" stroke-width="12" stroke-linecap="round"/>
-<path d="M88 160 q40-12 80 0" fill="none" stroke="#ffffff" stroke-width="12" stroke-linecap="round"/>
-
-  </g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" aria-label="Retro - Spotify Music Icon">
+  <rect x="28" y="28" width="200" height="200" stroke="#ffffff" stroke-width="6" fill="none"/>
+  <path d="M80,104 Q128,78 176,104" stroke="#ffffff" stroke-width="12" fill="none" stroke-linecap="round"/>
+  <path d="M88,136 Q128,114 168,136" stroke="#ffffff" stroke-width="10" fill="none" stroke-linecap="round"/>
+  <path d="M96,166 Q128,148 160,166" stroke="#ffffff" stroke-width="10" fill="none" stroke-linecap="round"/>
 </svg>

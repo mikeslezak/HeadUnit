@@ -8,6 +8,7 @@
 #include <QDir>
 #include <QDateTime>
 #include <QtMath>
+#include <QCoreApplication>
 
 // Picovoice C API
 extern "C" {
@@ -36,6 +37,7 @@ PicovoiceManager::PicovoiceManager(QObject *parent)
     , m_isRunning(false)
     , m_isPaused(false)
     , m_isInitialized(false)
+    , m_wakeWordAvailable(false)
     , m_speechStartTime(0)
     , m_lastVoiceActivityTime(0)
     , m_lastDetectionTime(0)
@@ -79,22 +81,31 @@ void PicovoiceManager::start()
         }
 
         if (!initializePorcupine()) {
-            emit error("Failed to initialize Porcupine wake word detection");
-            return;
+            qWarning() << "PicovoiceManager: Porcupine init failed. Wake word detection disabled - use button activation.";
+            m_wakeWordAvailable = false;
+        } else {
+            m_wakeWordAvailable = true;
         }
+        emit wakeWordAvailableChanged();
 
         if (!initializeRhino()) {
             qWarning() << "PicovoiceManager: Rhino initialization failed (context file may be missing). Continuing without intent detection.";
-            // Not a fatal error - can still use Leopard for STT
         }
 
         if (!initializeLeopard()) {
-            emit error("Failed to initialize Leopard speech-to-text");
-            return;
+            qWarning() << "PicovoiceManager: Leopard init failed. Will use Google STT only.";
         }
 
         m_isInitialized = true;
         emit initializedChanged();
+    }
+
+    // Use Picovoice sample rate if available, otherwise default 16kHz
+    if (m_sampleRate == 0) {
+        m_sampleRate = 16000;
+    }
+    if (m_frameLength == 0) {
+        m_frameLength = 512;
     }
 
     // Setup audio input
@@ -135,8 +146,13 @@ void PicovoiceManager::start()
     m_state = Listening;
     emit runningChanged();
 
-    setStatusMessage(QString("Listening for '%1'...").arg(m_wakeWord));
-    qDebug() << "PicovoiceManager: Started - listening for wake word";
+    if (m_wakeWordAvailable) {
+        setStatusMessage(QString("Listening for '%1'...").arg(m_wakeWord));
+        qDebug() << "PicovoiceManager: Started - listening for wake word";
+    } else {
+        setStatusMessage("Ready (button activation only)");
+        qDebug() << "PicovoiceManager: Started - button activation mode (no wake word)";
+    }
 }
 
 void PicovoiceManager::stop()
@@ -315,22 +331,24 @@ void PicovoiceManager::onAudioReady()
         const int16_t *inputFrame = reinterpret_cast<const int16_t*>(m_audioBuffer.constData());
 
         // Apply Koala noise suppression if available
-        QVector<int16_t> processedFrame(m_frameLength);
+        if (m_processedFrame.size() != m_frameLength) {
+            m_processedFrame.resize(m_frameLength);
+        }
         if (m_koala && m_koalaFrameLength == m_frameLength) {
             // Koala initialized and frame sizes match - apply noise suppression
-            pv_status_t status = pv_koala_process(m_koala, inputFrame, processedFrame.data());
+            pv_status_t status = pv_koala_process(m_koala, inputFrame, m_processedFrame.data());
             if (status != PV_STATUS_SUCCESS) {
                 qWarning() << "PicovoiceManager: Koala process error:" << pv_status_to_string(status);
                 // Continue without noise suppression
-                memcpy(processedFrame.data(), inputFrame, bytesPerFrame);
+                memcpy(m_processedFrame.data(), inputFrame, bytesPerFrame);
             }
         } else {
             // No Koala or frame size mismatch - use original audio
-            memcpy(processedFrame.data(), inputFrame, bytesPerFrame);
+            memcpy(m_processedFrame.data(), inputFrame, bytesPerFrame);
         }
 
         // Process frame based on current state
-        processAudioFrame(processedFrame.data(), m_frameLength);
+        processAudioFrame(m_processedFrame.data(), m_frameLength);
 
         // Remove processed frame from buffer
         m_audioBuffer.remove(0, bytesPerFrame);
@@ -632,6 +650,23 @@ void PicovoiceManager::onGoogleError(const QString &message)
     resetToListening();
 }
 
+void PicovoiceManager::manualActivate()
+{
+    if (!m_isRunning) {
+        qWarning() << "PicovoiceManager: Cannot manually activate - pipeline not running";
+        return;
+    }
+
+    qDebug() << "PicovoiceManager: Manual activation (button press)";
+
+    // Simulate wake word detection - go to WaitingForReadyPrompt
+    m_lastDetectionTime = QDateTime::currentMSecsSinceEpoch();
+    emit wakeWordDetected(m_wakeWord);
+
+    m_state = WaitingForReadyPrompt;
+    setStatusMessage("Playing ready prompt...");
+}
+
 void PicovoiceManager::resetToListening()
 {
     m_speechBuffer.clear();
@@ -642,7 +677,11 @@ void PicovoiceManager::resetToListening()
         pv_rhino_reset(m_rhino);
     }
 
-    setStatusMessage(QString("Listening for '%1'...").arg(m_wakeWord));
+    if (m_wakeWordAvailable) {
+        setStatusMessage(QString("Listening for '%1'...").arg(m_wakeWord));
+    } else {
+        setStatusMessage("Ready (button activation only)");
+    }
 }
 
 // ========== INITIALIZATION ==========
@@ -656,15 +695,23 @@ bool PicovoiceManager::initializeKoala()
 
     qDebug() << "PicovoiceManager: Initializing Koala noise suppression...";
 
-    // Koala doesn't require a model path for default operation
+    // Koala v3 requires model path and device parameter
+    QString koalaModelPath = getModelPath("koala");
+    QByteArray accessKeyBytes = m_accessKey.toUtf8();
+    QByteArray modelPathBytes = koalaModelPath.toUtf8();
     pv_status_t status = pv_koala_init(
-        m_accessKey.isEmpty() ? nullptr : m_accessKey.toUtf8().constData(),
-        nullptr,  // Use default model
+        m_accessKey.isEmpty() ? nullptr : accessKeyBytes.constData(),
+        modelPathBytes.constData(),
+        "best",   // Auto-select best device (CPU/GPU)
         &m_koala
     );
 
     if (status != PV_STATUS_SUCCESS) {
-        qCritical() << "PicovoiceManager: Failed to initialize Koala:" << pv_status_to_string(status);
+        QString statusStr = pv_status_to_string(status);
+        qCritical() << "PicovoiceManager: Failed to initialize Koala:" << statusStr;
+        if (statusStr == "INVALID_ARGUMENT") {
+            qCritical() << "  Likely cause: Access key invalid/expired or Koala SDK library incompatible";
+        }
         return false;
     }
 
@@ -704,9 +751,12 @@ bool PicovoiceManager::initializePorcupine()
         return false;
     }
 
-    const char *accessKey = m_accessKey.isEmpty() ? nullptr : m_accessKey.toUtf8().constData();
-    const char *modelPathC = modelPath.toUtf8().constData();
-    const char *keywordPathC = keywordPath.toUtf8().constData();
+    QByteArray accessKeyBytes = m_accessKey.toUtf8();
+    QByteArray modelPathBytes = modelPath.toUtf8();
+    QByteArray keywordPathBytes = keywordPath.toUtf8();
+    const char *accessKey = m_accessKey.isEmpty() ? nullptr : accessKeyBytes.constData();
+    const char *modelPathC = modelPathBytes.constData();
+    const char *keywordPathC = keywordPathBytes.constData();
     const char *keywordPaths[] = { keywordPathC };
     const float sensitivities[] = { m_sensitivity };
 
@@ -720,7 +770,18 @@ bool PicovoiceManager::initializePorcupine()
     );
 
     if (status != PV_STATUS_SUCCESS) {
-        qCritical() << "PicovoiceManager: Failed to initialize Porcupine:" << pv_status_to_string(status);
+        QString statusStr = pv_status_to_string(status);
+        qCritical() << "PicovoiceManager: Failed to initialize Porcupine:" << statusStr;
+
+        if (statusStr == "INVALID_ARGUMENT") {
+            qCritical() << "  Likely cause: Picovoice access key is invalid, expired, or incompatible with SDK v" << pv_porcupine_version();
+            qCritical() << "  Get a new key at: https://console.picovoice.ai/";
+        } else if (statusStr == "KEY_ERROR") {
+            qCritical() << "  Access key validation failed. Check your PICOVOICE_ACCESS_KEY in .env";
+        } else if (statusStr == "IO_ERROR") {
+            qCritical() << "  File read error - model or keyword file may be corrupted";
+        }
+
         return false;
     }
 
@@ -749,7 +810,7 @@ bool PicovoiceManager::initializeRhino()
 
     // If no custom context path, try default location
     if (contextPath.isEmpty()) {
-        contextPath = "/home/mike/HeadUnit/external/rhino/contexts/headunit_raspberry-pi.rhn";
+        contextPath = basePath() + "/external/rhino/contexts/headunit_raspberry-pi.rhn";
     }
 
     qDebug() << "  Model path:" << modelPath;
@@ -766,9 +827,12 @@ bool PicovoiceManager::initializeRhino()
         return false;
     }
 
-    const char *accessKey = m_accessKey.isEmpty() ? nullptr : m_accessKey.toUtf8().constData();
-    const char *modelPathC = modelPath.toUtf8().constData();
-    const char *contextPathC = contextPath.toUtf8().constData();
+    QByteArray accessKeyBytes = m_accessKey.toUtf8();
+    QByteArray modelPathBytes = modelPath.toUtf8();
+    QByteArray contextPathBytes = contextPath.toUtf8();
+    const char *accessKey = m_accessKey.isEmpty() ? nullptr : accessKeyBytes.constData();
+    const char *modelPathC = modelPathBytes.constData();
+    const char *contextPathC = contextPathBytes.constData();
 
     pv_status_t status = pv_rhino_init(
         accessKey,
@@ -817,12 +881,15 @@ bool PicovoiceManager::initializeLeopard()
         return false;
     }
 
-    const char *accessKey = m_accessKey.isEmpty() ? nullptr : m_accessKey.toUtf8().constData();
-    const char *modelPathC = modelPath.toUtf8().constData();
+    QByteArray accessKeyBytes = m_accessKey.toUtf8();
+    QByteArray modelPathBytes = modelPath.toUtf8();
+    const char *accessKey = m_accessKey.isEmpty() ? nullptr : accessKeyBytes.constData();
+    const char *modelPathC = modelPathBytes.constData();
 
     pv_status_t status = pv_leopard_init(
         accessKey,
         modelPathC,
+        "best",     // device (auto-select CPU/GPU)
         true,       // enable_automatic_punctuation
         false,      // enable_diarization
         &m_leopard  // output handle
@@ -885,37 +952,48 @@ void PicovoiceManager::cleanupLeopard()
 
 // ========== PATH HELPERS ==========
 
+QString PicovoiceManager::basePath()
+{
+    // Use application directory to find external SDKs (portable)
+    static QString base = QCoreApplication::applicationDirPath() + "/..";
+    return base;
+}
+
 QString PicovoiceManager::getModelPath(const QString &component) const
 {
+    QString base = basePath() + "/external";
     if (component == "porcupine") {
-        return "/home/mike/HeadUnit/external/porcupine/lib/common/porcupine_params.pv";
+        return base + "/porcupine/lib/common/porcupine_params.pv";
     } else if (component == "rhino") {
-        return "/home/mike/HeadUnit/external/rhino/common/rhino_params.pv";
+        return base + "/rhino/common/rhino_params.pv";
     } else if (component == "leopard") {
-        return "/home/mike/HeadUnit/external/leopard/common/leopard_params.pv";
+        return base + "/leopard/common/leopard_params.pv";
+    } else if (component == "koala") {
+        return base + "/koala/common/koala_params.pv";
     }
     return QString();
 }
 
 QString PicovoiceManager::getKeywordPath() const
 {
+    QString base = basePath() + "/external/porcupine/resources/keyword_files/raspberry-pi";
+
     // Check for custom "Hey Sammy" wake word (must be raspberry-pi platform to match library)
     if (m_wakeWord.toLower() == "hey sammy") {
-        QString customPath = "/home/mike/HeadUnit/external/porcupine/resources/keyword_files/raspberry-pi/Hey-Sammy_en_raspberry-pi.ppn";
+        QString customPath = base + "/Hey-Sammy_en_raspberry-pi.ppn";
         if (QFile::exists(customPath)) {
             return customPath;
         }
         // Fallback to jarvis if Hey Sammy file not found
         qWarning() << "PicovoiceManager: Hey Sammy wake word file not found. Please download the Raspberry Pi version from Picovoice Console.";
         qWarning() << "PicovoiceManager: Falling back to 'jarvis' wake word";
-        return "/home/mike/HeadUnit/external/porcupine/resources/keyword_files/raspberry-pi/jarvis_raspberry-pi.ppn";
+        return base + "/jarvis_raspberry-pi.ppn";
     }
 
     // For built-in wake words, use the standard path
     QString keywordName = m_wakeWord;
     keywordName.replace("_", " ");
-    return QString("/home/mike/HeadUnit/external/porcupine/resources/keyword_files/raspberry-pi/%1_raspberry-pi.ppn")
-        .arg(keywordName);
+    return QString("%1/%2_raspberry-pi.ppn").arg(base, keywordName);
 }
 
 void PicovoiceManager::setStatusMessage(const QString &msg)
@@ -937,10 +1015,10 @@ int16_t PicovoiceManager::calculateFrameEnergy(const int16_t *frame, int32_t len
 
     int64_t sumSquares = 0;
     for (int32_t i = 0; i < length; ++i) {
-        int32_t sample = frame[i];
+        int64_t sample = static_cast<int64_t>(frame[i]);
         sumSquares += sample * sample;
     }
 
     // Return RMS as int16_t (approximation using integer math)
-    return static_cast<int16_t>(qSqrt(sumSquares / length));
+    return static_cast<int16_t>(qSqrt(static_cast<double>(sumSquares) / length));
 }

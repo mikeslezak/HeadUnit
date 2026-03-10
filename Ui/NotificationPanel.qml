@@ -1,22 +1,17 @@
 import QtQuick 2.15
 import QtQuick.Effects
+import HeadUnit
 
 Rectangle {
     id: root
     anchors.fill: parent
     color: Qt.rgba(0, 0, 0, 0.85)
 
-    required property var theme
+    property var theme: null
     signal closeRequested()
 
     property bool isPinned: false
 
-    readonly property color bgCol: theme?.palette?.bg ?? "#0a0a0f"
-    readonly property color textCol: theme?.palette?.text ?? "#39ff14"
-    readonly property color primaryCol: theme?.palette?.primary ?? "#00f0ff"
-    readonly property color accentCol: theme?.palette?.accent ?? "#ff006e"
-    readonly property string fontFamily: theme?.typography?.fontFamily ?? "Noto Sans"
-    readonly property int fontSize: theme?.typography?.fontSize ? Number(theme.typography.fontSize) : 16
 
     // Click outside to close
     MouseArea {
@@ -35,8 +30,8 @@ Rectangle {
         anchors.top: parent.top
         anchors.bottom: parent.bottom
         width: 350
-        color: bgCol
-        border.color: primaryCol
+        color: ThemeValues.bgCol
+        border.color: ThemeValues.primaryCol
         border.width: 2
 
         MouseArea {
@@ -53,7 +48,7 @@ Rectangle {
                 width: parent.width
                 height: 60
                 color: Qt.rgba(0, 0, 0, 0.5)
-                border.color: primaryCol
+                border.color: ThemeValues.primaryCol
                 border.width: 1
 
                 Row {
@@ -63,9 +58,9 @@ Rectangle {
 
                     Text {
                         text: "NOTIFICATIONS"
-                        color: primaryCol
-                        font.pixelSize: fontSize + 4
-                        font.family: fontFamily
+                        color: ThemeValues.primaryCol
+                        font.pixelSize: ThemeValues.fontSize + 4
+                        font.family: ThemeValues.fontFamily
                         font.weight: Font.Bold
                         anchors.verticalCenter: parent.verticalCenter
                     }
@@ -77,16 +72,16 @@ Rectangle {
                         height: 30
                         radius: 15
                         color: "transparent"
-                        border.color: primaryCol
+                        border.color: ThemeValues.primaryCol
                         border.width: 1
                         anchors.verticalCenter: parent.verticalCenter
 
                         Text {
                             anchors.centerIn: parent
                             text: notificationManager.notificationCount
-                            color: primaryCol
-                            font.pixelSize: fontSize - 2
-                            font.family: fontFamily
+                            color: ThemeValues.primaryCol
+                            font.pixelSize: ThemeValues.fontSize - 2
+                            font.family: ThemeValues.fontFamily
                             font.weight: Font.Bold
                         }
                     }
@@ -96,8 +91,8 @@ Rectangle {
                         width: 35
                         height: 35
                         radius: 6
-                        color: isPinned ? Qt.rgba(primaryCol.r, primaryCol.g, primaryCol.b, 0.2) : "transparent"
-                        border.color: primaryCol
+                        color: isPinned ? Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.2) : "transparent"
+                        border.color: ThemeValues.primaryCol
                         border.width: 1
                         anchors.verticalCenter: parent.verticalCenter
 
@@ -119,14 +114,14 @@ Rectangle {
                         height: 35
                         radius: 6
                         color: "transparent"
-                        border.color: accentCol
+                        border.color: ThemeValues.accentCol
                         border.width: 1
                         anchors.verticalCenter: parent.verticalCenter
 
                         Text {
                             anchors.centerIn: parent
                             text: "✕"
-                            color: accentCol
+                            color: ThemeValues.accentCol
                             font.pixelSize: 20
                             font.weight: Font.Bold
                         }
@@ -151,7 +146,7 @@ Rectangle {
                     width: ListView.view.width
                     height: 100
                     color: Qt.rgba(0, 0, 0, 0.3)
-                    border.color: Qt.rgba(primaryCol.r, primaryCol.g, primaryCol.b, 0.3)
+                    border.color: Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.3)
                     border.width: 1
 
                     Column {
@@ -168,14 +163,14 @@ Rectangle {
                                 width: 40
                                 height: 40
                                 radius: 20
-                                color: Qt.rgba(primaryCol.r, primaryCol.g, primaryCol.b, 0.2)
-                                border.color: primaryCol
+                                color: Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.2)
+                                border.color: ThemeValues.primaryCol
                                 border.width: 1
 
                                 Text {
                                     anchors.centerIn: parent
                                     text: modelData.appName ? modelData.appName.substring(0, 1).toUpperCase() : "?"
-                                    color: primaryCol
+                                    color: ThemeValues.primaryCol
                                     font.pixelSize: 20
                                     font.weight: Font.Bold
                                 }
@@ -187,9 +182,9 @@ Rectangle {
 
                                 Text {
                                     text: modelData.title || "Notification"
-                                    color: textCol
-                                    font.pixelSize: fontSize
-                                    font.family: fontFamily
+                                    color: ThemeValues.textCol
+                                    font.pixelSize: ThemeValues.fontSize
+                                    font.family: ThemeValues.fontFamily
                                     font.weight: Font.Bold
                                     elide: Text.ElideRight
                                     width: parent.width
@@ -197,9 +192,9 @@ Rectangle {
 
                                 Text {
                                     text: modelData.message || ""
-                                    color: Qt.rgba(textCol.r, textCol.g, textCol.b, 0.7)
-                                    font.pixelSize: fontSize - 3
-                                    font.family: fontFamily
+                                    color: Qt.rgba(ThemeValues.textCol.r, ThemeValues.textCol.g, ThemeValues.textCol.b, 0.7)
+                                    font.pixelSize: ThemeValues.fontSize - 3
+                                    font.family: ThemeValues.fontFamily
                                     wrapMode: Text.WordWrap
                                     maximumLineCount: 2
                                     elide: Text.ElideRight
@@ -221,15 +216,15 @@ Rectangle {
                                     height: 28
                                     radius: 4
                                     color: "transparent"
-                                    border.color: primaryCol
+                                    border.color: ThemeValues.primaryCol
                                     border.width: 1
 
                                     Text {
                                         anchors.centerIn: parent
                                         text: modelData
-                                        color: primaryCol
-                                        font.pixelSize: fontSize - 4
-                                        font.family: fontFamily
+                                        color: ThemeValues.primaryCol
+                                        font.pixelSize: ThemeValues.fontSize - 4
+                                        font.family: ThemeValues.fontFamily
                                     }
 
                                     MouseArea {
@@ -252,14 +247,14 @@ Rectangle {
                         width: 24
                         height: 24
                         radius: 12
-                        color: Qt.rgba(accentCol.r, accentCol.g, accentCol.b, 0.2)
-                        border.color: accentCol
+                        color: Qt.rgba(ThemeValues.accentCol.r, ThemeValues.accentCol.g, ThemeValues.accentCol.b, 0.2)
+                        border.color: ThemeValues.accentCol
                         border.width: 1
 
                         Text {
                             anchors.centerIn: parent
                             text: "✕"
-                            color: accentCol
+                            color: ThemeValues.accentCol
                             font.pixelSize: 14
                             font.weight: Font.Bold
                         }
@@ -275,9 +270,9 @@ Rectangle {
                 Text {
                     anchors.centerIn: parent
                     text: "No notifications"
-                    color: Qt.rgba(textCol.r, textCol.g, textCol.b, 0.5)
-                    font.pixelSize: fontSize + 2
-                    font.family: fontFamily
+                    color: Qt.rgba(ThemeValues.textCol.r, ThemeValues.textCol.g, ThemeValues.textCol.b, 0.5)
+                    font.pixelSize: ThemeValues.fontSize + 2
+                    font.family: ThemeValues.fontFamily
                     visible: notificationManager.notificationCount === 0
                 }
             }

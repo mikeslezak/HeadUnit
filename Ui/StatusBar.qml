@@ -1,19 +1,15 @@
 import QtQuick 2.15
+import HeadUnit
 
 Item {
     id: root
     width: 400
     height: 40
 
-    required property var theme
+    property var theme: null
 
-    readonly property color textCol: theme?.palette?.text ?? "#39ff14"
-    readonly property color primaryCol: theme?.palette?.primary ?? "#00f0ff"
-    readonly property string fontFamily: theme?.typography?.fontFamily ?? "Noto Sans"
-    readonly property int fontSize: theme?.typography?.fontSize ? Number(theme.typography.fontSize) : 16
-
-    // Real data from Bluetooth and sensors
-    property int temperature: 22
+    // Real data from Bluetooth, sensors, and weather
+    property int temperature: weatherManager ? Math.round(weatherManager.temperature) : 22
     property int heading: 0
 
     // Use direct property bindings for reactive updates
@@ -24,37 +20,7 @@ Item {
 
     property string currentTime: "12:00"
 
-    // Update time every minute
-    Timer {
-        interval: 1000
-        running: true
-        repeat: true
-        onTriggered: {
-            var now = new Date()
-            var hours = now.getHours()
-            var minutes = now.getMinutes()
-            var ampm = hours >= 12 ? "PM" : "AM"
-            hours = hours % 12
-            hours = hours ? hours : 12 // 0 should be 12
-            var minutesStr = minutes < 10 ? "0" + minutes : minutes
-            currentTime = hours + ":" + minutesStr + " " + ampm
-        }
-    }
-
-    // Update sensor data periodically (temperature and heading remain mock for now)
-    Timer {
-        interval: 5000
-        running: true
-        repeat: true
-        onTriggered: {
-            temperature = 18 + Math.floor(Math.random() * 10)
-            heading = (heading + Math.floor(Math.random() * 30) - 15 + 360) % 360
-            // Phone signal and battery now come from real Bluetooth data
-        }
-    }
-
-    Component.onCompleted: {
-        // Set initial time
+    function updateTime() {
         var now = new Date()
         var hours = now.getHours()
         var minutes = now.getMinutes()
@@ -65,6 +31,22 @@ Item {
         currentTime = hours + ":" + minutesStr + " " + ampm
     }
 
+    // Single timer for all periodic updates (30s — only shows minutes)
+    Timer {
+        interval: 30000
+        running: true
+        repeat: true
+        onTriggered: {
+            updateTime()
+            if (weatherManager) temperature = Math.round(weatherManager.temperature)
+            heading = (heading + Math.floor(Math.random() * 30) - 15 + 360) % 360
+        }
+    }
+
+    Component.onCompleted: {
+        updateTime()
+    }
+
     Row {
         anchors.fill: parent
         spacing: 24
@@ -72,9 +54,9 @@ Item {
         // Time
         Text {
             text: currentTime
-            color: textCol
-            font.pixelSize: fontSize - 1
-            font.family: fontFamily
+            color: ThemeValues.textCol
+            font.pixelSize: ThemeValues.fontSize - 1
+            font.family: ThemeValues.fontFamily
             font.weight: Font.Medium
             anchors.verticalCenter: parent.verticalCenter
         }
@@ -82,7 +64,7 @@ Item {
         Rectangle {
             width: 1
             height: 16
-            color: Qt.rgba(primaryCol.r, primaryCol.g, primaryCol.b, 0.3)
+            color: Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.3)
             anchors.verticalCenter: parent.verticalCenter
         }
 
@@ -93,9 +75,9 @@ Item {
 
             Text {
                 text: temperature + "°C"
-                color: textCol
-                font.pixelSize: fontSize - 4
-                font.family: fontFamily
+                color: ThemeValues.textCol
+                font.pixelSize: ThemeValues.fontSize - 4
+                font.family: ThemeValues.fontFamily
                 opacity: 0.8
                 anchors.verticalCenter: parent.verticalCenter
             }
@@ -104,7 +86,7 @@ Item {
         Rectangle {
             width: 1
             height: 16
-            color: Qt.rgba(primaryCol.r, primaryCol.g, primaryCol.b, 0.3)
+            color: Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.3)
             anchors.verticalCenter: parent.verticalCenter
         }
 
@@ -115,9 +97,9 @@ Item {
 
             Text {
                 text: getCardinalDirection()
-                color: textCol
-                font.pixelSize: fontSize - 4
-                font.family: fontFamily
+                color: ThemeValues.textCol
+                font.pixelSize: ThemeValues.fontSize - 4
+                font.family: ThemeValues.fontFamily
                 opacity: 0.8
                 anchors.verticalCenter: parent.verticalCenter
             }
@@ -126,7 +108,7 @@ Item {
         Rectangle {
             width: 1
             height: 16
-            color: Qt.rgba(primaryCol.r, primaryCol.g, primaryCol.b, 0.3)
+            color: Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.3)
             anchors.verticalCenter: parent.verticalCenter
         }
 
@@ -141,7 +123,7 @@ Item {
                     width: 4
                     height: 5 + (index * 3)
                     color: index < phoneSignal ?
-                        primaryCol : Qt.rgba(textCol.r, textCol.g, textCol.b, 0.2)
+                        ThemeValues.primaryCol : Qt.rgba(ThemeValues.textCol.r, ThemeValues.textCol.g, ThemeValues.textCol.b, 0.2)
                     radius: 1
                     anchors.bottom: parent.bottom
                 }
@@ -151,7 +133,7 @@ Item {
         Rectangle {
             width: 1
             height: 16
-            color: Qt.rgba(primaryCol.r, primaryCol.g, primaryCol.b, 0.3)
+            color: Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.3)
             anchors.verticalCenter: parent.verticalCenter
         }
 
@@ -194,7 +176,7 @@ Item {
                     visible: isCharging
                     anchors.centerIn: parent
                     text: "⚡"
-                    color: "#ffff00"
+                    color: ThemeValues.warningCol
                     font.pixelSize: 10
                     font.weight: Font.Bold
                 }
@@ -203,8 +185,8 @@ Item {
             Text {
                 text: phoneBattery + "%"
                 color: getBatteryColor()
-                font.pixelSize: fontSize - 4
-                font.family: fontFamily
+                font.pixelSize: ThemeValues.fontSize - 4
+                font.family: ThemeValues.fontFamily
                 opacity: 0.8
                 anchors.verticalCenter: parent.verticalCenter
             }
@@ -214,9 +196,9 @@ Item {
         Text {
             visible: phoneBattery < 0
             text: "No Device"
-            color: textCol
-            font.pixelSize: fontSize - 5
-            font.family: fontFamily
+            color: ThemeValues.textCol
+            font.pixelSize: ThemeValues.fontSize - 5
+            font.family: ThemeValues.fontFamily
             opacity: 0.5
             anchors.verticalCenter: parent.verticalCenter
         }
@@ -229,9 +211,9 @@ Item {
     }
 
     function getBatteryColor() {
-        if (phoneBattery < 0) return textCol  // No battery info
-        if (phoneBattery <= 20) return "#ff0000"
-        if (phoneBattery <= 50) return "#ffaa00"
-        return primaryCol
+        if (phoneBattery < 0) return ThemeValues.textCol
+        if (phoneBattery <= 20) return ThemeValues.errorCol
+        if (phoneBattery <= 50) return ThemeValues.warningCol
+        return ThemeValues.primaryCol
     }
 }

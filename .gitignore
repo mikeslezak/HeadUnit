@@ -36,6 +36,29 @@ install_manifest.txt
 # Secrets
 .env
 
+# External SDK duplicates and archives
+external/*_sdk/
+external/*.tar.gz
+
+# External build artifacts (build from source, don't commit)
+external/librespot-src/
+external/librespot
+external/maplibre-native-qt/
+external/maplibre-install/
+
+# Picovoice SDK binaries and models (large, download separately)
+external/porcupine/
+external/koala/lib/
+external/koala/common/
+external/leopard/lib/
+external/leopard/common/
+external/leopard/common/*.bak
+external/rhino/lib/
+external/rhino/common/*.bak
+
+# Debug/temp files
+Error recent
+
 # OS specific
 .DS_Store
 Thumbs.db
