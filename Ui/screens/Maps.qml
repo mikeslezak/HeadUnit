@@ -189,143 +189,144 @@ Item {
                 }
             }
 
-            // GPS marker
-            MapQuickItem {
-                id: gpsMarker
-                coordinate: gps.position.coordinateValid
+            // GPS location — outer ring (MapCircle is natively supported by MapLibre)
+            MapCircle {
+                id: gpsRing
+                center: gps.position.coordinateValid
                     ? gps.position.coordinate
                     : QtPositioning.coordinate(0, 0)
                 visible: gps.position.coordinateValid
-                anchorPoint.x: gpsDot.width / 2
-                anchorPoint.y: gpsDot.height / 2
-
-                sourceItem: Item {
-                    id: gpsDot
-                    width: 28; height: 28
-
-                    // Pulse ring
-                    Rectangle {
-                        anchors.centerIn: parent
-                        width: 28; height: 28; radius: 14
-                        color: "transparent"
-                        border.color: ThemeValues.primaryCol
-                        border.width: 2
-                        opacity: 0.4
-
-                        SequentialAnimation on scale {
-                            loops: Animation.Infinite
-                            NumberAnimation { from: 1.0; to: 1.8; duration: 1500; easing.type: Easing.OutQuad }
-                            NumberAnimation { from: 1.8; to: 1.0; duration: 0 }
-                        }
-                        SequentialAnimation on opacity {
-                            loops: Animation.Infinite
-                            NumberAnimation { from: 0.5; to: 0.0; duration: 1500; easing.type: Easing.OutQuad }
-                            NumberAnimation { from: 0.0; to: 0.5; duration: 0 }
-                        }
-                    }
-
-                    // Inner dot
-                    Rectangle {
-                        anchors.centerIn: parent
-                        width: 14; height: 14; radius: 7
-                        color: ThemeValues.primaryCol
-
-                        Rectangle {
-                            anchors.centerIn: parent
-                            width: 6; height: 6; radius: 3
-                            color: "white"
-                        }
-                    }
-                }
+                radius: 24
+                color: "transparent"
+                border.color: ThemeValues.primaryCol
+                border.width: 2
+                opacity: 0.4
             }
 
-            // Search result marker
-            MapQuickItem {
-                id: searchMarker
-                visible: false
-                anchorPoint.x: 12
-                anchorPoint.y: 36
-
-                sourceItem: Item {
-                    width: 24; height: 36
-
-                    Rectangle {
-                        width: 24; height: 24; radius: 12
-                        color: ThemeValues.accentCol
-                        anchors.top: parent.top
-
-                        Text {
-                            anchors.centerIn: parent
-                            text: "\u2022"
-                            color: "white"
-                            font.pixelSize: 16; font.bold: true
-                        }
-                    }
-                    Canvas {
-                        anchors.bottom: parent.bottom
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        width: 12; height: 14
-                        onPaint: {
-                            var ctx = getContext("2d")
-                            ctx.fillStyle = ThemeValues.accentCol.toString()
-                            ctx.beginPath()
-                            ctx.moveTo(0, 0)
-                            ctx.lineTo(12, 0)
-                            ctx.lineTo(6, 14)
-                            ctx.closePath()
-                            ctx.fill()
-                        }
-                    }
-                }
-            }
-
-            // Destination marker (route endpoint)
-            MapQuickItem {
-                id: destMarker
-                visible: root.routeActive && root.routeDestination !== null
-                coordinate: root.routeDestination
-                    ? QtPositioning.coordinate(root.routeDestination.lat, root.routeDestination.lon)
+            // GPS location — inner dot
+            MapCircle {
+                id: gpsDot
+                center: gps.position.coordinateValid
+                    ? gps.position.coordinate
                     : QtPositioning.coordinate(0, 0)
-                anchorPoint.x: 16
-                anchorPoint.y: 44
-
-                sourceItem: Item {
-                    width: 32; height: 56
-
-                    // Flag pole
-                    Rectangle {
-                        x: 1; y: 0
-                        width: 2; height: 56
-                        color: ThemeValues.primaryCol
-                    }
-
-                    // Flag
-                    Rectangle {
-                        x: 3; y: 0
-                        width: 28; height: 20
-                        radius: 3
-                        color: ThemeValues.primaryCol
-
-                        Text {
-                            anchors.centerIn: parent
-                            text: "B"
-                            color: ThemeValues.bgCol
-                            font.pixelSize: 12
-                            font.family: ThemeValues.fontFamily
-                            font.bold: true
-                        }
-                    }
-
-                    // Base circle
-                    Rectangle {
-                        anchors.bottom: parent.bottom
-                        anchors.horizontalCenter: parent.left
-                        anchors.horizontalCenterOffset: 2
-                        width: 8; height: 8; radius: 4
-                        color: ThemeValues.primaryCol
-                    }
-                }
+                visible: gps.position.coordinateValid
+                radius: 10
+                color: ThemeValues.primaryCol
+                border.color: "white"
+                border.width: 2
             }
+        }
+    }
+
+    // ── Overlay markers (positioned on top of MapView via fromCoordinate) ──
+
+    // Helper: reposition overlay markers when map moves or zooms
+    property var _searchCoord: null
+    property var _destCoord: null
+
+    Timer {
+        id: markerUpdateTimer
+        interval: 16
+        repeat: false
+        onTriggered: root.updateOverlayMarkers()
+    }
+
+    Connections {
+        target: mapLoader.item ? mapLoader.item.map : null
+        function onCenterChanged() { markerUpdateTimer.restart() }
+        function onZoomLevelChanged() { markerUpdateTimer.restart() }
+    }
+
+    function updateOverlayMarkers() {
+        if (!mapLoader.item) return
+        var map = mapLoader.item.map
+
+        if (_searchCoord && searchOverlay.visible) {
+            var sp = map.fromCoordinate(_searchCoord, false)
+            searchOverlay.x = mapLoader.x + sp.x - searchOverlay.width / 2
+            searchOverlay.y = mapLoader.y + sp.y - searchOverlay.height
+        }
+
+        if (_destCoord && destOverlay.visible) {
+            var dp = map.fromCoordinate(_destCoord, false)
+            destOverlay.x = mapLoader.x + dp.x - 2
+            destOverlay.y = mapLoader.y + dp.y - destOverlay.height
+        }
+    }
+
+    // Search result marker overlay
+    Item {
+        id: searchOverlay
+        width: 24; height: 36
+        visible: false
+        z: 15
+
+        Rectangle {
+            width: 24; height: 24; radius: 12
+            color: ThemeValues.accentCol
+            anchors.top: parent.top
+
+            Text {
+                anchors.centerIn: parent
+                text: "\u2022"
+                color: "white"
+                font.pixelSize: 16; font.bold: true
+            }
+        }
+        Canvas {
+            anchors.bottom: parent.bottom
+            anchors.horizontalCenter: parent.horizontalCenter
+            width: 12; height: 14
+            onPaint: {
+                var ctx = getContext("2d")
+                ctx.fillStyle = ThemeValues.accentCol.toString()
+                ctx.beginPath()
+                ctx.moveTo(0, 0)
+                ctx.lineTo(12, 0)
+                ctx.lineTo(6, 14)
+                ctx.closePath()
+                ctx.fill()
+            }
+        }
+    }
+
+    // Destination marker overlay
+    Item {
+        id: destOverlay
+        width: 32; height: 56
+        visible: root.routeActive && root.routeDestination !== null
+        z: 15
+
+        onVisibleChanged: if (visible) markerUpdateTimer.restart()
+
+        Rectangle {
+            x: 1; y: 0
+            width: 2; height: 56
+            color: ThemeValues.primaryCol
+        }
+
+        Rectangle {
+            x: 3; y: 0
+            width: 28; height: 20
+            radius: 3
+            color: ThemeValues.primaryCol
+
+            Text {
+                anchors.centerIn: parent
+                text: "B"
+                color: ThemeValues.bgCol
+                font.pixelSize: 12
+                font.family: ThemeValues.fontFamily
+                font.bold: true
+            }
+        }
+
+        Rectangle {
+            anchors.bottom: parent.bottom
+            anchors.horizontalCenter: parent.left
+            anchors.horizontalCenterOffset: 2
+            width: 8; height: 8; radius: 4
+            color: ThemeValues.primaryCol
         }
     }
 
@@ -417,7 +418,7 @@ Item {
                         searchInput.text = ""
                         searchInput.focus = false
                         searchResultsVisible = false
-                        searchMarker.visible = false
+                        searchOverlay.visible = false
                         clearRoute()
                     }
                 }
@@ -506,9 +507,10 @@ Item {
                             mapLoader.item.map.zoomLevel = 15
                             followMode = false
 
-                            searchMarker.coordinate = QtPositioning.coordinate(
+                            root._searchCoord = QtPositioning.coordinate(
                                 modelData.lat, modelData.lon)
-                            searchMarker.visible = true
+                            searchOverlay.visible = true
+                            markerUpdateTimer.restart()
                         }
                         searchInput.text = modelData.name
                         searchResultsVisible = false
@@ -847,8 +849,9 @@ Item {
                             mapLoader.item.map.zoomLevel = 15
                             followMode = false
 
-                            searchMarker.coordinate = QtPositioning.coordinate(coords[1], coords[0])
-                            searchMarker.visible = true
+                            root._searchCoord = QtPositioning.coordinate(coords[1], coords[0])
+                            searchOverlay.visible = true
+                            markerUpdateTimer.restart()
 
                             getDirections(coords[1], coords[0], result.features[0].place_name || "")
                         }
@@ -906,6 +909,8 @@ Item {
                     }
 
                     routeDestination = { lat: destLat, lon: destLon, name: destName }
+                    root._destCoord = QtPositioning.coordinate(destLat, destLon)
+                    markerUpdateTimer.restart()
 
                     // Build GeoJSON for the route line
                     routeGeoJson = {
@@ -955,13 +960,15 @@ Item {
         routeDistance = ""
         routeDuration = ""
         routeDestination = null
+        root._destCoord = null
+        root._searchCoord = null
         routeGeoJson = { "type": "Feature", "geometry": { "type": "LineString", "coordinates": [] } }
         routeSteps = []
         currentStep = 0
         nextManeuver = ""
         nextInstruction = ""
         nextStepDistance = ""
-        searchMarker.visible = false
+        searchOverlay.visible = false
     }
 
     function fitRouteBounds(lat1, lon1, lat2, lon2) {
