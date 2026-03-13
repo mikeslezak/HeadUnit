@@ -14,13 +14,9 @@ Item {
 
     // Loader references from Main.qml
     property var claudeIndicatorLoader: null
-    property var voiceControlLoader: null
-
-    // Theme for confirmation dialog
-    property var theme: null
 
     // Track which TTS speech is playing to handle onSpeechFinished correctly
-    // "ready" = ready prompt after wake word, "response" = Claude's response, "alert" = copilot alert
+    // "ready" = ready prompt after wake word, "response" = Claude's response, "nav_ack" = navigation acknowledgment
     property string pendingSpeechType: ""
 
     // Whether Claude's last response expects a follow-up reply
@@ -31,6 +27,10 @@ Item {
 
     // Queue for proactive alerts that arrive while TTS is speaking
     property var pendingAlerts: []
+
+    // Navigation briefing: after the short nav ack, wait for route data to arrive
+    // then deliver one cohesive briefing instead of two separate messages
+    property string pendingNavDestination: ""
 
     // Track which music source was playing when Jarvis activated, so we can resume after
     property string pausedAudioSource: ""
@@ -44,6 +44,11 @@ Item {
         target: picovoiceManager
 
         function onWakeWordDetected(keyword) {
+            // Cancel any pending nav briefing — new wake word takes priority
+            navBriefingTimer.stop()
+            root.pendingNavDestination = ""
+            root.pendingAlerts = []
+
             console.log("Wake word detected via PicovoiceManager:", keyword, "- Activating Claude AI")
 
             // CRITICAL: Stop any ongoing TTS playback immediately to prevent audio conflicts
@@ -130,6 +135,16 @@ Item {
                 if (claudeIndicatorLoader && claudeIndicatorLoader.item) {
                     claudeIndicatorLoader.item.setState("listening")
                 }
+            } else if (root.pendingSpeechType === "nav_ack") {
+                // Short nav acknowledgment finished — show thinking state
+                // while we wait for route data to arrive for the full briefing
+                console.log("TTS nav ack finished, waiting for route data")
+                picovoiceManager.resume()
+                if (claudeIndicatorLoader && claudeIndicatorLoader.item) {
+                    claudeIndicatorLoader.item.setState("thinking")
+                }
+                root.pendingSpeechType = ""
+                return
             } else if (root.pendingSpeechType === "response") {
                 // Claude response finished speaking
                 hideClaudeTimer.stop()
@@ -138,12 +153,12 @@ Item {
                 if (root.pendingAlerts.length > 0) {
                     var alerts = root.pendingAlerts
                     root.pendingAlerts = []
-                    var alertContext = "The following alerts just came in. Briefly mention them in a natural, conversational way: " + alerts.join(". ")
+                    var alertContext = "New conditions just came in. Mention these naturally and concisely in one flowing thought: " + alerts.join(". ")
                     console.log("VoicePipeline: Sending queued alerts to Claude:", alertContext)
                     if (claudeIndicatorLoader && claudeIndicatorLoader.item) {
                         claudeIndicatorLoader.item.setState("thinking")
                     }
-                    claudeClient.sendMessage(alertContext, contextAggregator.buildContext())
+                    claudeClient.sendMessage(alertContext, contextAggregator.buildContext(), true)
                     return
                 }
 
@@ -201,14 +216,13 @@ Item {
 
         function onResponseReceived(response, toolCalls) {
             console.log("Claude response:", response)
-            if (claudeIndicatorLoader && claudeIndicatorLoader.item) {
-                claudeIndicatorLoader.item.setState("speaking")
-            }
 
             voiceCommandHandler.processClaudeResponse(response)
 
-            // Check for expects_reply in JSON command block
+            // Check for expects_reply and navigate action in JSON command block
             root.pendingFollowUp = false
+            var isNavAction = false
+            var navDestination = ""
             var jsonMatch = response.match(/```json\s*(\{[\s\S]*?\})\s*```/)
             if (jsonMatch) {
                 try {
@@ -216,7 +230,33 @@ Item {
                     if (cmd.expects_reply === true) {
                         root.pendingFollowUp = true
                     }
+                    if (cmd.action === "navigate" && cmd.destination) {
+                        isNavAction = true
+                        navDestination = cmd.destination
+                    }
                 } catch(e) {}
+            }
+
+            // If this is a navigate action, speak the short acknowledgment immediately
+            // ("On it", "Firing up the route", etc.) then wait for route data to arrive
+            // before delivering the full briefing as one cohesive message.
+            if (isNavAction) {
+                var navAckText = response.replace(/```json[\s\S]*?```/g, "").trim()
+                root.pendingNavDestination = navDestination
+                console.log("VoicePipeline: Nav action — speaking ack, waiting for route data")
+                if (claudeIndicatorLoader && claudeIndicatorLoader.item) {
+                    claudeIndicatorLoader.item.setState("speaking")
+                }
+                // Speak the short ack so the user isn't left in silence
+                root.pendingSpeechType = "nav_ack"
+                googleTTS.speak(navAckText.length > 0 ? navAckText : "On it.")
+                // Start the timer — route data typically arrives within 3-8 seconds
+                navBriefingTimer.start()
+                return
+            }
+
+            if (claudeIndicatorLoader && claudeIndicatorLoader.item) {
+                claudeIndicatorLoader.item.setState("speaking")
             }
 
             // Strip JSON command blocks before speaking — TTS should only read natural language
@@ -232,6 +272,9 @@ Item {
 
         function onError(message) {
             console.log("Claude error:", message)
+            navBriefingTimer.stop()
+            root.pendingNavDestination = ""
+            root.pendingAlerts = []
             if (claudeIndicatorLoader && claudeIndicatorLoader.item) {
                 claudeIndicatorLoader.item.hide()
             }
@@ -272,6 +315,17 @@ Item {
         function onProactiveAlert(message) {
             console.log("Copilot proactive alert:", message)
 
+            // If a nav briefing is pending, collect alerts for the unified briefing
+            if (root.pendingNavDestination !== "") {
+                console.log("VoicePipeline: Collecting alert for nav briefing")
+                var alerts = root.pendingAlerts
+                alerts.push(message)
+                root.pendingAlerts = alerts
+                // Restart the briefing timer — more data may still be arriving
+                navBriefingTimer.restart()
+                return
+            }
+
             // If TTS is currently speaking, queue the alert for after it finishes
             if (googleTTS.isSpeaking || root.pendingSpeechType !== "") {
                 console.log("VoicePipeline: TTS busy, queuing alert")
@@ -283,6 +337,33 @@ Item {
 
             speakAlert(message)
         }
+    }
+
+    // Deliver a unified navigation briefing — combines the initial nav response
+    // with all route data (weather, road conditions, surface, etc.) into one prompt
+    function deliverNavBriefing() {
+        var destination = root.pendingNavDestination
+        var routeAlerts = root.pendingAlerts
+
+        // Clear state
+        root.pendingNavDestination = ""
+        root.pendingAlerts = []
+
+        var prompt = "You just started navigation to " + destination + ". "
+        if (routeAlerts.length > 0) {
+            prompt += "Here is the route data that just came in: " + routeAlerts.join(" ") + " "
+        }
+        prompt += "Give the driver a single, cohesive route briefing. Acknowledge the destination, mention the drive time if you know it, then cover weather and any road conditions in one natural flow. Keep it concise — this all needs to sound like one thought, not a list."
+
+        console.log("VoicePipeline: Delivering unified nav briefing for", destination,
+                     "with", routeAlerts.length, "route alerts")
+
+        if (claudeIndicatorLoader && claudeIndicatorLoader.item) {
+            claudeIndicatorLoader.item.setState("processing")
+        }
+        root.pendingFollowUp = false
+        claudeClient.sendMessage(prompt, contextAggregator.buildContext(), true)
+        hideClaudeTimer.start()
     }
 
     // Send a proactive alert through Claude for natural conversational delivery
@@ -300,10 +381,10 @@ Item {
         }
 
         // Send to Claude so Jarvis delivers it conversationally
-        var prompt = "The following road conditions have been detected along the driver's current route. Give them a brief, natural heads-up about all of these. Be conversational, not robotic. Here are the conditions: " + message
+        var prompt = "New route conditions detected. Mention these naturally and concisely in one flowing thought: " + message
         root.pendingSpeechType = "response"
         root.pendingFollowUp = false
-        claudeClient.sendMessage(prompt, contextAggregator.buildContext())
+        claudeClient.sendMessage(prompt, contextAggregator.buildContext(), true)
         hideClaudeTimer.start()
     }
 
@@ -321,6 +402,18 @@ Item {
                 contextAggregator.routeActive = root.screenContainer.navActive
                 contextAggregator.routeDuration = root.screenContainer.navRouteDuration || ""
             }
+        }
+    }
+
+    // Navigation briefing timer — waits for route data managers to report back
+    // before sending everything to Claude for one cohesive briefing.
+    // Fires 8s after the navigate action (or restarts when new alerts arrive).
+    Timer {
+        id: navBriefingTimer
+        interval: 8000
+        repeat: false
+        onTriggered: {
+            deliverNavBriefing()
         }
     }
 
@@ -482,6 +575,9 @@ Item {
         console.log("VoicePipeline: Canceling interaction, stopping TTS, resetting voice pipeline")
         root.pendingSpeechType = ""
         root.pendingFollowUp = false
+        navBriefingTimer.stop()
+        root.pendingNavDestination = ""
+        root.pendingAlerts = []
         hideClaudeTimer.stop()
         googleTTS.stop()
         picovoiceManager.cancelAndReset()

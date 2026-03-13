@@ -30,6 +30,8 @@ void PlacesSearchManager::setContextAggregator(ContextAggregator *ctx) { m_conte
 
 void PlacesSearchManager::searchPlaces(const QString &query, const QString &category)
 {
+    ++m_generation;
+
     if (m_mapboxToken.isEmpty()) {
         emit searchFailed("Mapbox token not configured");
         return;
@@ -61,12 +63,19 @@ void PlacesSearchManager::searchPlaces(const QString &query, const QString &cate
     QUrl requestUrl(url);
     requestUrl.setQuery(params);
 
-    m_mapboxNetwork->get(QNetworkRequest(requestUrl));
+    QNetworkRequest req(requestUrl);
+    req.setTransferTimeout(15000);
+    req.setAttribute(QNetworkRequest::UserMax, m_generation);
+    m_mapboxNetwork->get(req);
 }
 
 void PlacesSearchManager::onMapboxReply(QNetworkReply *reply)
 {
     reply->deleteLater();
+
+    if (reply->request().attribute(QNetworkRequest::UserMax).toInt() != m_generation) {
+        return;
+    }
 
     if (reply->error() != QNetworkReply::NoError) {
         emit searchFailed("Search failed: " + reply->errorString());
@@ -133,6 +142,8 @@ void PlacesSearchManager::enrichWithGoogle(QList<PlaceResult> results)
 
         QNetworkRequest req(requestUrl);
         req.setAttribute(QNetworkRequest::User, i);  // Store index
+        req.setAttribute(QNetworkRequest::UserMax, m_generation);
+        req.setTransferTimeout(15000);
         m_googleNetwork->get(req);
     }
 }
@@ -140,6 +151,10 @@ void PlacesSearchManager::enrichWithGoogle(QList<PlaceResult> results)
 void PlacesSearchManager::onGoogleReply(QNetworkReply *reply)
 {
     reply->deleteLater();
+
+    if (reply->request().attribute(QNetworkRequest::UserMax).toInt() != m_generation) {
+        return;
+    }
 
     int idx = reply->request().attribute(QNetworkRequest::User).toInt();
 
@@ -196,6 +211,7 @@ QString PlacesSearchManager::formatResults(const QList<PlaceResult> &results) co
 
 void PlacesSearchManager::geocodePlace(const QString &query)
 {
+    ++m_geocodeGeneration;
     m_lastGeocodeQuery = query;
     double lat = m_context ? m_context->gpsLatitude() : 0.0;
     double lon = m_context ? m_context->gpsLongitude() : 0.0;
@@ -227,12 +243,19 @@ void PlacesSearchManager::geocodePlace(const QString &query)
     QNetworkRequest req(url);
     req.setRawHeader("User-Agent", "HeadUnit/1.0");
     req.setAttribute(QNetworkRequest::User, "nominatim"); // Tag source
+    req.setAttribute(QNetworkRequest::UserMax, m_geocodeGeneration);
+    req.setTransferTimeout(15000);
     m_geocodeNetwork->get(req);
 }
 
 void PlacesSearchManager::onGeocodeReply(QNetworkReply *reply)
 {
     reply->deleteLater();
+
+    if (reply->request().attribute(QNetworkRequest::UserMax).toInt() != m_geocodeGeneration) {
+        return;
+    }
+
     QString source = reply->request().attribute(QNetworkRequest::User).toString();
 
     if (reply->error() != QNetworkReply::NoError) {
@@ -282,6 +305,8 @@ void PlacesSearchManager::geocodeFallbackGoogle()
     req.setRawHeader("X-Goog-FieldMask",
         "places.displayName,places.location,places.formattedAddress");
     req.setAttribute(QNetworkRequest::User, "google"); // Tag source
+    req.setAttribute(QNetworkRequest::UserMax, m_geocodeGeneration);
+    req.setTransferTimeout(15000);
 
     QJsonObject body;
     body["textQuery"] = m_lastGeocodeQuery;

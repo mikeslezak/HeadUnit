@@ -43,6 +43,7 @@ PicovoiceManager::PicovoiceManager(QObject *parent)
     , m_lastVoiceActivityTime(0)
     , m_lastDetectionTime(0)
     , m_followUpTimer(nullptr)
+    , m_readyPromptTimer(nullptr)
 {
     qDebug() << "PicovoiceManager: Initializing unified voice pipeline...";
     setStatusMessage("Initializing Picovoice");
@@ -62,6 +63,17 @@ PicovoiceManager::PicovoiceManager(QObject *parent)
         qDebug() << "PicovoiceManager: Follow-up timeout, returning to listening";
         resetToListening();
     });
+
+    // Ready prompt safety timer: recovers if TTS fails during ready prompt
+    m_readyPromptTimer = new QTimer(this);
+    m_readyPromptTimer->setSingleShot(true);
+    m_readyPromptTimer->setInterval(5000);
+    connect(m_readyPromptTimer, &QTimer::timeout, this, [this]() {
+        if (m_state == WaitingForReadyPrompt) {
+            qWarning() << "PicovoiceManager: Ready prompt timeout — TTS may have failed, resetting";
+            cancelAndReset();
+        }
+    });
 }
 
 PicovoiceManager::~PicovoiceManager()
@@ -74,8 +86,6 @@ PicovoiceManager::~PicovoiceManager()
 
 void PicovoiceManager::start()
 {
-    QMutexLocker locker(&m_mutex);
-
     if (m_isRunning) {
         qDebug() << "PicovoiceManager: Already running";
         return;
@@ -168,8 +178,6 @@ void PicovoiceManager::start()
 
 void PicovoiceManager::stop()
 {
-    QMutexLocker locker(&m_mutex);
-
     if (!m_isRunning) {
         return;
     }
@@ -438,6 +446,7 @@ void PicovoiceManager::processAudioFrame(const int16_t *frame, int32_t length)
                 m_speechStartTime = QDateTime::currentMSecsSinceEpoch();
                 m_lastVoiceActivityTime = m_speechStartTime;
                 m_speechBuffer.clear();
+                m_speechBuffer.reserve(16000 * 10);
 
                 // Accumulate this frame
                 for (int32_t i = 0; i < length; ++i) {
@@ -477,6 +486,7 @@ void PicovoiceManager::processWakeWord(const int16_t *frame)
             // Transition to WaitingForReadyPrompt state - wait for TTS prompt to finish
             // This prevents recording the assistant's "ready" voice prompt
             m_state = WaitingForReadyPrompt;
+            m_readyPromptTimer->start();
             setStatusMessage("Playing ready prompt...");
             qDebug() << "PicovoiceManager: Waiting for ready prompt to finish...";
         } else {
@@ -487,6 +497,8 @@ void PicovoiceManager::processWakeWord(const int16_t *frame)
 
 void PicovoiceManager::onReadyPromptFinished()
 {
+    m_readyPromptTimer->stop();
+
     if (m_state != WaitingForReadyPrompt) {
         qDebug() << "PicovoiceManager: onReadyPromptFinished called but not in WaitingForReadyPrompt state";
         return;
@@ -505,6 +517,7 @@ void PicovoiceManager::onReadyPromptFinished()
         m_speechStartTime = now;
         m_lastVoiceActivityTime = now;
         m_speechBuffer.clear();
+        m_speechBuffer.reserve(16000 * 10);
         setStatusMessage("Processing speech...");
     }
 }
@@ -518,6 +531,7 @@ void PicovoiceManager::processRhinoIntent(const int16_t *frame)
         m_speechStartTime = now;
         m_lastVoiceActivityTime = now;
         m_speechBuffer.clear();
+        m_speechBuffer.reserve(16000 * 10);
         return;
     }
 
@@ -662,14 +676,19 @@ void PicovoiceManager::onGoogleTranscriptionReady(const QString &text, float con
 {
     qDebug() << "PicovoiceManager: Google STT transcription:" << text << "confidence:" << confidence;
 
-    if (!text.trimmed().isEmpty()) {
-        emit transcriptionReady(text);
-    } else {
-        qDebug() << "PicovoiceManager: Empty Google STT result, ignoring";
+    if (text.trimmed().isEmpty()) {
+        qDebug() << "PicovoiceManager: Empty Google STT result, returning to listening";
+        m_speechBuffer.clear();
+        m_speechBuffer.reserve(16000 * 10);
+        resetToListening();
+        return;
     }
+
+    emit transcriptionReady(text);
 
     // Reset state and speech buffer
     m_speechBuffer.clear();
+    m_speechBuffer.reserve(16000 * 10);
     resetToListening();
 }
 
@@ -692,6 +711,7 @@ void PicovoiceManager::onGoogleError(const QString &message)
 
     // Reset state
     m_speechBuffer.clear();
+    m_speechBuffer.reserve(16000 * 10);
     resetToListening();
 }
 
@@ -709,6 +729,7 @@ void PicovoiceManager::manualActivate()
     emit wakeWordDetected(m_wakeWord);
 
     m_state = WaitingForReadyPrompt;
+    m_readyPromptTimer->start();
     setStatusMessage("Playing ready prompt...");
 }
 
@@ -722,6 +743,7 @@ void PicovoiceManager::enterFollowUpMode()
     qDebug() << "PicovoiceManager: Entering follow-up mode (12s timeout)";
     m_state = WaitingForFollowUp;
     m_speechBuffer.clear();
+    m_speechBuffer.reserve(16000 * 10);
     // Only start the timeout if not paused (TTS might still be playing).
     // If paused, the timer will start when resume() is called.
     if (!m_isPaused) {
@@ -740,6 +762,7 @@ void PicovoiceManager::cancelAndReset()
 void PicovoiceManager::resetToListening()
 {
     m_speechBuffer.clear();
+    m_speechBuffer.reserve(16000 * 10);
     m_followUpTimer->stop();
     m_state = Listening;
 

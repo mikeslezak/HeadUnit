@@ -60,6 +60,8 @@ private:
 
     QList<PlaceResult> m_pendingResults;
     int m_pendingGoogleRequests = 0;
+    int m_generation = 0;
+    int m_geocodeGeneration = 0;
 };
 
 #endif // PLACESSEARCHMANAGER_H

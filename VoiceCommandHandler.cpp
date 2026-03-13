@@ -2,7 +2,6 @@
 #include "ContactManager.h"
 #include "MessageManager.h"
 #include "BluetoothManager.h"
-#include "GoogleTTS.h"
 #include <QDebug>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -17,7 +16,6 @@ VoiceCommandHandler::VoiceCommandHandler(QObject *parent)
     , m_contactManager(nullptr)
     , m_messageManager(nullptr)
     , m_bluetoothManager(nullptr)
-    , m_googleTTS(nullptr)
 {
     qDebug() << "VoiceCommandHandler: Initialized";
 }
@@ -42,12 +40,6 @@ void VoiceCommandHandler::setBluetoothManager(QObject *bluetoothManager)
 {
     m_bluetoothManager = bluetoothManager;
     qDebug() << "VoiceCommandHandler: BluetoothManager set";
-}
-
-void VoiceCommandHandler::setGoogleTTS(QObject *googleTTS)
-{
-    m_googleTTS = googleTTS;
-    qDebug() << "VoiceCommandHandler: GoogleTTS set";
 }
 
 // ========================================================================
@@ -87,6 +79,12 @@ void VoiceCommandHandler::processClaudeResponse(const QString &claudeResponse)
 {
     qDebug() << "VoiceCommandHandler: Processing Claude response...";
 
+    // Auto-cancel any stale pending confirmation before processing new command
+    if (m_awaitingConfirmation) {
+        qDebug() << "VoiceCommandHandler: Clearing stale pending confirmation";
+        cancelAction();
+    }
+
     // Parse JSON command from Claude's response
     QVariantMap command = parseCommandJSON(claudeResponse);
 
@@ -98,26 +96,26 @@ void VoiceCommandHandler::processClaudeResponse(const QString &claudeResponse)
     QString action = command["action"].toString();
     qDebug() << "VoiceCommandHandler: Executing action:" << action;
 
-    // Route to appropriate handler
+    // Route to appropriate handler and track success
+    bool succeeded = false;
     if (action == "call") {
-        executeCallCommand(command);
+        succeeded = executeCallCommand(command);
     } else if (action == "message") {
-        executeMessageCommand(command);
+        succeeded = executeMessageCommand(command);
     } else if (action == "read_messages") {
-        executeReadMessagesCommand(command);
+        succeeded = executeReadMessagesCommand(command);
     } else if (action == "navigate") {
-        executeNavigateCommand(command);
+        succeeded = executeNavigateCommand(command);
     } else if (action == "search_places") {
-        executeSearchPlacesCommand(command);
+        succeeded = executeSearchPlacesCommand(command);
     } else if (action == "quiet_mode") {
-        executeQuietModeCommand(command);
+        succeeded = executeQuietModeCommand(command);
     } else {
         qWarning() << "VoiceCommandHandler: Unknown action:" << action;
-        speakFeedback("I'm not sure how to do that.");
     }
 
-    // Check for expects_reply flag — signal follow-up mode
-    if (command.contains("expects_reply") && command["expects_reply"].toBool()) {
+    // Check for expects_reply flag — signal follow-up mode only if action succeeded
+    if (succeeded && command.contains("expects_reply") && command["expects_reply"].toBool()) {
         qDebug() << "VoiceCommandHandler: Claude expects a reply, signaling follow-up mode";
         emit followUpExpected();
     }
@@ -128,8 +126,7 @@ QVariantMap VoiceCommandHandler::parseCommandJSON(const QString &claudeResponse)
     // Look for JSON block in Claude's response
     // Expected format: ```json\n{...}\n```
 
-    QRegularExpression jsonPattern(R"(```json\s*(\{[^`]*\})\s*```)",
-                                   QRegularExpression::DotMatchesEverythingOption);
+    QRegularExpression jsonPattern(R"(```json\s*(\{[^`]*\})\s*```)");
     QRegularExpressionMatch match = jsonPattern.match(claudeResponse);
 
     if (!match.hasMatch()) {
@@ -154,7 +151,7 @@ QVariantMap VoiceCommandHandler::parseCommandJSON(const QString &claudeResponse)
 // COMMAND EXECUTION
 // ========================================================================
 
-void VoiceCommandHandler::executeCallCommand(const QVariantMap &command)
+bool VoiceCommandHandler::executeCallCommand(const QVariantMap &command)
 {
     QString contactName = command["contact_name"].toString();
     QString phoneNumber = command["phone_number"].toString();
@@ -167,28 +164,26 @@ void VoiceCommandHandler::executeCallCommand(const QVariantMap &command)
     }
 
     if (phoneNumber.isEmpty()) {
-        speakFeedback(QString("I couldn't find a phone number for %1").arg(contactName));
         emit commandFailed("call", "Contact not found or no phone number");
-        return;
+        return false;
     }
 
     // Execute call via BluetoothManager
     if (m_bluetoothManager) {
-        speakFeedback(QString("Calling %1").arg(contactName.isEmpty() ? phoneNumber : contactName));
-
         // Call dialNumber method
         QMetaObject::invokeMethod(m_bluetoothManager, "dialNumber",
                                 Q_ARG(QString, phoneNumber));
 
         emit commandExecuted("call", QString("Calling %1").arg(contactName));
+        return true;
     } else {
         qWarning() << "VoiceCommandHandler: BluetoothManager not set";
-        speakFeedback("I can't make calls right now");
         emit commandFailed("call", "BluetoothManager not available");
+        return false;
     }
 }
 
-void VoiceCommandHandler::executeMessageCommand(const QVariantMap &command)
+bool VoiceCommandHandler::executeMessageCommand(const QVariantMap &command)
 {
     QString contactName = command["contact_name"].toString();
     QString messageBody = command["message_body"].toString();
@@ -203,15 +198,13 @@ void VoiceCommandHandler::executeMessageCommand(const QVariantMap &command)
     }
 
     if (phoneNumber.isEmpty()) {
-        speakFeedback(QString("I couldn't find a phone number for %1").arg(contactName));
         emit commandFailed("message", "Contact not found or no phone number");
-        return;
+        return false;
     }
 
     if (messageBody.isEmpty()) {
-        speakFeedback("What would you like to say?");
         emit commandFailed("message", "No message body provided");
-        return;
+        return false;
     }
 
     // Store pending command and request confirmation
@@ -221,16 +214,16 @@ void VoiceCommandHandler::executeMessageCommand(const QVariantMap &command)
     setPendingAction("send_message");
     setAwaitingConfirmation(true);
 
-    // Speak confirmation request
+    // Request confirmation via signal (QML layer handles TTS)
     QString recipient = contactName.isEmpty() ? phoneNumber : contactName;
     QString confirmMsg = QString("Sending message to %1: %2. Should I send it?")
                             .arg(recipient, messageBody);
-    speakFeedback(confirmMsg);
 
     emit confirmationRequested("send_message", confirmMsg);
+    return true;
 }
 
-void VoiceCommandHandler::executeReadMessagesCommand(const QVariantMap &command)
+bool VoiceCommandHandler::executeReadMessagesCommand(const QVariantMap &command)
 {
     QString contactName = command["contact_name"].toString();
 
@@ -238,32 +231,22 @@ void VoiceCommandHandler::executeReadMessagesCommand(const QVariantMap &command)
 
     if (!m_messageManager) {
         qWarning() << "VoiceCommandHandler: MessageManager not set";
-        speakFeedback("I can't access messages right now");
         emit commandFailed("read_messages", "MessageManager not available");
-        return;
+        return false;
     }
 
     // Get conversation model
     QObject *conversationModel = m_messageManager->property("conversationModel").value<QObject*>();
     if (!conversationModel) {
-        speakFeedback("No messages found");
-        return;
-    }
-
-    // If contact name specified, find their conversation
-    if (!contactName.isEmpty()) {
-        speakFeedback(QString("Reading messages from %1").arg(contactName));
-        // TODO: Implement message reading from MessageManager
-    } else {
-        // Read recent messages
-        speakFeedback("Reading recent messages");
-        // TODO: Implement reading recent messages
+        emit commandFailed("read_messages", "No messages found");
+        return false;
     }
 
     emit commandExecuted("read_messages", QString("Reading messages for %1").arg(contactName));
+    return true;
 }
 
-void VoiceCommandHandler::executeNavigateCommand(const QVariantMap &command)
+bool VoiceCommandHandler::executeNavigateCommand(const QVariantMap &command)
 {
     QString destination = command["destination"].toString();
 
@@ -271,14 +254,15 @@ void VoiceCommandHandler::executeNavigateCommand(const QVariantMap &command)
 
     if (destination.isEmpty()) {
         emit commandFailed("navigate", "No destination provided");
-        return;
+        return false;
     }
 
     emit navigationRequested(destination);
     emit commandExecuted("navigate", QString("Navigating to %1").arg(destination));
+    return true;
 }
 
-void VoiceCommandHandler::executeSearchPlacesCommand(const QVariantMap &command)
+bool VoiceCommandHandler::executeSearchPlacesCommand(const QVariantMap &command)
 {
     QString query = command["query"].toString();
     QString category = command["category"].toString();
@@ -287,19 +271,21 @@ void VoiceCommandHandler::executeSearchPlacesCommand(const QVariantMap &command)
 
     if (query.isEmpty()) {
         emit commandFailed("search_places", "No search query provided");
-        return;
+        return false;
     }
 
     emit placesSearchRequested(query, category);
     emit commandExecuted("search_places", QString("Searching for %1").arg(query));
+    return true;
 }
 
-void VoiceCommandHandler::executeQuietModeCommand(const QVariantMap &command)
+bool VoiceCommandHandler::executeQuietModeCommand(const QVariantMap &command)
 {
     bool enabled = command.value("enabled", true).toBool();
     qDebug() << "VoiceCommandHandler: Quiet mode -" << (enabled ? "on" : "off");
     emit quietModeRequested(enabled);
     emit commandExecuted("quiet_mode", enabled ? "enabled" : "disabled");
+    return true;
 }
 
 // ========================================================================
@@ -326,7 +312,6 @@ void VoiceCommandHandler::confirmAction()
                                     Q_ARG(QString, phoneNumber),
                                     Q_ARG(QString, messageBody));
 
-            speakFeedback("Message sent");
             emit commandExecuted("send_message", QString("Sent to %1").arg(contactName));
         }
     }
@@ -340,8 +325,6 @@ void VoiceCommandHandler::confirmAction()
 void VoiceCommandHandler::cancelAction()
 {
     qDebug() << "VoiceCommandHandler: Canceling action:" << m_pendingAction;
-
-    speakFeedback("Cancelled");
 
     setAwaitingConfirmation(false);
     setPendingAction("");
@@ -387,12 +370,3 @@ QString VoiceCommandHandler::findContactPhoneNumber(const QString &contactName)
     return phoneNumber;
 }
 
-void VoiceCommandHandler::speakFeedback(const QString &text)
-{
-    qDebug() << "VoiceCommandHandler: Speaking:" << text;
-
-    if (m_googleTTS) {
-        QMetaObject::invokeMethod(m_googleTTS, "speak",
-                                Q_ARG(QString, text));
-    }
-}

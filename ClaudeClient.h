@@ -22,7 +22,7 @@
  * - System context injection (vehicle status, navigation, etc.)
  * - Tool/function calling support for actions
  * - Secure API key management
- * - Rate limiting and error handling
+ * - Error handling
  * - Offline mode graceful degradation
  *
  * Usage:
@@ -128,7 +128,7 @@ public slots:
      * @param message: User's spoken/typed message
      * @param systemContext: Optional system context (JSON string with vehicle state, etc.)
      */
-    void sendMessage(const QString &message, const QString &systemContext = QString());
+    void sendMessage(const QString &message, const QString &systemContext = QString(), bool ephemeral = false);
 
     /**
      * Clear conversation history
@@ -190,11 +190,6 @@ private slots:
      */
     void onReadyRead();
 
-    /**
-     * Handle network errors
-     */
-    void onNetworkError(QNetworkReply::NetworkError error);
-
 private:
     // ========== HELPER METHODS ==========
 
@@ -251,11 +246,18 @@ private:
     QStringList m_contactNames;
 
     // Streaming
-    QString m_streamBuffer;
+    QByteArray m_streamBuffer;
     QString m_currentResponse;
+
+    // Pending user message (added to history only on successful response)
+    QString m_pendingUserMessage;
+    bool m_ephemeralRequest = false;
 
     // Conversation inactivity timeout
     QTimer *m_conversationTimer;
+
+    // Safety timeout for m_isProcessing
+    QTimer *m_safetyTimer;
 
     // Constants
     static constexpr const char* API_ENDPOINT = "https://api.anthropic.com/v1/messages";

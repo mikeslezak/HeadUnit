@@ -38,7 +38,6 @@ void RoadSurfaceManager::setRouteCoordinates(const QJsonArray &coordinates, doub
 
     ++m_generation;
     m_routeCoordinates = coordinates;
-    sampleRoutePoints(coordinates);
 
     m_active = true;
     emit activeChanged();
@@ -46,7 +45,7 @@ void RoadSurfaceManager::setRouteCoordinates(const QJsonArray &coordinates, doub
     fetchConditions();
     m_refreshTimer->start();
 
-    qDebug() << "RoadSurfaceManager: Tracking route with" << m_routePoints.size() << "sample points";
+    qDebug() << "RoadSurfaceManager: Tracking route with" << coordinates.size() << "coordinates";
 }
 
 void RoadSurfaceManager::clearRoute()
@@ -54,7 +53,6 @@ void RoadSurfaceManager::clearRoute()
     ++m_generation;
     m_active = false;
     m_routeCoordinates = QJsonArray();
-    m_routePoints.clear();
     m_allReports.clear();
     m_routeReports.clear();
     m_summary.clear();
@@ -68,27 +66,9 @@ void RoadSurfaceManager::clearRoute()
     qDebug() << "RoadSurfaceManager: Route cleared";
 }
 
-void RoadSurfaceManager::sampleRoutePoints(const QJsonArray &coordinates)
-{
-    m_routePoints.clear();
-    int numCoords = coordinates.size();
-    // Sample ~20 points along the route for proximity checks
-    int numSamples = qMin(20, numCoords);
-    if (numSamples < 2) numSamples = 2;
-
-    for (int i = 0; i < numSamples; ++i) {
-        double fraction = static_cast<double>(i) / (numSamples - 1);
-        int idx = qMin(static_cast<int>(fraction * (numCoords - 1)), numCoords - 1);
-
-        QJsonArray coord = coordinates[idx].toArray();
-        if (coord.size() >= 2) {
-            m_routePoints.append({ coord[1].toDouble(), coord[0].toDouble() }); // lat, lon
-        }
-    }
-}
-
 void RoadSurfaceManager::fetchConditions()
 {
+    ++m_generation;
     m_allReports.clear();
     m_pendingRequests = 0;
 
@@ -353,7 +333,7 @@ bool RoadSurfaceManager::isNearRoute(double lat, double lon) const
             int j = qMin(i + step, numCoords - 1);
             QJsonArray b = m_routeCoordinates[j].toArray();
             if (a.size() >= 2 && b.size() >= 2) {
-                double dist = pointToSegmentDistanceKm(
+                double dist = GeoUtils::pointToSegmentDistanceKm(
                     lat, lon,
                     a[1].toDouble(), a[0].toDouble(),  // lat, lon (GeoJSON is lon,lat)
                     b[1].toDouble(), b[0].toDouble());
@@ -373,29 +353,4 @@ bool RoadSurfaceManager::isNearRoute(double lat, double lon) const
     return false;
 }
 
-double RoadSurfaceManager::pointToSegmentDistanceKm(double pLat, double pLon,
-                                                       double aLat, double aLon,
-                                                       double bLat, double bLon) const
-{
-    // Project point P onto line segment AB using flat-earth approximation (fine for short segments)
-    // Returns distance in km from P to the closest point on segment AB
-    double dx = bLon - aLon;
-    double dy = bLat - aLat;
-    double lenSq = dx * dx + dy * dy;
-
-    if (lenSq < 1e-12) {
-        // A and B are the same point
-        return GeoUtils::haversineKm(pLat, pLon, aLat, aLon);
-    }
-
-    // Parameter t of the projection of P onto AB, clamped to [0,1]
-    double t = ((pLon - aLon) * dx + (pLat - aLat) * dy) / lenSq;
-    t = qBound(0.0, t, 1.0);
-
-    // Closest point on segment
-    double closestLat = aLat + t * dy;
-    double closestLon = aLon + t * dx;
-
-    return GeoUtils::haversineKm(pLat, pLon, closestLat, closestLon);
-}
 

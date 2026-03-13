@@ -53,9 +53,6 @@ private:
     void processEvents();
     void buildSummary();
     bool isOnRoute(double lat, double lon) const;
-    double pointToSegmentDistanceKm(double pLat, double pLon,
-                                     double aLat, double aLon,
-                                     double bLat, double bLon) const;
     QString shortenDescription(const QString &desc) const;
 
     QNetworkAccessManager *m_albertaNetwork;

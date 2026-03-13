@@ -33,7 +33,7 @@ void HighwayCameraManager::setRouteCoordinates(const QJsonArray &coordinates, do
         return;
     }
 
-    m_routeCoordinates = coordinates;
+    ++m_generation;
     sampleRoutePoints(coordinates);
 
     m_active = true;
@@ -47,8 +47,8 @@ void HighwayCameraManager::setRouteCoordinates(const QJsonArray &coordinates, do
 
 void HighwayCameraManager::clearRoute()
 {
+    ++m_generation;
     m_active = false;
-    m_routeCoordinates = QJsonArray();
     m_routePoints.clear();
     m_allCameras.clear();
     m_routeCameras.clear();
@@ -81,6 +81,7 @@ void HighwayCameraManager::sampleRoutePoints(const QJsonArray &coordinates)
 
 void HighwayCameraManager::fetchCameras()
 {
+    ++m_generation;
     m_allCameras.clear();
     m_pendingRequests = 0;
 
@@ -89,6 +90,7 @@ void HighwayCameraManager::fetchCameras()
     QUrl abUrl("https://511.alberta.ca/api/v2/get/cameras");
     QNetworkRequest abReq(abUrl);
     abReq.setRawHeader("Accept", "application/json");
+    abReq.setAttribute(QNetworkRequest::UserMax, m_generation);
     m_albertaNetwork->get(abReq);
 
     // DriveBC webcams
@@ -96,6 +98,7 @@ void HighwayCameraManager::fetchCameras()
     QUrl bcUrl("https://www.drivebc.ca/api/webcams/");
     QNetworkRequest bcReq(bcUrl);
     bcReq.setRawHeader("Accept", "application/json");
+    bcReq.setAttribute(QNetworkRequest::UserMax, m_generation);
     m_drivebcNetwork->get(bcReq);
 
     qDebug() << "HighwayCameraManager: Fetching cameras from 511AB and DriveBC";
@@ -104,6 +107,10 @@ void HighwayCameraManager::fetchCameras()
 void HighwayCameraManager::onAlbertaReply(QNetworkReply *reply)
 {
     reply->deleteLater();
+
+    if (reply->request().attribute(QNetworkRequest::UserMax).toInt() != m_generation) {
+        return;
+    }
 
     if (reply->error() != QNetworkReply::NoError) {
         qWarning() << "HighwayCameraManager: Alberta fetch failed:" << reply->errorString();
@@ -155,6 +162,10 @@ void HighwayCameraManager::onAlbertaReply(QNetworkReply *reply)
 void HighwayCameraManager::onDriveBCReply(QNetworkReply *reply)
 {
     reply->deleteLater();
+
+    if (reply->request().attribute(QNetworkRequest::UserMax).toInt() != m_generation) {
+        return;
+    }
 
     if (reply->error() != QNetworkReply::NoError) {
         qWarning() << "HighwayCameraManager: DriveBC fetch failed:" << reply->errorString();

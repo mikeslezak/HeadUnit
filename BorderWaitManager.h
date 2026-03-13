@@ -45,9 +45,9 @@ private slots:
 private:
     struct KnownCrossing {
         QString name;
-        double lat;
-        double lon;
-        int cbpPortNumber;  // for matching CBP data, 0 if CBSA-only
+        double lat = 0.0;
+        double lon = 0.0;
+        int cbpPortNumber = 0;  // for matching CBP data, 0 if CBSA-only
     };
 
     struct WaitTimeData {
@@ -56,12 +56,12 @@ private:
         int passengerMinutes = -1;
         int lanesOpen = 0;
         QString lastUpdated;
-        double lat;
-        double lon;
+        double lat = 0.0;
+        double lon = 0.0;
         QString source;
     };
 
-    struct RoutePoint { double lat; double lon; };
+    struct RoutePoint { double lat = 0.0; double lon = 0.0; };
 
     void processResults();
     void buildSummary();
@@ -82,7 +82,6 @@ private:
 
     QList<WaitTimeData> m_waitData;
     QList<RoutePoint> m_routePoints;
-    QJsonArray m_routeCoordinates;
     int m_pendingRequests = 0;
     int m_generation = 0;
 };

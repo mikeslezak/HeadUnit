@@ -92,7 +92,7 @@ void CopilotMonitor::checkConditions()
             m_drivingTimer.start();
             m_drivingAlertSent = false;
         } else if (!moving && m_isDriving) {
-            // Stopped — reset if stopped for > 5 min (checked next cycle)
+            // Stopped — reset driving state if already been driving for > 5 min (any stop on a long drive resets)
             if (m_drivingTimer.elapsed() > 5 * 60 * 1000) {
                 m_isDriving = false;
                 m_drivingAlertSent = false;
@@ -226,21 +226,14 @@ void CopilotMonitor::flushRouteAlerts()
 {
     if (m_pendingRouteAlerts.isEmpty()) return;
 
-    // Throttle the combined batch as "route_alerts"
-    if (shouldThrottle("route_alerts")) {
-        qDebug() << "CopilotMonitor: Throttled batch, will retry";
-        m_routeAlertBatchTimer->setInterval(60000); // retry in 60s
-        m_routeAlertBatchTimer->start();
-        return;
-    }
+    // Route briefings are never throttled — the user explicitly asked for navigation.
+    // Flush immediately every time.
 
     // Combine all pending alerts into one message
     QString combined = m_pendingRouteAlerts.join(" ");
     m_pendingRouteAlerts.clear();
 
-    // Reset batch timer interval back to normal for next batch
-    m_routeAlertBatchTimer->setInterval(3000);
-
+    // Update timestamps so OTHER alert types are still throttled after a route briefing
     qint64 now = QDateTime::currentMSecsSinceEpoch();
     m_lastAlertTime["route_alerts"] = now;
     m_lastAnyAlertTime = now;

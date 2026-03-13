@@ -7,7 +7,6 @@
 #include <QByteArray>
 #include <QVector>
 #include <QVariantMap>
-#include <QMutex>
 #include <QString>
 #include <QTimer>
 
@@ -145,8 +144,8 @@ private:
     QTimer *m_followUpTimer;
     static const int FOLLOW_UP_TIMEOUT_MS = 12000;  // 12 seconds
 
-    // Thread safety
-    QMutex m_mutex;
+    // Ready prompt safety timeout
+    QTimer *m_readyPromptTimer;
 
     // Initialization methods
     bool initializePorcupine();

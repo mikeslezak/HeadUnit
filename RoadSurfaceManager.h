@@ -42,22 +42,16 @@ private slots:
 private:
     struct SurfaceReport {
         QString roadName;
-        QString condition;      // "Bare Dry", "Bare Wet", "Covered Snow", "Ice", etc.
-        double pavementTempC;   // NaN if unavailable
-        double lat;
-        double lon;
-        QString source;         // "511AB" or "DriveBC"
+        QString condition;          // "Bare Dry", "Bare Wet", "Covered Snow", "Ice", etc.
+        double pavementTempC = 0.0; // NaN if unavailable
+        double lat = 0.0;
+        double lon = 0.0;
+        QString source;             // "511AB" or "DriveBC"
     };
-
-    struct RoutePoint { double lat; double lon; };
 
     void processResults();
     void buildSummary();
-    void sampleRoutePoints(const QJsonArray &coordinates);
     bool isNearRoute(double lat, double lon) const;
-    double pointToSegmentDistanceKm(double pLat, double pLon,
-                                     double aLat, double aLon,
-                                     double bLat, double bLon) const;
     // Decode Google Encoded Polyline to get first coordinate
     static QPair<double, double> decodePolylineFirstPoint(const QString &encoded);
 
@@ -71,7 +65,6 @@ private:
 
     QList<SurfaceReport> m_allReports;
     QList<SurfaceReport> m_routeReports;
-    QList<RoutePoint> m_routePoints;
     QJsonArray m_routeCoordinates;
     int m_pendingRequests = 0;
     int m_generation = 0;

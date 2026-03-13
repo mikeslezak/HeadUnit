@@ -39,9 +39,9 @@ private slots:
 
 private:
     struct RoutePoint {
-        double lat;
-        double lon;
-        double etaMinutes;       // minutes from now to reach this point
+        double lat = 0.0;
+        double lon = 0.0;
+        double etaMinutes = 0.0; // minutes from now to reach this point
         QString weatherDesc;
         double tempC = 0.0;
         int weatherCode = 0;

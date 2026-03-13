@@ -40,14 +40,14 @@ private:
         QString id;
         QString name;
         QString imageUrl;
-        double lat;
-        double lon;
+        double lat = 0.0;
+        double lon = 0.0;
         QString direction;
         QString roadName;
         QString source;
     };
 
-    struct RoutePoint { double lat; double lon; };
+    struct RoutePoint { double lat = 0.0; double lon = 0.0; };
 
     void processResults();
     void sampleRoutePoints(const QJsonArray &coordinates);
@@ -63,8 +63,8 @@ private:
     QList<Camera> m_allCameras;
     QList<Camera> m_routeCameras;
     QList<RoutePoint> m_routePoints;
-    QJsonArray m_routeCoordinates;
     int m_pendingRequests = 0;
+    int m_generation = 0;
 };
 
 #endif // HIGHWAYCAMERAMANAGER_H

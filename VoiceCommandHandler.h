@@ -61,7 +61,6 @@ public slots:
     void setContactManager(QObject *contactManager);
     void setMessageManager(QObject *messageManager);
     void setBluetoothManager(QObject *bluetoothManager);
-    void setGoogleTTS(QObject *googleTTS);
 
 signals:
     void statusMessageChanged();
@@ -125,20 +124,19 @@ private:
     QVariantMap parseCommandJSON(const QString &claudeResponse);
 
     /**
-     * Execute specific command types
+     * Execute specific command types (return true on success)
      */
-    void executeCallCommand(const QVariantMap &command);
-    void executeMessageCommand(const QVariantMap &command);
-    void executeReadMessagesCommand(const QVariantMap &command);
-    void executeNavigateCommand(const QVariantMap &command);
-    void executeSearchPlacesCommand(const QVariantMap &command);
-    void executeQuietModeCommand(const QVariantMap &command);
+    bool executeCallCommand(const QVariantMap &command);
+    bool executeMessageCommand(const QVariantMap &command);
+    bool executeReadMessagesCommand(const QVariantMap &command);
+    bool executeNavigateCommand(const QVariantMap &command);
+    bool executeSearchPlacesCommand(const QVariantMap &command);
+    bool executeQuietModeCommand(const QVariantMap &command);
 
     /**
      * Helper methods
      */
     QString findContactPhoneNumber(const QString &contactName);
-    void speakFeedback(const QString &text);
 
     // Member variables
     QString m_statusMessage;
@@ -152,7 +150,6 @@ private:
     QObject *m_contactManager;
     QObject *m_messageManager;
     QObject *m_bluetoothManager;
-    QObject *m_googleTTS;
 };
 
 #endif // VOICECOMMANDHANDLER_H

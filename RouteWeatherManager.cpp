@@ -332,8 +332,16 @@ QString RouteWeatherManager::descriptionForCode(int code) const
 
 bool RouteWeatherManager::isSevereWeather(int code) const
 {
-    return code == 65 || code == 66 || code == 67
-        || code == 56 || code == 57
-        || code >= 73;
+    // Heavy rain(65), freezing rain(66,67), freezing drizzle(56,57),
+    // heavy snow(75), snow grains(77), violent showers(82),
+    // heavy snow showers(86), thunderstorms(95,96,99)
+    return code == 56 || code == 57    // freezing drizzle
+        || code == 65                   // heavy rain
+        || code == 66 || code == 67     // freezing rain
+        || code == 75                   // heavy snow
+        || code == 77                   // snow grains
+        || code == 82                   // violent showers
+        || code == 86                   // heavy snow showers
+        || code >= 95;                  // thunderstorms
 }
 

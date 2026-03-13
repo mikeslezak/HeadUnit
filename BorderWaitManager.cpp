@@ -60,7 +60,6 @@ void BorderWaitManager::setRouteCoordinates(const QJsonArray &coordinates, doubl
     }
 
     ++m_generation;
-    m_routeCoordinates = coordinates;
     sampleRoutePoints(coordinates);
 
     if (!isNearBorder()) {
@@ -85,7 +84,6 @@ void BorderWaitManager::clearRoute()
 {
     ++m_generation;
     m_active = false;
-    m_routeCoordinates = QJsonArray();
     m_routePoints.clear();
     m_waitData.clear();
     m_summary.clear();
@@ -135,6 +133,7 @@ bool BorderWaitManager::isNearBorder() const
 
 void BorderWaitManager::fetchWaitTimes()
 {
+    ++m_generation;
     m_waitData.clear();
     m_pendingRequests = 0;
 

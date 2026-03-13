@@ -89,6 +89,7 @@ void RoadConditionManager::sampleRoutePoints(const QJsonArray &coordinates)
 
 void RoadConditionManager::fetchConditions()
 {
+    ++m_generation;
     m_allEvents.clear();
     m_pendingRequests = 0;
 
@@ -318,7 +319,7 @@ bool RoadConditionManager::isOnRoute(double lat, double lon) const
             int j = qMin(i + step, numCoords - 1);
             QJsonArray b = m_routeCoordinates[j].toArray();
             if (a.size() >= 2 && b.size() >= 2) {
-                double dist = pointToSegmentDistanceKm(
+                double dist = GeoUtils::pointToSegmentDistanceKm(
                     lat, lon,
                     a[1].toDouble(), a[0].toDouble(),  // lat, lon (GeoJSON is lon,lat)
                     b[1].toDouble(), b[0].toDouble());
@@ -338,31 +339,6 @@ bool RoadConditionManager::isOnRoute(double lat, double lon) const
     return false;
 }
 
-double RoadConditionManager::pointToSegmentDistanceKm(double pLat, double pLon,
-                                                       double aLat, double aLon,
-                                                       double bLat, double bLon) const
-{
-    // Project point P onto line segment AB using flat-earth approximation (fine for short segments)
-    // Returns distance in km from P to the closest point on segment AB
-    double dx = bLon - aLon;
-    double dy = bLat - aLat;
-    double lenSq = dx * dx + dy * dy;
-
-    if (lenSq < 1e-12) {
-        // A and B are the same point
-        return GeoUtils::haversineKm(pLat, pLon, aLat, aLon);
-    }
-
-    // Parameter t of the projection of P onto AB, clamped to [0,1]
-    double t = ((pLon - aLon) * dx + (pLat - aLat) * dy) / lenSq;
-    t = qBound(0.0, t, 1.0);
-
-    // Closest point on segment
-    double closestLat = aLat + t * dy;
-    double closestLon = aLon + t * dx;
-
-    return GeoUtils::haversineKm(pLat, pLon, closestLat, closestLon);
-}
 
 QString RoadConditionManager::shortenDescription(const QString &desc) const
 {

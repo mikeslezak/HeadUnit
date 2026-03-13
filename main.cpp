@@ -34,21 +34,23 @@
 
 void myMessageHandler(QtMsgType type, const QMessageLogContext &context, const QString &msg) {
     QByteArray localMsg = msg.toLocal8Bit();
+    const char *file = context.file ? context.file : "";
+    const char *function = context.function ? context.function : "";
     switch (type) {
     case QtDebugMsg:
-        fprintf(stderr, "Debug: %s (%s:%u, %s)\n", localMsg.constData(), context.file, context.line, context.function);
+        fprintf(stderr, "Debug: %s (%s:%u, %s)\n", localMsg.constData(), file, context.line, function);
         break;
     case QtInfoMsg:
-        fprintf(stderr, "Info: %s (%s:%u, %s)\n", localMsg.constData(), context.file, context.line, context.function);
+        fprintf(stderr, "Info: %s (%s:%u, %s)\n", localMsg.constData(), file, context.line, function);
         break;
     case QtWarningMsg:
-        fprintf(stderr, "Warning: %s (%s:%u, %s)\n", localMsg.constData(), context.file, context.line, context.function);
+        fprintf(stderr, "Warning: %s (%s:%u, %s)\n", localMsg.constData(), file, context.line, function);
         break;
     case QtCriticalMsg:
-        fprintf(stderr, "Critical: %s (%s:%u, %s)\n", localMsg.constData(), context.file, context.line, context.function);
+        fprintf(stderr, "Critical: %s (%s:%u, %s)\n", localMsg.constData(), file, context.line, function);
         break;
     case QtFatalMsg:
-        fprintf(stderr, "Fatal: %s (%s:%u, %s)\n", localMsg.constData(), context.file, context.line, context.function);
+        fprintf(stderr, "Fatal: %s (%s:%u, %s)\n", localMsg.constData(), file, context.line, function);
         abort();
     }
 }
@@ -96,18 +98,24 @@ int main(int argc, char *argv[])
     BorderWaitManager borderWaitManager;
 
     // Set API keys from environment variables (loaded via .env)
-    googleTTS.setApiKey(qEnvironmentVariable("GOOGLE_API_KEY"));
-    picovoiceManager.setAccessKey(qEnvironmentVariable("PICOVOICE_ACCESS_KEY"));
-    picovoiceManager.setGoogleApiKey(qEnvironmentVariable("GOOGLE_API_KEY"));
+    QString googleApiKey = qEnvironmentVariable("GOOGLE_API_KEY");
+    QString picovoiceAccessKey = qEnvironmentVariable("PICOVOICE_ACCESS_KEY");
+    googleTTS.setApiKey(googleApiKey);
+    picovoiceManager.setAccessKey(picovoiceAccessKey);
+    picovoiceManager.setGoogleApiKey(googleApiKey);
+    if (googleApiKey.isEmpty()) {
+        qWarning() << "GOOGLE_API_KEY not set - TTS and STT will not work. Set it with: export GOOGLE_API_KEY=your_key";
+    }
+    if (picovoiceAccessKey.isEmpty()) {
+        qWarning() << "PICOVOICE_ACCESS_KEY not set - wake word and voice pipeline will not work. Set it with: export PICOVOICE_ACCESS_KEY=your_key";
+    }
 
     // Set default TTS preferences (can be changed in Settings)
     googleTTS.setVoiceName("en-US-Studio-O");  // Studio: highest quality female US English voice
     googleTTS.setSpeakingRate(1.0);  // Normal speed
     googleTTS.setPitch(0.0);  // Normal pitch
 
-    // Connect wake word detector to QML Claude UI (handled in Main.qml via Connections)
-    // Note: The wake word signal will be connected to QML to trigger the Claude AI interface
-    // The wakeWordDetected signal is exposed via setContextProperty below
+    // Wake word and voice pipeline wiring is handled by VoicePipeline.qml
 
     QQmlApplicationEngine engine;
 
@@ -115,7 +123,6 @@ int main(int argc, char *argv[])
     voiceCommandHandler.setContactManager(&contactManager);
     voiceCommandHandler.setMessageManager(&messageManager);
     voiceCommandHandler.setBluetoothManager(&bluetoothManager);
-    voiceCommandHandler.setGoogleTTS(&googleTTS);
 
     // Set up BluetoothManager dependencies
     bluetoothManager.setContactManager(&contactManager);
@@ -174,12 +181,13 @@ int main(int argc, char *argv[])
                          QString followUp = QString("[SYSTEM: Places search completed. Present these results to the user "
                              "conversationally with distance and rating. Ask which one they want directions to. "
                              "Include expects_reply: true in your JSON.]\n\n%1").arg(results);
-                         claudeClient.sendMessage(followUp, contextAggregator.buildContext());
+                         claudeClient.sendMessage(followUp, contextAggregator.buildContext(), true);
                      });
     QObject::connect(&placesSearchManager, &PlacesSearchManager::searchFailed,
                      [&claudeClient](const QString &error) {
                          claudeClient.sendMessage(
-                             QString("Places search failed: %1. Let the user know.").arg(error));
+                             QString("Places search failed: %1. Let the user know.").arg(error),
+                             QString(), true);
                      });
 
     // Follow-up mode: when Claude expects a reply, keep mic open without wake word

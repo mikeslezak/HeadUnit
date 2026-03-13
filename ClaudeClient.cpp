@@ -12,7 +12,7 @@ ClaudeClient::ClaudeClient(QObject *parent)
     , m_networkManager(new QNetworkAccessManager(this))
     , m_currentReply(nullptr)
     , m_model(DEFAULT_MODEL)
-    , m_maxTokens(1024)
+    , m_maxTokens(2048)
     , m_temperature(0.7)
     , m_isConnected(false)
     , m_isProcessing(false)
@@ -53,6 +53,26 @@ ClaudeClient::ClaudeClient(QObject *parent)
         if (!m_conversationHistory.isEmpty()) {
             qDebug() << "ClaudeClient: Conversation timed out, clearing history";
             clearConversation();
+        }
+    });
+
+    // Safety timeout — force-reset m_isProcessing after 45s
+    m_safetyTimer = new QTimer(this);
+    m_safetyTimer->setSingleShot(true);
+    m_safetyTimer->setInterval(45000);
+    connect(m_safetyTimer, &QTimer::timeout, this, [this]() {
+        if (m_isProcessing) {
+            qWarning() << "ClaudeClient: Safety timeout — forcing processing reset";
+            if (m_currentReply) {
+                m_currentReply->abort();
+                m_currentReply->deleteLater();
+                m_currentReply = nullptr;
+            }
+            m_streamBuffer.clear();
+            m_isProcessing = false;
+            emit processingChanged();
+            emit error("Request timed out after 45 seconds");
+            setStatusMessage("Error: Request timed out");
         }
     });
 
@@ -120,7 +140,7 @@ void ClaudeClient::setTemperature(double temp)
 // MESSAGING
 // ========================================================================
 
-void ClaudeClient::sendMessage(const QString &message, const QString &systemContext)
+void ClaudeClient::sendMessage(const QString &message, const QString &systemContext, bool ephemeral)
 {
     if (!m_isConnected || m_apiKey.isEmpty()) {
         emit error("API key not configured");
@@ -140,6 +160,7 @@ void ClaudeClient::sendMessage(const QString &message, const QString &systemCont
     }
 
     m_isProcessing = true;
+    m_ephemeralRequest = ephemeral;
     emit processingChanged();
     setStatusMessage("Sending request to Claude...");
 
@@ -175,11 +196,12 @@ void ClaudeClient::sendMessage(const QString &message, const QString &systemCont
     // Connect reply signals
     connect(m_currentReply, &QNetworkReply::readyRead,
             this, &ClaudeClient::onReadyRead);
-    connect(m_currentReply, &QNetworkReply::errorOccurred,
-            this, &ClaudeClient::onNetworkError);
 
-    // Add user message to history
-    addToHistory("user", message);
+    // Store pending user message (added to history only on successful response)
+    m_pendingUserMessage = message;
+
+    // Start safety timeout
+    m_safetyTimer->start();
 }
 
 void ClaudeClient::clearConversation()
@@ -231,13 +253,14 @@ void ClaudeClient::onNetworkReply(QNetworkReply *reply)
     }
 
     m_isProcessing = false;
+    m_safetyTimer->stop();
     emit processingChanged();
 
     // Debug HTTP response details
     int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
 
     // Use stream buffer (data already read by onReadyRead)
-    QByteArray responseData = m_streamBuffer.toUtf8();
+    QByteArray responseData = m_streamBuffer;
     m_streamBuffer.clear();
 
     qDebug() << "ClaudeClient: HTTP Status Code:" << statusCode;
@@ -283,31 +306,10 @@ void ClaudeClient::onReadyRead()
     }
 
     // For streaming responses (if we enable streaming in the future)
-    QByteArray chunk = m_currentReply->readAll();
-    m_streamBuffer.append(QString::fromUtf8(chunk));
+    m_streamBuffer.append(m_currentReply->readAll());
 
     // Note: Claude API doesn't support streaming in the same way as some other APIs
     // This is here for potential future implementation
-}
-
-void ClaudeClient::onNetworkError(QNetworkReply::NetworkError error)
-{
-    Q_UNUSED(error);
-
-    if (!m_currentReply) {
-        return;
-    }
-
-    QString errorMsg = m_currentReply->errorString();
-    qWarning() << "ClaudeClient: Network error:" << errorMsg;
-
-    // Null out so the finished handler (onNetworkReply) skips re-processing
-    m_currentReply = nullptr;
-
-    m_isProcessing = false;
-    emit processingChanged();
-    emit this->error("Connection error: " + errorMsg);
-    setStatusMessage("Error: " + errorMsg);
 }
 
 // ========================================================================
@@ -362,38 +364,41 @@ QString ClaudeClient::buildSystemPrompt() const
 
     // Voice output rules
     prompt += "VOICE OUTPUT RULES:\n";
-    prompt += "- Responses are spoken aloud via TTS. Keep them SHORT: 1-3 sentences max.\n";
+    prompt += "- Responses are spoken aloud via TTS. Keep them SHORT: 1-3 sentences for simple replies, up to 5 for route briefings.\n";
     prompt += "- NEVER use markdown (no **, ##, bullets, numbered lists) or emojis.\n";
     prompt += "- Write exactly how a chill person would actually talk. Use contractions, casual phrasing.\n";
     prompt += "- Avoid stiff or formal language. Say \"yeah\" not \"certainly\", \"gotcha\" not \"understood\".\n";
+    prompt += "- VARY your phrasing. Do NOT start every alert with \"heads up\". Mix it up: \"so\", \"alright\", \"oh\", \"by the way\", \"just so you know\", or jump straight into the info.\n";
     prompt += "- Use the live context to give informed, location-aware answers.\n";
-    prompt += "- If asked about location, weather, or route, reference the actual data.\n\n";
+    prompt += "- If asked about location, weather, or route, reference the actual data.\n";
+    prompt += "- For route briefings: weave everything (destination, drive time, weather, road conditions) into one natural flow. Don't deliver them as separate topics — make it sound like one thought.\n\n";
 
     // Actions
     prompt += "AVAILABLE ACTIONS:\n";
     prompt += "When the user requests an action, respond with a brief spoken acknowledgment AND a JSON command block:\n\n";
     prompt += "```json\n";
     prompt += "{\n";
-    prompt += "  \"action\": \"call|message|read_messages|navigate|search_places\",\n";
+    prompt += "  \"action\": \"call|message|read_messages|navigate|search_places|quiet_mode\",\n";
     prompt += "  \"contact_name\": \"Contact Name\",\n";
     prompt += "  \"message_body\": \"Message text\",\n";
     prompt += "  \"phone_number\": \"+1234567890\",\n";
     prompt += "  \"destination\": \"Place or address\",\n";
     prompt += "  \"query\": \"search query for places\",\n";
     prompt += "  \"category\": \"restaurant|gas_station|hotel|etc\",\n";
+    prompt += "  \"enabled\": true,\n";
     prompt += "  \"expects_reply\": true\n";
     prompt += "}\n";
     prompt += "```\n\n";
 
     prompt += "ACTION RULES:\n";
-    prompt += "- navigate: ALWAYS emit this action when the user wants to go somewhere, even if GPS is unavailable. Set destination to what the user said. The system will geocode the text. Examples: 'Starbucks', '123 Main St', 'GoodLife Fitness in Okotoks'.\n";
+    prompt += "- navigate: ALWAYS emit this action when the user wants to go somewhere, even if GPS is unavailable. Set destination to what the user said. The system will geocode the text. Examples: 'Starbucks', '123 Main St', 'GoodLife Fitness in Okotoks'. Keep the spoken part very short (just 'On it' or 'Firing up the route') — the system will ask you for a full route briefing once route data is ready.\n";
     prompt += "- call/message: Use contact_name EXACTLY as the user said.\n";
     prompt += "- search_places: Use when user wants to find nearby places (food, gas, hotels, etc). Set query to the search term and category if obvious.\n";
     prompt += "- quiet_mode: Use when user says 'stop alerts', 'quiet mode', 'be quiet', or similar. Set enabled to true to silence proactive alerts, false to re-enable.\n";
     prompt += "- expects_reply: Set to true when you ask a question (\"Want directions?\", \"Which one?\"). This keeps the mic open for a follow-up without the wake word.\n\n";
 
     prompt += "EXAMPLES:\n";
-    prompt += "- \"Navigate to Starbucks\" -> \"Navigating to Starbucks.\" + {\"action\": \"navigate\", \"destination\": \"Starbucks\"}\n";
+    prompt += "- \"Navigate to Starbucks\" -> \"On it.\" + {\"action\": \"navigate\", \"destination\": \"Starbucks\"}\n";
     prompt += "- \"Find tacos nearby\" -> \"Searching for tacos near you.\" + {\"action\": \"search_places\", \"query\": \"tacos\", \"category\": \"restaurant\"}\n";
     prompt += "- \"Call Mom\" -> \"Calling Mom.\" + {\"action\": \"call\", \"contact_name\": \"Mom\"}\n";
     prompt += "- \"Where am I?\" -> Reference GPS coordinates and location name from context. No JSON needed.\n";
@@ -451,8 +456,14 @@ void ClaudeClient::parseResponse(const QJsonObject &json)
         }
     }
 
-    // Add assistant response to history
-    addToHistory("assistant", responseText);
+    // Stop safety timer on successful parse
+    m_safetyTimer->stop();
+
+    // Add to history only for non-ephemeral requests
+    if (!m_ephemeralRequest) {
+        addToHistory("user", m_pendingUserMessage);
+        addToHistory("assistant", responseText);
+    }
 
     // Emit complete response
     m_currentResponse = responseText;

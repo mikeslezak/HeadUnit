@@ -92,6 +92,7 @@ void AvalancheManager::sampleMountainPoints(const QJsonArray &coordinates, doubl
 
 void AvalancheManager::fetchForecasts()
 {
+    ++m_generation;
     m_pendingRequests = m_points.size();
 
     for (int i = 0; i < m_points.size(); ++i) {

@@ -7,7 +7,7 @@ import HeadUnit
 
 Item {
     id: root
-    property var theme: null
+    property var theme: null  // Set by ScreenContainer but unused — Maps uses ThemeValues singleton
     property string mapboxToken: ""
 
     property bool mapReady: false
@@ -31,7 +31,7 @@ Item {
     property string routeDistance: ""
     property string routeDuration: ""
     property var routeDestination: null   // {lat, lon, name}
-    property var routeGeoJson: ({})       // GeoJSON for the route line
+    property var routeGeoJson: ({"type": "Feature", "geometry": {"type": "LineString", "coordinates": []}})  // GeoJSON for the route line
 
     // Weather overlay
     property bool radarVisible: false
@@ -41,12 +41,23 @@ Item {
     property real _preRadarZoom: -1   // saved zoom before radar zoom-out
     property var _preRadarCenter: null // saved center before radar zoom-out
 
+    // Directions request generation counter (guards in-flight XHR responses)
+    property int directionsGeneration: 0
+
     // Turn-by-turn state
     property var routeSteps: []           // Array of step objects from Directions API
     property int currentStep: 0           // Index into routeSteps
     property string nextManeuver: ""      // e.g. "turn-right", "arrive"
     property string nextInstruction: ""   // Human-readable instruction
     property string nextStepDistance: ""  // Distance to next maneuver
+
+    // Clear route a few seconds after arrival (lets user hear the arrival instruction)
+    Timer {
+        id: arrivalClearTimer
+        interval: 5000
+        repeat: false
+        onTriggered: clearRoute()
+    }
 
     // Save map viewport when user stops panning
     Timer {
@@ -216,6 +227,7 @@ Item {
                 if (position.speedValid) {
                     contextAggregator.gpsSpeed = position.speed * 3.6 // m/s to km/h
                 }
+                contextAggregator.gpsHeading = position.directionValid ? position.direction : -1.0
             }
             // Forward GPS to SpeedLimitManager for live speed limit tracking
             if (position.coordinateValid && typeof speedLimitManager !== 'undefined') {
@@ -488,6 +500,8 @@ Item {
     MouseArea {
         anchors.fill: parent
         z: 5
+        propagateComposedEvents: true
+        onPressed: function(mouse) { mouse.accepted = false }
         onClicked: {
             if (!searchBarVisible) {
                 searchBarVisible = true
@@ -532,7 +546,7 @@ Item {
             : Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.15)
         border.width: 1
         z: 20
-        visible: searchBarVisible
+        visible: opacity > 0
         opacity: searchBarVisible ? 1.0 : 0.0
 
         Behavior on opacity { NumberAnimation { duration: 200 } }
@@ -840,6 +854,8 @@ Item {
                 } catch (e) {
                     console.error("Geocode error:", e)
                 }
+            } else if (xhr.readyState === XMLHttpRequest.DONE && xhr.status !== 200) {
+                console.warn("Geocode request failed with status:", xhr.status, xhr.statusText)
             }
         }
         xhr.open("GET", url)
@@ -848,6 +864,9 @@ Item {
 
     // ── Directions (Mapbox Directions API) ──
     function getDirections(destLat, destLon, destName) {
+        directionsGeneration++
+        var myGeneration = directionsGeneration
+
         // Use GPS if available, otherwise use current map center
         var origin
         if (gps.position.coordinateValid) {
@@ -866,7 +885,16 @@ Item {
 
         var xhr = new XMLHttpRequest()
         xhr.onreadystatechange = function() {
+            if (xhr.readyState === XMLHttpRequest.DONE && xhr.status !== 200) {
+                console.warn("Directions request failed with status:", xhr.status, xhr.statusText)
+                return
+            }
             if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
+                // Discard stale response if a newer request was made or route was cleared
+                if (myGeneration !== root.directionsGeneration) {
+                    console.log("Directions: discarding stale response (gen", myGeneration, "vs", root.directionsGeneration, ")")
+                    return
+                }
                 try {
                     var result = JSON.parse(xhr.responseText)
                     if (!result.routes || result.routes.length === 0) {
@@ -905,6 +933,12 @@ Item {
                     }
 
                     routeActive = true
+
+                    // Feed route metadata to ContextAggregator for voice assistant awareness
+                    if (typeof contextAggregator !== 'undefined') {
+                        contextAggregator.routeDestination = destName || searchInput.text
+                        contextAggregator.routeDistance = routeDistance
+                    }
 
                     // Parse turn-by-turn steps
                     var legs = route.legs
@@ -984,6 +1018,8 @@ Item {
     }
 
     function clearRoute() {
+        directionsGeneration++
+        arrivalClearTimer.stop()
         routeActive = false
         routeDistance = ""
         routeDuration = ""
@@ -997,6 +1033,12 @@ Item {
         nextInstruction = ""
         nextStepDistance = ""
         searchOverlay.visible = false
+
+        // Clear route metadata from ContextAggregator
+        if (typeof contextAggregator !== 'undefined') {
+            contextAggregator.routeDestination = ""
+            contextAggregator.routeDistance = ""
+        }
 
         // Clear route weather tracking
         if (typeof routeWeatherManager !== 'undefined') {
@@ -1014,6 +1056,9 @@ Item {
         if (typeof highwayCameraManager !== 'undefined') highwayCameraManager.clearRoute()
         if (typeof avalancheManager !== 'undefined') avalancheManager.clearRoute()
         if (typeof borderWaitManager !== 'undefined') borderWaitManager.clearRoute()
+
+        // Clear stale route alerts so they don't leak after route clear
+        if (typeof copilotMonitor !== 'undefined') copilotMonitor.clearPendingAlerts()
     }
 
     function fitRouteBounds(lat1, lon1, lat2, lon2) {
@@ -1143,6 +1188,7 @@ Item {
                 nextManeuver = "arrive"
                 nextInstruction = "You have arrived"
                 nextStepDistance = ""
+                arrivalClearTimer.restart()
             }
         }
     }

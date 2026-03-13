@@ -42,10 +42,10 @@ signals:
 
 private:
     struct SpeedSegment {
-        double lat;
-        double lon;
-        int speedKmh;  // 0 if unknown
-        bool isNone;    // true if maxspeed was "none" (no limit)
+        double lat = 0.0;
+        double lon = 0.0;
+        int speedKmh = 0;  // 0 if unknown
+        bool isNone = false;    // true if maxspeed was "none" (no limit)
     };
 
     void buildSummary();

@@ -251,6 +251,7 @@ void GoogleTTS::onNetworkReply(QNetworkReply *reply)
         reply->deleteLater();
         m_currentReply = nullptr;
         reset();
+        emit speechFinished();
         return;
     }
 
@@ -294,6 +295,7 @@ void GoogleTTS::onNetworkReply(QNetworkReply *reply)
         qWarning() << "GoogleTTS: No audioContent in response";
         emit error("No audio data received");
         setStatusMessage("Error: No audio data");
+        emit speechFinished();
     }
 
     reply->deleteLater();
@@ -385,6 +387,7 @@ void GoogleTTS::playAudio(const QByteArray &audioData)
     if (!initializeAudio()) {
         emit error("Failed to initialize audio output");
         setStatusMessage("Error: Audio initialization failed");
+        emit speechFinished();
         return;
     }
 
@@ -411,20 +414,24 @@ void GoogleTTS::onAudioStateChanged(QAudio::State state)
     switch (state) {
     case QAudio::IdleState:
         // Playback finished
-        qDebug() << "GoogleTTS: Playback finished";
-        emit speechFinished();
-        setStatusMessage("Ready");
-        reset();
+        if (m_isSpeaking) {
+            qDebug() << "GoogleTTS: Playback finished";
+            emit speechFinished();
+            setStatusMessage("Ready");
+            reset();
+        }
         break;
 
     case QAudio::StoppedState:
         // Playback stopped (either finished or error)
-        if (m_audioSink && m_audioSink->error() != QAudio::NoError) {
-            qWarning() << "GoogleTTS: Audio error:" << m_audioSink->error();
-            emit error("Audio playback error");
-            setStatusMessage("Error: Playback failed");
+        if (m_isSpeaking) {
+            if (m_audioSink && m_audioSink->error() != QAudio::NoError) {
+                qWarning() << "GoogleTTS: Audio error:" << m_audioSink->error();
+                emit error("Audio playback error");
+                setStatusMessage("Error: Playback failed");
+            }
+            reset();
         }
-        reset();
         break;
 
     case QAudio::ActiveState:

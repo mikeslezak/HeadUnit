@@ -41,8 +41,8 @@ private slots:
 
 private:
     struct ForecastPoint {
-        double lat;
-        double lon;
+        double lat = 0.0;
+        double lon = 0.0;
         QString locationLabel;
         int dangerAlpine = 0;    // 1-5
         int dangerTreeline = 0;

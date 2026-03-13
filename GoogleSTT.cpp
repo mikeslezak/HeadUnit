@@ -176,6 +176,7 @@ void GoogleSTT::sendToGoogle(const QByteArray &audioData)
     QUrl requestUrl(url);
     QNetworkRequest networkRequest{requestUrl};
     networkRequest.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    networkRequest.setTransferTimeout(15000);
 
     // Send request
     QByteArray requestData = QJsonDocument(request).toJson(QJsonDocument::Compact);
@@ -256,7 +257,7 @@ void GoogleSTT::onNetworkReply(QNetworkReply *reply)
     if (transcription.isEmpty()) {
         qDebug() << "GoogleSTT: No transcription result (silence or unclear audio)";
         setStatusMessage("No speech detected");
-        // Don't emit error, just don't emit transcriptionReady
+        emit transcriptionReady("", 0.0f);
     } else {
         qDebug() << "GoogleSTT: Transcription:" << transcription << "confidence:" << confidence;
         setStatusMessage("Transcription complete");
@@ -277,6 +278,8 @@ void GoogleSTT::onNetworkError(QNetworkReply::NetworkError error)
 
     QString errorMsg = m_currentReply->errorString();
     qWarning() << "GoogleSTT: Network error:" << errorMsg;
+
+    m_currentReply = nullptr;
 
     m_isProcessing = false;
     emit processingChanged();

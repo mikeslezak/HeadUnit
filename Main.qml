@@ -393,8 +393,6 @@ Window {
             VoicePipeline {
                 id: voicePipeline
                 claudeIndicatorLoader: claudeIndicatorLoader
-                voiceControlLoader: voiceControlLoader
-                theme: theme
                 screenContainer: screenContainer
                 onNotificationRequested: function(message, type) {
                     var notification = {
