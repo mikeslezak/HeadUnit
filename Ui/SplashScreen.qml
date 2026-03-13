@@ -492,7 +492,7 @@ Rectangle {
             gradient: Gradient {
                 GradientStop { position: 0.0; color: "transparent" }
                 GradientStop { position: 0.55; color: "transparent" }
-                GradientStop { position: 1.0; color: Qt.rgba(0, 0, 0, 0.7) }
+                GradientStop { position: 1.0; color: Qt.rgba(splashBg.r, splashBg.g, splashBg.b, 0.7) }
             }
         }
 

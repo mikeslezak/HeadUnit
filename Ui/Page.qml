@@ -1,4 +1,5 @@
 import QtQuick 2.15
+import HeadUnit
 
 Item {
     id: root
@@ -6,15 +7,15 @@ Item {
     clip: true
 
     // Theme tokens with safe fallbacks
-    readonly property color bgCol: theme?.palette?.bg ?? "#0a0a0f"
-    readonly property color textCol: theme?.palette?.text ?? "white"
+    readonly property color bgCol: theme?.palette?.bg ?? ThemeValues.bgCol
+    readonly property color textCol: theme?.palette?.text ?? ThemeValues.textCol
     readonly property int marginPx: theme?.layout?.pageMargin !== undefined
         ? Number(theme.layout.pageMargin) : 0
 
     readonly property string ovType: theme?.overlay?.type ? String(theme.overlay.type) : "none"
     readonly property real ovOpacity: theme?.overlay?.opacity !== undefined
         ? Number(theme.overlay.opacity) : 0.14
-    readonly property color ovColor: theme?.overlay?.color ?? (textCol === "white" ? "#ffffff" : textCol)
+    readonly property color ovColor: theme?.overlay?.color ?? ThemeValues.textCol
     readonly property real ovSpacing: theme?.overlay?.spacing !== undefined
         ? Number(theme.overlay.spacing) : 12
     readonly property url ovImage: theme?.overlay?.image && theme?.name

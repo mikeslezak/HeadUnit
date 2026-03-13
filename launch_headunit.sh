@@ -46,6 +46,10 @@ fi
 # MapLibre reads this env var for API key (used for Mapbox tile requests)
 export MLN_API_KEY="${MAPBOX_TOKEN}"
 
+# Kill any existing HeadUnit instance to prevent duplicates
+pkill -f "appHeadUnit" 2>/dev/null
+sleep 1
+
 # Start Tidal service (background, auto-restart)
 TIDAL_SERVICE="$SCRIPT_DIR/services/tidal_service.py"
 if [ -f "$TIDAL_SERVICE" ] && command -v python3 &>/dev/null; then

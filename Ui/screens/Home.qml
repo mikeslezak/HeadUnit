@@ -16,9 +16,9 @@ Item {
         Rectangle {
             anchors.fill: parent
             gradient: Gradient {
-                GradientStop { position: 0.0; color: Qt.rgba(0.06, 0.06, 0.10, 1.0) }
-                GradientStop { position: 0.5; color: Qt.rgba(0.08, 0.08, 0.12, 1.0) }
-                GradientStop { position: 1.0; color: Qt.rgba(0.05, 0.05, 0.08, 1.0) }
+                GradientStop { position: 0.0; color: Qt.darker(ThemeValues.bgCol, 1.15) }
+                GradientStop { position: 0.5; color: Qt.darker(ThemeValues.bgCol, 1.05) }
+                GradientStop { position: 1.0; color: Qt.darker(ThemeValues.bgCol, 1.2) }
             }
 
             // Subtle grid lines for map feel
@@ -51,10 +51,28 @@ Item {
             anchors.centerIn: parent
             spacing: 8
 
-            Text {
+            Canvas {
                 anchors.horizontalCenter: parent.horizontalCenter
-                text: "\uD83D\uDDFA"
-                font.pixelSize: 48
+                width: 48; height: 48
+                onPaint: {
+                    var ctx = getContext("2d")
+                    ctx.clearRect(0, 0, width, height)
+                    ctx.strokeStyle = ThemeValues.primaryCol.toString()
+                    ctx.fillStyle = ThemeValues.primaryCol.toString()
+                    ctx.lineWidth = 2
+                    ctx.lineCap = "round"
+                    ctx.lineJoin = "round"
+                    // Map pin
+                    ctx.beginPath()
+                    ctx.arc(24, 18, 10, Math.PI, 0)
+                    ctx.lineTo(24, 40)
+                    ctx.closePath()
+                    ctx.stroke()
+                    // Inner dot
+                    ctx.beginPath()
+                    ctx.arc(24, 18, 4, 0, Math.PI * 2)
+                    ctx.fill()
+                }
             }
 
             Text {

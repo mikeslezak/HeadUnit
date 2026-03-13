@@ -105,9 +105,21 @@ void VoiceCommandHandler::processClaudeResponse(const QString &claudeResponse)
         executeMessageCommand(command);
     } else if (action == "read_messages") {
         executeReadMessagesCommand(command);
+    } else if (action == "navigate") {
+        executeNavigateCommand(command);
+    } else if (action == "search_places") {
+        executeSearchPlacesCommand(command);
+    } else if (action == "quiet_mode") {
+        executeQuietModeCommand(command);
     } else {
         qWarning() << "VoiceCommandHandler: Unknown action:" << action;
         speakFeedback("I'm not sure how to do that.");
+    }
+
+    // Check for expects_reply flag — signal follow-up mode
+    if (command.contains("expects_reply") && command["expects_reply"].toBool()) {
+        qDebug() << "VoiceCommandHandler: Claude expects a reply, signaling follow-up mode";
+        emit followUpExpected();
     }
 }
 
@@ -249,6 +261,45 @@ void VoiceCommandHandler::executeReadMessagesCommand(const QVariantMap &command)
     }
 
     emit commandExecuted("read_messages", QString("Reading messages for %1").arg(contactName));
+}
+
+void VoiceCommandHandler::executeNavigateCommand(const QVariantMap &command)
+{
+    QString destination = command["destination"].toString();
+
+    qDebug() << "VoiceCommandHandler: Navigate command - Destination:" << destination;
+
+    if (destination.isEmpty()) {
+        emit commandFailed("navigate", "No destination provided");
+        return;
+    }
+
+    emit navigationRequested(destination);
+    emit commandExecuted("navigate", QString("Navigating to %1").arg(destination));
+}
+
+void VoiceCommandHandler::executeSearchPlacesCommand(const QVariantMap &command)
+{
+    QString query = command["query"].toString();
+    QString category = command["category"].toString();
+
+    qDebug() << "VoiceCommandHandler: Search places - Query:" << query << "Category:" << category;
+
+    if (query.isEmpty()) {
+        emit commandFailed("search_places", "No search query provided");
+        return;
+    }
+
+    emit placesSearchRequested(query, category);
+    emit commandExecuted("search_places", QString("Searching for %1").arg(query));
+}
+
+void VoiceCommandHandler::executeQuietModeCommand(const QVariantMap &command)
+{
+    bool enabled = command.value("enabled", true).toBool();
+    qDebug() << "VoiceCommandHandler: Quiet mode -" << (enabled ? "on" : "off");
+    emit quietModeRequested(enabled);
+    emit commandExecuted("quiet_mode", enabled ? "enabled" : "disabled");
 }
 
 // ========================================================================

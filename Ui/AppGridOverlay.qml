@@ -16,7 +16,6 @@ Rectangle {
     readonly property var apps: [
         { key: "home",     label: "Home",     icon: "home" },
         { key: "music",    label: "Music",    icon: "music" },
-        { key: "maps",     label: "Maps",     icon: "maps" },
         { key: "phone",    label: "Phone",    icon: "phone" },
         { key: "messages", label: "Messages", icon: "messages" },
         { key: "contacts", label: "Contacts", icon: "contacts" },

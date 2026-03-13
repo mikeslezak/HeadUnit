@@ -151,6 +151,11 @@ class TidalService:
                     'quality': stream.audio_quality or '',
                     'bit_depth': stream.bit_depth,
                     'sample_rate': stream.sample_rate,
+                    'title': track.name or '',
+                    'artist': track.artist.name if track.artist else '',
+                    'album': track.album.name if track.album else '',
+                    'image_url': track.album.image(640) if track.album else '',
+                    'duration': track.duration or 0,
                 }
         except Exception as e:
             log.error(f"Failed to get stream URL for track {track_id}: {e}")
@@ -217,13 +222,148 @@ class TidalService:
             log.error(f"Failed to remove favorite: {e}")
             return False
 
-    def get_home_playlists(self):
-        """Get curated/featured playlists."""
+    def get_home(self):
+        """Get the full home page data: mixes, favorite albums, favorite artists, and home page sections."""
+        if not self.is_logged_in():
+            return {}
+
+        result = {'sections': []}
+
+        # 1. Mixes For You (My Mix 1-8, Daily Discovery, etc.)
         try:
             mixes = self.session.mixes()
-            return [self._mix_to_dict(m) for m in mixes[:10]]
-        except Exception:
-            return []
+            mix_list = []
+            for m in mixes[:12]:
+                d = self._mix_to_dict(m)
+                # Try to get mix image
+                try:
+                    images = m.image(640)
+                    d['image_url'] = images
+                except Exception:
+                    d['image_url'] = ''
+                mix_list.append(d)
+            if mix_list:
+                result['sections'].append({
+                    'title': 'Mixes For You',
+                    'type': 'mixes',
+                    'items': mix_list,
+                })
+        except Exception as e:
+            log.warning(f"Failed to get mixes: {e}")
+
+        # 2. Favorite Albums (recently added first)
+        try:
+            favs = self.session.user.favorites
+            fav_albums = favs.albums(limit=20)
+            albums = [self._album_to_dict(a) for a in fav_albums]
+            if albums:
+                result['sections'].append({
+                    'title': 'Your Albums',
+                    'type': 'albums',
+                    'items': albums,
+                })
+        except Exception as e:
+            log.warning(f"Failed to get favorite albums: {e}")
+
+        # 3. Favorite Artists
+        try:
+            favs = self.session.user.favorites
+            fav_artists = favs.artists(limit=20)
+            artists = [self._artist_to_dict(a) for a in fav_artists]
+            if artists:
+                result['sections'].append({
+                    'title': 'Your Artists',
+                    'type': 'artists',
+                    'items': artists,
+                })
+        except Exception as e:
+            log.warning(f"Failed to get favorite artists: {e}")
+
+        # 4. Favorite Tracks (for quick access row)
+        try:
+            favs = self.session.user.favorites
+            fav_tracks = favs.tracks(limit=20)
+            tracks = [self._track_to_dict(t) for t in fav_tracks]
+            if tracks:
+                result['sections'].append({
+                    'title': 'Your Tracks',
+                    'type': 'tracks',
+                    'items': tracks,
+                })
+        except Exception as e:
+            log.warning(f"Failed to get favorite tracks: {e}")
+
+        # 5. Home page content from Tidal API (suggested albums, playlists, etc.)
+        try:
+            home = self.session.home()
+            if home and hasattr(home, 'categories'):
+                for cat in home.categories[:6]:
+                    try:
+                        title = getattr(cat, 'title', '') or ''
+                        cat_type = str(getattr(cat, 'type', ''))
+                        items = []
+
+                        if not hasattr(cat, 'items') or not cat.items:
+                            continue
+
+                        for item in cat.items[:15]:
+                            if isinstance(item, tidalapi.album.Album):
+                                items.append(self._album_to_dict(item))
+                            elif isinstance(item, tidalapi.artist.Artist):
+                                items.append(self._artist_to_dict(item))
+                            elif isinstance(item, tidalapi.media.Track):
+                                items.append(self._track_to_dict(item))
+                            elif isinstance(item, tidalapi.playlist.Playlist):
+                                items.append(self._playlist_to_dict(item))
+                            elif isinstance(item, tidalapi.mix.Mix) or isinstance(item, tidalapi.mix.MixV2):
+                                d = self._mix_to_dict(item)
+                                try:
+                                    d['image_url'] = item.image(640)
+                                except Exception:
+                                    d['image_url'] = ''
+                                items.append(d)
+
+                        if items and title:
+                            # Map category type to our item types
+                            section_type = 'albums'  # default
+                            if 'TRACK' in cat_type:
+                                section_type = 'tracks'
+                            elif 'ARTIST' in cat_type:
+                                section_type = 'artists'
+                            elif 'PLAYLIST' in cat_type:
+                                section_type = 'playlists'
+                            elif 'MIX' in cat_type:
+                                section_type = 'mixes'
+                            elif 'MIXED' in cat_type:
+                                section_type = 'mixed'
+
+                            result['sections'].append({
+                                'title': title,
+                                'type': section_type,
+                                'items': items,
+                            })
+                    except Exception as e:
+                        log.warning(f"Failed to parse home category: {e}")
+        except Exception as e:
+            log.warning(f"Failed to get home page: {e}")
+
+        log.info(f"Home page: {len(result['sections'])} sections")
+        return result
+
+    def get_mix_tracks(self, mix_id):
+        """Get tracks from a specific mix."""
+        if not self.is_logged_in():
+            return {}
+        try:
+            mix = self.session.mix(mix_id)
+            tracks = mix.items()
+            return {
+                'mix': self._mix_to_dict(mix),
+                'tracks': [self._track_to_dict(t) for t in tracks if isinstance(t, tidalapi.media.Track)],
+            }
+        except Exception as e:
+            log.error(f"Failed to get mix {mix_id}: {e}")
+            return {}
 
     # ── Helpers ──
 
@@ -288,8 +428,9 @@ class TidalService:
     def _mix_to_dict(self, mix):
         return {
             'id': mix.id,
-            'title': mix.title,
-            'sub_title': getattr(mix, 'sub_title', ''),
+            'title': mix.title or '',
+            'sub_title': getattr(mix, 'sub_title', '') or '',
+            'image_url': '',  # Caller fills this in when available
         }
 
 
@@ -400,7 +541,13 @@ class SocketServer:
             elif cmd == 'home':
                 if not self.tidal.is_logged_in():
                     return {'cmd': cmd, 'ok': False, 'error': 'Not logged in'}
-                data = self.tidal.get_home_playlists()
+                data = self.tidal.get_home()
+                return {'cmd': cmd, 'ok': True, 'data': data}
+
+            elif cmd == 'get_mix':
+                if not self.tidal.is_logged_in():
+                    return {'cmd': cmd, 'ok': False, 'error': 'Not logged in'}
+                data = self.tidal.get_mix_tracks(req.get('mix_id', ''))
                 return {'cmd': cmd, 'ok': True, 'data': data}
 
             elif cmd == 'ping':

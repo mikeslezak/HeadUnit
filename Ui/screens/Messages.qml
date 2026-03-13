@@ -427,7 +427,7 @@ Item {
                             Rectangle {
                                 width: parent.width - 60
                                 height: parent.height
-                                color: Qt.rgba(0, 0, 0, 0.5)
+                                color: Qt.rgba(ThemeValues.bgCol.r, ThemeValues.bgCol.g, ThemeValues.bgCol.b, 0.5)
                                 border.color: messageInput.activeFocus ? ThemeValues.primaryCol : Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.5)
                                 border.width: 2
                                 radius: 6
@@ -510,10 +510,22 @@ Item {
                 anchors.centerIn: parent
                 spacing: 15
 
-                Text {
+                Canvas {
                     anchors.horizontalCenter: parent.horizontalCenter
-                    text: "📱"
-                    font.pixelSize: 48
+                    width: 48; height: 48
+                    onPaint: {
+                        var ctx = getContext("2d"); ctx.clearRect(0, 0, width, height)
+                        ctx.strokeStyle = ThemeValues.primaryCol.toString(); ctx.lineWidth = 2.5; ctx.lineCap = "round"; ctx.lineJoin = "round"
+                        // Message bubble
+                        ctx.beginPath(); ctx.roundedRect(4, 4, 40, 28, 6, 6); ctx.stroke()
+                        // Tail
+                        ctx.beginPath(); ctx.moveTo(12, 32); ctx.lineTo(8, 40); ctx.lineTo(20, 32); ctx.stroke()
+                        // Dots
+                        ctx.fillStyle = ThemeValues.primaryCol.toString()
+                        ctx.beginPath(); ctx.arc(16, 18, 2, 0, Math.PI * 2); ctx.fill()
+                        ctx.beginPath(); ctx.arc(24, 18, 2, 0, Math.PI * 2); ctx.fill()
+                        ctx.beginPath(); ctx.arc(32, 18, 2, 0, Math.PI * 2); ctx.fill()
+                    }
                 }
 
                 Text {

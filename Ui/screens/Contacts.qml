@@ -143,10 +143,23 @@ Item {
                         border.width: 1
                         radius: 25
 
-                        Text {
+                        Canvas {
                             anchors.centerIn: parent
-                            text: "📞"
-                            font.pixelSize: 24
+                            width: 24; height: 24
+                            onPaint: {
+                                var ctx = getContext("2d")
+                                ctx.clearRect(0, 0, width, height)
+                                ctx.fillStyle = ThemeValues.successCol.toString()
+                                ctx.beginPath()
+                                ctx.roundedRect(3, 1, 7, 6, 3, 3)
+                                ctx.fill()
+                                ctx.beginPath()
+                                ctx.roundedRect(3, 17, 7, 6, 3, 3)
+                                ctx.fill()
+                                ctx.beginPath()
+                                ctx.arc(12, 12, 2, 0, Math.PI * 2)
+                                ctx.fill()
+                            }
                         }
 
                         MouseArea {
@@ -196,7 +209,7 @@ Item {
                         width: parent.width - 70
                         height: 40
                         anchors.verticalCenter: parent.verticalCenter
-                        color: Qt.rgba(0, 0, 0, 0.3)
+                        color: Qt.rgba(ThemeValues.bgCol.r, ThemeValues.bgCol.g, ThemeValues.bgCol.b, 0.3)
                         border.color: ThemeValues.primaryCol
                         border.width: 1
                         radius: 4

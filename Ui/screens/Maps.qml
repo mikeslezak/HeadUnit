@@ -32,6 +32,14 @@ Item {
     property var routeDestination: null   // {lat, lon, name}
     property var routeGeoJson: ({})       // GeoJSON for the route line
 
+    // Weather overlay
+    property bool radarVisible: false
+    property string _owmKey: (typeof owmApiKey !== 'undefined') ? owmApiKey : ""
+    property var _weatherLayers: []   // array of {sourceParam, layerParam} objects
+    property var _mapStyle: mapLoader.item ? mapLoader.item._styleRef : null
+    property real _preRadarZoom: -1   // saved zoom before radar zoom-out
+    property var _preRadarCenter: null // saved center before radar zoom-out
+
     // Turn-by-turn state
     property var routeSteps: []           // Array of step objects from Directions API
     property int currentStep: 0           // Index into routeSteps
@@ -53,6 +61,134 @@ Item {
         }
     }
 
+    // OWM weather layer definitions: [id, layerName, opacity]
+    readonly property var _owmLayerDefs: [
+        ["precipitation", "precipitation_new", 1.0]
+    ]
+
+    function toggleRadar() {
+        if (!root._mapStyle) {
+            console.warn("Weather: map style not available")
+            return
+        }
+
+        if (root.radarVisible) {
+            removeWeatherLayers()
+            root.radarVisible = false
+
+            // Snap back to pre-radar view if we zoomed out
+            if (root._preRadarZoom > 0 && mapLoader.item) {
+                mapLoader.item.map.zoomLevel = root._preRadarZoom
+                if (root._preRadarCenter)
+                    mapLoader.item.map.center = root._preRadarCenter
+                root._preRadarZoom = -1
+                root._preRadarCenter = null
+                followMode = true
+            }
+            console.log("Weather overlays removed")
+        } else {
+            root.radarVisible = true
+
+            // Auto zoom-out during navigation so weather layers are visible
+            if (root.routeActive && mapLoader.item && mapLoader.item.map.zoomLevel > 8) {
+                root._preRadarZoom = mapLoader.item.map.zoomLevel
+                root._preRadarCenter = mapLoader.item.map.center
+                mapLoader.item.map.zoomLevel = 7
+                followMode = false
+                if (root.routeDestination && gps.position.coordinateValid) {
+                    var midLat = (gps.position.coordinate.latitude + root.routeDestination.lat) / 2
+                    var midLon = (gps.position.coordinate.longitude + root.routeDestination.lon) / 2
+                    mapLoader.item.map.center = QtPositioning.coordinate(midLat, midLon)
+                }
+            }
+
+            addWeatherLayers()
+        }
+    }
+
+    function removeWeatherLayers() {
+        for (var i = root._weatherLayers.length - 1; i >= 0; i--) {
+            var entry = root._weatherLayers[i]
+            if (entry.layerParam && root._mapStyle) {
+                root._mapStyle.removeParameter(entry.layerParam)
+                entry.layerParam.destroy()
+            }
+            if (entry.sourceParam && root._mapStyle) {
+                root._mapStyle.removeParameter(entry.sourceParam)
+                entry.sourceParam.destroy()
+            }
+        }
+        root._weatherLayers = []
+    }
+
+    function addWeatherLayers() {
+        if (!root._mapStyle) return
+
+        removeWeatherLayers()
+
+        if (root._owmKey !== "") {
+            // Add all OWM layers
+            var layers = []
+            for (var i = 0; i < root._owmLayerDefs.length; i++) {
+                var def = root._owmLayerDefs[i]
+                var id = def[0]
+                var layerName = def[1]
+                var opacity = def[2]
+                var tileUrl = "https://tile.openweathermap.org/map/" + layerName + "/{z}/{x}/{y}.png?appid=" + root._owmKey
+
+                var srcParam = Qt.createQmlObject(
+                    'import MapLibre 3.0; SourceParameter { styleId: "wx-' + id + '-src"; type: "raster"; property var tiles: ["' + tileUrl + '"]; property int tileSize: 256 }',
+                    root._mapStyle, "wxSrc" + id)
+                root._mapStyle.addParameter(srcParam)
+
+                var layerParam = Qt.createQmlObject(
+                    'import MapLibre 3.0; LayerParameter { styleId: "wx-' + id + '-layer"; type: "raster"; property string source: "wx-' + id + '-src"; paint: ({"raster-opacity": ' + opacity + '}) }',
+                    root._mapStyle, "wxLayer" + id)
+                root._mapStyle.addParameter(layerParam)
+
+                layers.push({ sourceParam: srcParam, layerParam: layerParam })
+                console.log("Weather layer added:", id, "opacity:", opacity)
+            }
+            root._weatherLayers = layers
+        } else {
+            // Fallback: RainViewer precipitation only
+            fetchRainViewerUrl()
+        }
+    }
+
+    function fetchRainViewerUrl() {
+        var xhr = new XMLHttpRequest()
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
+                try {
+                    var data = JSON.parse(xhr.responseText)
+                    var radar = data.radar
+                    if (radar && radar.past && radar.past.length > 0) {
+                        var latest = radar.past[radar.past.length - 1]
+                        var tileUrl = "https://tilecache.rainviewer.com" + latest.path + "/256/{z}/{x}/{y}/2/1_1.png"
+
+                        var srcParam = Qt.createQmlObject(
+                            'import MapLibre 3.0; SourceParameter { styleId: "wx-precip-src"; type: "raster"; property var tiles: ["' + tileUrl + '"]; property int tileSize: 256 }',
+                            root._mapStyle, "wxSrcPrecip")
+                        root._mapStyle.addParameter(srcParam)
+
+                        var layerParam = Qt.createQmlObject(
+                            'import MapLibre 3.0; LayerParameter { styleId: "wx-precip-layer"; type: "raster"; property string source: "wx-precip-src"; paint: ({"raster-opacity": 0.8}) }',
+                            root._mapStyle, "wxLayerPrecip")
+                        root._mapStyle.addParameter(layerParam)
+
+                        root._weatherLayers = [{ sourceParam: srcParam, layerParam: layerParam }]
+                        console.log("Weather: RainViewer fallback layer added")
+                    }
+                } catch (e) {
+                    console.error("RainViewer API error:", e)
+                }
+            }
+        }
+        xhr.open("GET", "https://api.rainviewer.com/public/weather-maps.json")
+        xhr.send()
+    }
+
     Component.onDestruction: {
         if (mapLoader.item) {
             var c = mapLoader.item.map.center
@@ -71,6 +207,21 @@ Item {
         onPositionChanged: {
             if (position.coordinateValid && followMode && mapLoader.item) {
                 mapLoader.item.map.center = position.coordinate
+            }
+            // Forward GPS to ContextAggregator for voice assistant location awareness
+            if (position.coordinateValid && typeof contextAggregator !== 'undefined') {
+                contextAggregator.gpsLatitude = position.coordinate.latitude
+                contextAggregator.gpsLongitude = position.coordinate.longitude
+                if (position.speedValid) {
+                    contextAggregator.gpsSpeed = position.speed * 3.6 // m/s to km/h
+                }
+            }
+            // Forward GPS to SpeedLimitManager for live speed limit tracking
+            if (position.coordinateValid && typeof speedLimitManager !== 'undefined') {
+                speedLimitManager.updateGpsPosition(
+                    position.coordinate.latitude,
+                    position.coordinate.longitude,
+                    position.speedValid ? position.speed * 3.6 : 0)
             }
             if (position.coordinateValid && routeActive) {
                 advanceStepIfNeeded()
@@ -120,6 +271,7 @@ Item {
 
         MapView {
             id: mapView
+            property alias _styleRef: mapStyle
 
             map.plugin: Plugin {
                 name: "maplibre"
@@ -187,6 +339,7 @@ Item {
                         "line-opacity": 0.85
                     })
                 }
+
             }
 
             // GPS location — outer ring (MapCircle is natively supported by MapLibre)
@@ -212,7 +365,7 @@ Item {
                 visible: gps.position.coordinateValid
                 radius: 10
                 color: ThemeValues.primaryCol
-                border.color: "white"
+                border.color: ThemeValues.textCol
                 border.width: 2
             }
         }
@@ -269,7 +422,7 @@ Item {
             Text {
                 anchors.centerIn: parent
                 text: "\u2022"
-                color: "white"
+                color: ThemeValues.textCol
                 font.pixelSize: 16; font.bold: true
             }
         }
@@ -337,11 +490,11 @@ Item {
         anchors.topMargin: 8
         anchors.left: parent.left
         anchors.leftMargin: 12
-        anchors.right: controlColumn.left
+        anchors.right: parent.right
         anchors.rightMargin: 12
-        height: 42
-        radius: 21
-        color: Qt.rgba(0.03, 0.03, 0.06, 0.85)
+        height: 48
+        radius: 24
+        color: Qt.rgba(ThemeValues.bgCol.r, ThemeValues.bgCol.g, ThemeValues.bgCol.b, 0.85)
         border.color: searchInput.activeFocus
             ? ThemeValues.primaryCol
             : Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.15)
@@ -445,7 +598,7 @@ Item {
         anchors.right: searchBar.right
         height: Math.min(searchResults.length * 44, 220)
         radius: 12
-        color: Qt.rgba(0.03, 0.03, 0.06, 0.92)
+        color: Qt.rgba(ThemeValues.bgCol.r, ThemeValues.bgCol.g, ThemeValues.bgCol.b, 0.92)
         border.color: Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.15)
         border.width: 1
         visible: searchResultsVisible && searchResults.length > 0
@@ -501,6 +654,7 @@ Item {
                     id: resultMa
                     anchors.fill: parent
                     onClicked: {
+                        console.log("Search result clicked:", modelData.name, modelData.lat, modelData.lon)
                         if (mapLoader.item) {
                             mapLoader.item.map.center = QtPositioning.coordinate(
                                 modelData.lat, modelData.lon)
@@ -531,11 +685,11 @@ Item {
         anchors.topMargin: 8
         anchors.left: parent.left
         anchors.leftMargin: 12
-        anchors.right: controlColumn.left
+        anchors.right: parent.right
         anchors.rightMargin: 12
         height: 76
         radius: 14
-        color: Qt.rgba(0.03, 0.03, 0.06, 0.9)
+        color: Qt.rgba(ThemeValues.bgCol.r, ThemeValues.bgCol.g, ThemeValues.bgCol.b, 0.9)
         border.color: Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.25)
         border.width: 1
         visible: routeActive && routeSteps.length > 0
@@ -601,13 +755,14 @@ Item {
         }
     }
 
-    // ── Right control strip ──
+    // ── Left control strip (below search bar) ──
     Column {
         id: controlColumn
-        anchors.right: parent.right
-        anchors.rightMargin: 10
-        anchors.verticalCenter: parent.verticalCenter
-        spacing: 6
+        anchors.left: parent.left
+        anchors.leftMargin: 12
+        anchors.bottom: bottomBar.top
+        anchors.bottomMargin: 12
+        spacing: 8
         z: 15
 
         MapButton {
@@ -626,7 +781,7 @@ Item {
             }
         }
 
-        Item { width: 1; height: 12 }
+        Item { width: 1; height: 8 }
 
         MapButton {
             text: "\u2316"
@@ -642,12 +797,21 @@ Item {
 
         MapButton {
             text: "3D"
-            fontSize: 10
+            fontSize: 12
             onClicked: {
                 if (!mapLoader.item) return
                 var current = mapLoader.item.map.tilt
                 mapLoader.item.map.tilt = current > 0 ? 0 : 45
             }
+        }
+
+        Item { width: 1; height: 8 }
+
+        MapButton {
+            text: "R"
+            fontSize: 14
+            highlighted: root.radarVisible
+            onClicked: toggleRadar()
         }
     }
 
@@ -658,7 +822,7 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         height: routeActive ? 72 : 40
-        color: Qt.rgba(0.03, 0.03, 0.06, 0.8)
+        color: Qt.rgba(ThemeValues.bgCol.r, ThemeValues.bgCol.g, ThemeValues.bgCol.b, 0.8)
         z: 15
 
         Behavior on height { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
@@ -817,7 +981,10 @@ Item {
             + "&limit=" + limit
             + "&language=en"
 
-        if (mapLoader.item) {
+        // Prefer GPS position for proximity bias, fall back to map center
+        if (gps.position.coordinateValid) {
+            url += "&proximity=" + gps.position.coordinate.longitude + "," + gps.position.coordinate.latitude
+        } else if (mapLoader.item) {
             var c = mapLoader.item.map.center
             url += "&proximity=" + c.longitude + "," + c.latitude
         }
@@ -844,6 +1011,7 @@ Item {
                         searchResultsVisible = true
                     } else {
                         var coords = result.features[0].center
+                        console.log("Geocode result:", result.features[0].place_name, "at", coords[1], coords[0])
                         if (mapLoader.item) {
                             mapLoader.item.map.center = QtPositioning.coordinate(coords[1], coords[0])
                             mapLoader.item.map.zoomLevel = 15
@@ -867,16 +1035,21 @@ Item {
 
     // ── Directions (Mapbox Directions API) ──
     function getDirections(destLat, destLon, destName) {
-        if (!gps.position.coordinateValid) {
-            console.warn("No GPS fix — cannot calculate route")
+        // Use GPS if available, otherwise use current map center
+        var origin
+        if (gps.position.coordinateValid) {
+            origin = gps.position.coordinate
+        } else if (mapLoader.item) {
+            origin = mapLoader.item.map.center
+            console.log("No GPS fix — using map center as origin")
+        } else {
+            console.warn("No GPS fix and no map — cannot calculate route")
             return
         }
-
-        var origin = gps.position.coordinate
         var url = "https://api.mapbox.com/directions/v5/mapbox/driving/"
             + origin.longitude + "," + origin.latitude + ";"
             + destLon + "," + destLat
-            + "?geometries=geojson&overview=full&steps=true&banner_instructions=true&access_token=" + root.mapboxToken
+            + "?geometries=geojson&overview=full&steps=true&banner_instructions=true&annotations=maxspeed&access_token=" + root.mapboxToken
 
         var xhr = new XMLHttpRequest()
         xhr.onreadystatechange = function() {
@@ -946,6 +1119,48 @@ Item {
                     // Fit map to show entire route
                     fitRouteBounds(origin.latitude, origin.longitude, destLat, destLon)
 
+                    // Feed route coordinates to RouteWeatherManager for weather-along-route tracking
+                    if (typeof routeWeatherManager !== 'undefined' && route.geometry && route.geometry.coordinates) {
+                        var coords = route.geometry.coordinates
+                        routeWeatherManager.setRouteCoordinates(coords, durSec)
+                        console.log("Maps: Sent", coords.length, "route coords to RouteWeatherManager, duration:", durSec, "sec")
+                    }
+
+                    // Feed route coordinates to RoadConditionManager for 511/DriveBC alerts
+                    if (typeof roadConditionManager !== 'undefined' && route.geometry && route.geometry.coordinates) {
+                        roadConditionManager.setRouteCoordinates(route.geometry.coordinates, durSec)
+                        console.log("Maps: Sent route coords to RoadConditionManager")
+                    }
+
+                    // Feed speed limit annotations to SpeedLimitManager
+                    if (typeof speedLimitManager !== 'undefined' && route.legs && route.legs.length > 0) {
+                        var annotation = route.legs[0].annotation
+                        if (annotation && annotation.maxspeed) {
+                            speedLimitManager.setSpeedLimitData(annotation.maxspeed, route.geometry.coordinates, durSec)
+                            console.log("Maps: Sent", annotation.maxspeed.length, "speed limit segments to SpeedLimitManager")
+                        }
+                    }
+
+                    // Feed route to RoadSurfaceManager for winter road conditions
+                    if (typeof roadSurfaceManager !== 'undefined' && route.geometry && route.geometry.coordinates) {
+                        roadSurfaceManager.setRouteCoordinates(route.geometry.coordinates, durSec)
+                    }
+
+                    // Feed route to HighwayCameraManager
+                    if (typeof highwayCameraManager !== 'undefined' && route.geometry && route.geometry.coordinates) {
+                        highwayCameraManager.setRouteCoordinates(route.geometry.coordinates, durSec)
+                    }
+
+                    // Feed route to AvalancheManager for mountain pass forecasts
+                    if (typeof avalancheManager !== 'undefined' && route.geometry && route.geometry.coordinates) {
+                        avalancheManager.setRouteCoordinates(route.geometry.coordinates, durSec)
+                    }
+
+                    // Feed route to BorderWaitManager (only activates if route is near a crossing)
+                    if (typeof borderWaitManager !== 'undefined' && route.geometry && route.geometry.coordinates) {
+                        borderWaitManager.setRouteCoordinates(route.geometry.coordinates, durSec)
+                    }
+
                 } catch (e) {
                     console.error("Directions error:", e)
                 }
@@ -969,6 +1184,23 @@ Item {
         nextInstruction = ""
         nextStepDistance = ""
         searchOverlay.visible = false
+
+        // Clear route weather tracking
+        if (typeof routeWeatherManager !== 'undefined') {
+            routeWeatherManager.clearRoute()
+        }
+
+        // Clear road condition tracking
+        if (typeof roadConditionManager !== 'undefined') {
+            roadConditionManager.clearRoute()
+        }
+
+        // Clear all other route-aware managers
+        if (typeof speedLimitManager !== 'undefined') speedLimitManager.clearRoute()
+        if (typeof roadSurfaceManager !== 'undefined') roadSurfaceManager.clearRoute()
+        if (typeof highwayCameraManager !== 'undefined') highwayCameraManager.clearRoute()
+        if (typeof avalancheManager !== 'undefined') avalancheManager.clearRoute()
+        if (typeof borderWaitManager !== 'undefined') borderWaitManager.clearRoute()
     }
 
     function fitRouteBounds(lat1, lon1, lat2, lon2) {
@@ -1150,10 +1382,10 @@ Item {
         property int fontSize: 18
         signal clicked()
 
-        width: 40; height: 40; radius: 10
+        width: 48; height: 48; radius: 12
         color: btnMa.pressed
             ? Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.25)
-            : Qt.rgba(0.03, 0.03, 0.06, 0.8)
+            : Qt.rgba(ThemeValues.bgCol.r, ThemeValues.bgCol.g, ThemeValues.bgCol.b, 0.8)
         border.color: highlighted
             ? ThemeValues.primaryCol
             : Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.15)

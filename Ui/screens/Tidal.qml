@@ -1,19 +1,22 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
+import Qt5Compat.GraphicalEffects
 import HeadUnit
 
 Item {
     id: root
     anchors.fill: parent
+    clip: true
     property var theme: null
 
-    // View stack: "home", "search", "favorites", "album", "artist", "nowplaying"
+    // View stack: "home", "search", "favorites", "album", "artist", "mix", "nowplaying"
     property string currentView: "home"
     property string searchQuery: ""
     property string searchType: "tracks"
     property var browseData: null
     property var browseTracks: []
     property bool queueVisible: false
+    property var homeSections: []
 
     // Helpers
     function formatMs(ms) {
@@ -42,7 +45,7 @@ Item {
 
         function onAuthStatusChanged() {
             if (tidalClient.isLoggedIn && currentView === "home") {
-                tidalClient.getFavorites()
+                tidalClient.getHome()
             }
         }
 
@@ -65,10 +68,22 @@ Item {
 
         function onFavoritesReceived(tracks) {
             homeFavorites = tracks
-            if (currentView === "home" || currentView === "favorites") {
+            if (currentView === "favorites") {
                 browseTracks = tracks
-                currentView = "favorites"
             }
+        }
+
+        function onHomeReceived(sections) {
+            homeSections = sections
+            if (currentView === "home") {
+                // Stay on home view
+            }
+        }
+
+        function onMixReceived(mix, tracks) {
+            browseData = mix
+            browseTracks = tracks
+            currentView = "mix"
         }
 
         function onPlayStateChanged() {
@@ -127,6 +142,7 @@ Item {
                             anchors.fill: parent
                             onClicked: {
                                 if (currentView === "album" || currentView === "artist") currentView = "search"
+                                else if (currentView === "mix") currentView = "home"
                                 else currentView = "home"
                             }
                         }
@@ -151,11 +167,16 @@ Item {
                             anchors.margins: 10
                             spacing: 8
 
-                            Text {
-                                text: "🔍"
-                                font.pixelSize: 16
+                            Canvas {
+                                width: 16; height: 16
                                 anchors.verticalCenter: parent.verticalCenter
                                 opacity: 0.5
+                                onPaint: {
+                                    var ctx = getContext("2d"); ctx.clearRect(0, 0, width, height)
+                                    ctx.strokeStyle = ThemeValues.textCol.toString(); ctx.lineWidth = 1.5; ctx.lineCap = "round"
+                                    ctx.beginPath(); ctx.arc(7, 7, 5, 0, Math.PI * 2); ctx.stroke()
+                                    ctx.beginPath(); ctx.moveTo(11, 11); ctx.lineTo(15, 15); ctx.stroke()
+                                }
                             }
 
                             TextInput {
@@ -265,15 +286,16 @@ Item {
                     }
                 }
 
-                // ── Search Type Tabs ──
+                // ── Navigation Tabs ──
                 Row {
                     width: parent.width
                     height: 44
-                    spacing: 8
+                    spacing: 6
                     visible: currentView === "search" || currentView === "home" || currentView === "favorites"
 
                     Repeater {
                         model: [
+                            { key: "home", label: "Home" },
                             { key: "tracks", label: "Tracks" },
                             { key: "albums", label: "Albums" },
                             { key: "artists", label: "Artists" },
@@ -281,13 +303,20 @@ Item {
                         ]
 
                         Rectangle {
-                            width: (parent.width - 24) / 4
+                            width: (parent.width - 24) / 5
                             height: 44
                             radius: ThemeValues.radius
-                            color: (searchType === modelData.key || (modelData.key === "favorites" && currentView === "favorites"))
+
+                            property bool isActive: {
+                                if (modelData.key === "home") return currentView === "home"
+                                if (modelData.key === "favorites") return currentView === "favorites"
+                                return currentView === "search" && searchType === modelData.key
+                            }
+
+                            color: isActive
                                 ? Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.2)
                                 : "transparent"
-                            border.color: (searchType === modelData.key || (modelData.key === "favorites" && currentView === "favorites"))
+                            border.color: isActive
                                 ? ThemeValues.primaryCol
                                 : Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.2)
                             border.width: 1
@@ -295,8 +324,7 @@ Item {
                             Text {
                                 anchors.centerIn: parent
                                 text: modelData.label
-                                color: (searchType === modelData.key || (modelData.key === "favorites" && currentView === "favorites"))
-                                    ? ThemeValues.primaryCol : ThemeValues.textCol
+                                color: isActive ? ThemeValues.primaryCol : ThemeValues.textCol
                                 font.pixelSize: ThemeValues.fontSize - 2
                                 font.family: ThemeValues.fontFamily
                                 font.weight: Font.Bold
@@ -305,7 +333,10 @@ Item {
                             MouseArea {
                                 anchors.fill: parent
                                 onClicked: {
-                                    if (modelData.key === "favorites") {
+                                    if (modelData.key === "home") {
+                                        currentView = "home"
+                                        if (homeSections.length === 0) tidalClient.getHome()
+                                    } else if (modelData.key === "favorites") {
                                         currentView = "favorites"
                                         tidalClient.getFavorites()
                                     } else {
@@ -472,6 +503,289 @@ Item {
                     }
                 }
 
+                // ── HOME VIEW: Horizontal scrolling sections ──
+                Item {
+                    width: parent.width
+                    height: parent.height - 110
+                    visible: tidalClient.isLoggedIn && currentView === "home"
+
+                    Flickable {
+                        id: homeFlick
+                        anchors.fill: parent
+                        clip: true
+                        contentHeight: homeCol.height
+                        flickableDirection: Flickable.VerticalFlick
+                        boundsBehavior: Flickable.StopAtBounds
+
+                        Column {
+                            id: homeCol
+                            width: homeFlick.width
+                            spacing: 16
+
+                            Repeater {
+                                model: homeSections
+
+                                Item {
+                                    id: sectionItem
+                                    width: homeCol.width
+                                    height: sectionTitle.height + 6 + sectionRowView.height
+                                    property string secType: modelData.type || ""
+                                    property var secItems: modelData.items || []
+
+                                    // Section title
+                                    Text {
+                                        id: sectionTitle
+                                        text: modelData.title || ""
+                                        color: ThemeValues.textCol
+                                        font.pixelSize: ThemeValues.fontSize + 2
+                                        font.family: ThemeValues.fontFamily
+                                        font.weight: Font.Bold
+                                        leftPadding: 4
+                                    }
+
+                                    // Horizontal scroll of items
+                                    ListView {
+                                        id: sectionRowView
+                                        anchors.top: sectionTitle.bottom
+                                        anchors.topMargin: 6
+                                        width: parent.width
+                                        height: sectionItem.secType === "tracks" ? 80 : 170
+                                        orientation: ListView.Horizontal
+                                        clip: true
+                                        spacing: 12
+                                        model: sectionItem.secItems
+                                        boundsBehavior: Flickable.StopAtBounds
+
+                                        delegate: Loader {
+                                            property var itemData: modelData
+                                            // Access section type from the sectionItem parent via id
+                                            property string _secType: sectionItem.secType
+
+                                            sourceComponent: {
+                                                if (_secType === "tracks") return homeTrackCardComponent
+                                                if (_secType === "artists") return homeArtistCardComponent
+                                                if (_secType === "mixes") return homeMixCardComponent
+                                                if (_secType === "playlists") return homePlaylistCardComponent
+                                                // mixed or default: infer from item fields
+                                                if (itemData.sub_title !== undefined) return homeMixCardComponent
+                                                if (itemData.name !== undefined && itemData.title === undefined) return homeArtistCardComponent
+                                                return homeAlbumCardComponent
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Empty state
+                        Text {
+                            visible: homeSections.length === 0 && !tidalClient.isLoading
+                            anchors.centerIn: parent
+                            text: "Loading your home..."
+                            color: Qt.rgba(ThemeValues.textCol.r, ThemeValues.textCol.g, ThemeValues.textCol.b, 0.3)
+                            font.pixelSize: ThemeValues.fontSize
+                            font.family: ThemeValues.fontFamily
+                        }
+                    }
+                }
+
+                // ── MIX VIEW: track list for a selected mix ──
+                Item {
+                    width: parent.width
+                    height: parent.height - 110
+                    visible: tidalClient.isLoggedIn && currentView === "mix"
+
+                    ListView {
+                        id: mixTrackList
+                        anchors.fill: parent
+                        clip: true
+                        spacing: 4
+
+                        header: Item {
+                            width: mixTrackList.width
+                            height: 80
+
+                            Row {
+                                anchors.fill: parent
+                                anchors.bottomMargin: 12
+                                spacing: 16
+
+                                Column {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    spacing: 4
+                                    width: parent.width - 280
+
+                                    Text {
+                                        width: parent.width
+                                        text: browseData ? (browseData.title || "") : ""
+                                        color: ThemeValues.textCol
+                                        font.pixelSize: ThemeValues.fontSize + 4
+                                        font.family: ThemeValues.fontFamily
+                                        font.weight: Font.Bold
+                                        elide: Text.ElideRight
+                                    }
+
+                                    Text {
+                                        text: browseData ? (browseData.sub_title || "") : ""
+                                        color: Qt.rgba(ThemeValues.textCol.r, ThemeValues.textCol.g, ThemeValues.textCol.b, 0.5)
+                                        font.pixelSize: ThemeValues.fontSize - 2
+                                        font.family: ThemeValues.fontFamily
+                                    }
+                                }
+
+                                Row {
+                                    spacing: 12
+                                    anchors.verticalCenter: parent.verticalCenter
+
+                                    Rectangle {
+                                        width: 120; height: 40
+                                        radius: ThemeValues.radius
+                                        color: playMixMa.pressed
+                                            ? Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.3)
+                                            : Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.15)
+                                        border.color: ThemeValues.primaryCol
+                                        border.width: 1
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: "▶  Play All"
+                                            color: ThemeValues.primaryCol
+                                            font.pixelSize: ThemeValues.fontSize - 2
+                                            font.family: ThemeValues.fontFamily
+                                            font.weight: Font.Bold
+                                        }
+
+                                        MouseArea {
+                                            id: playMixMa
+                                            anchors.fill: parent
+                                            onClicked: {
+                                                if (browseTracks.length > 0) {
+                                                    tidalClient.playTrackInContext(browseTracks[0].id, browseTracks, 0)
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        width: 110; height: 40
+                                        radius: ThemeValues.radius
+                                        color: shuffleMixMa.pressed
+                                            ? Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.2)
+                                            : "transparent"
+                                        border.color: Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.4)
+                                        border.width: 1
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: "⇄  Shuffle"
+                                            color: ThemeValues.textCol
+                                            font.pixelSize: ThemeValues.fontSize - 2
+                                            font.family: ThemeValues.fontFamily
+                                        }
+
+                                        MouseArea {
+                                            id: shuffleMixMa
+                                            anchors.fill: parent
+                                            onClicked: {
+                                                if (browseTracks.length > 0) {
+                                                    if (!tidalClient.shuffleEnabled) tidalClient.toggleShuffle()
+                                                    tidalClient.playTrackInContext(browseTracks[0].id, browseTracks, 0)
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        model: browseTracks
+
+                        delegate: Rectangle {
+                            width: mixTrackList.width
+                            height: 72
+                            radius: ThemeValues.radius
+                            property bool isCurrentTrack: tidalClient.isPlaying &&
+                                modelData.id && modelData.title === tidalClient.trackTitle
+                            color: mixTrackMa.pressed
+                                ? Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.25)
+                                : isCurrentTrack
+                                ? Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.12)
+                                : Qt.rgba(ThemeValues.cardBgCol.r, ThemeValues.cardBgCol.g, ThemeValues.cardBgCol.b, 0.25)
+                            border.color: isCurrentTrack ? ThemeValues.primaryCol
+                                : Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.1)
+                            border.width: 1
+
+                            Row {
+                                anchors.fill: parent
+                                anchors.leftMargin: 12
+                                anchors.rightMargin: 12
+                                anchors.topMargin: 6
+                                anchors.bottomMargin: 6
+                                spacing: 12
+
+                                Rectangle {
+                                    width: 56; height: 56
+                                    radius: 6
+                                    color: Qt.rgba(ThemeValues.cardBgCol.r, ThemeValues.cardBgCol.g, ThemeValues.cardBgCol.b, 0.8)
+                                    anchors.verticalCenter: parent.verticalCenter
+
+                                    Image {
+                                        anchors.fill: parent
+                                        anchors.margins: 1
+                                        source: modelData.image_url || ""
+                                        fillMode: Image.PreserveAspectCrop
+                                        visible: status === Image.Ready
+                                    }
+                                }
+
+                                Column {
+                                    width: parent.width - 56 - mixDurText.width - 36
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    spacing: 3
+
+                                    Text {
+                                        width: parent.width
+                                        text: modelData.title || ""
+                                        color: isCurrentTrack ? ThemeValues.primaryCol : ThemeValues.textCol
+                                        font.pixelSize: 17
+                                        font.family: ThemeValues.fontFamily
+                                        font.weight: Font.Bold
+                                        elide: Text.ElideRight
+                                    }
+
+                                    Text {
+                                        width: parent.width
+                                        text: modelData.artist || ""
+                                        color: Qt.rgba(ThemeValues.textCol.r, ThemeValues.textCol.g, ThemeValues.textCol.b, 0.6)
+                                        font.pixelSize: 14
+                                        font.family: ThemeValues.fontFamily
+                                        elide: Text.ElideRight
+                                    }
+                                }
+
+                                Text {
+                                    id: mixDurText
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: formatDuration(modelData.duration || 0)
+                                    color: Qt.rgba(ThemeValues.textCol.r, ThemeValues.textCol.g, ThemeValues.textCol.b, 0.45)
+                                    font.pixelSize: 14
+                                    font.family: ThemeValues.fontFamily
+                                }
+                            }
+
+                            MouseArea {
+                                id: mixTrackMa
+                                anchors.fill: parent
+                                onClicked: {
+                                    if (modelData.id) {
+                                        tidalClient.playTrackInContext(modelData.id, browseTracks, index)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // ── Content area (tracks, albums, artists, loading) ──
                 Item {
                     width: parent.width
@@ -546,7 +860,7 @@ Item {
                                     Rectangle {
                                         anchors.fill: parent
                                         radius: 6
-                                        color: Qt.rgba(0, 0, 0, 0.55)
+                                        color: Qt.rgba(ThemeValues.bgCol.r, ThemeValues.bgCol.g, ThemeValues.bgCol.b, 0.55)
                                         visible: isCurrentTrack
 
                                         Row {
@@ -1186,7 +1500,7 @@ Item {
                 MouseArea {
                     id: npBackMa
                     anchors.fill: parent
-                    onClicked: currentView = "search"
+                    onClicked: currentView = "home"
                 }
             }
 
@@ -1433,13 +1747,22 @@ Item {
                             radius: 32
                             color: "transparent"
 
-                            Text {
+                            Canvas {
                                 anchors.centerIn: parent
-                                text: "⇄"
-                                color: tidalClient.shuffleEnabled ? ThemeValues.primaryCol
-                                    : Qt.rgba(ThemeValues.textCol.r, ThemeValues.textCol.g, ThemeValues.textCol.b, 0.4)
-                                font.pixelSize: 24
-                                font.family: ThemeValues.fontFamily
+                                width: 24; height: 24
+                                property bool active: tidalClient.shuffleEnabled
+                                onPaint: {
+                                    var ctx = getContext("2d"); ctx.clearRect(0, 0, width, height)
+                                    ctx.strokeStyle = (active ? ThemeValues.primaryCol : Qt.rgba(ThemeValues.textCol.r, ThemeValues.textCol.g, ThemeValues.textCol.b, 0.4)).toString()
+                                    ctx.lineWidth = 2; ctx.lineCap = "round"
+                                    // Crossing arrows
+                                    ctx.beginPath(); ctx.moveTo(2, 6); ctx.lineTo(22, 18); ctx.stroke()
+                                    ctx.beginPath(); ctx.moveTo(2, 18); ctx.lineTo(22, 6); ctx.stroke()
+                                    // Arrow tips
+                                    ctx.beginPath(); ctx.moveTo(18, 4); ctx.lineTo(22, 6); ctx.lineTo(18, 8); ctx.stroke()
+                                    ctx.beginPath(); ctx.moveTo(18, 16); ctx.lineTo(22, 18); ctx.lineTo(18, 20); ctx.stroke()
+                                }
+                                onActiveChanged: requestPaint()
                             }
 
                             MouseArea {
@@ -1457,19 +1780,28 @@ Item {
                             border.width: 2
 
                             Image {
+                                id: npPrevIcon
                                 anchors.centerIn: parent
                                 source: iconSource("previous")
                                 width: 24; height: 24
                                 fillMode: Image.PreserveAspectFit
                                 smooth: true
+                                visible: status === Image.Ready
+                                layer.enabled: true
+                                layer.effect: ColorOverlay { color: ThemeValues.primaryCol }
                             }
 
-                            Text {
+                            Canvas {
                                 anchors.centerIn: parent
-                                text: "⏮"
-                                font.pixelSize: 26
-                                color: ThemeValues.primaryCol
-                                visible: iconSource("previous") === ""
+                                width: 24; height: 24
+                                visible: npPrevIcon.status !== Image.Ready
+                                onPaint: {
+                                    var ctx = getContext("2d"); ctx.clearRect(0, 0, width, height)
+                                    ctx.fillStyle = ThemeValues.primaryCol.toString()
+                                    // Previous: bar + triangle
+                                    ctx.fillRect(2, 4, 3, 16)
+                                    ctx.beginPath(); ctx.moveTo(20, 4); ctx.lineTo(7, 12); ctx.lineTo(20, 20); ctx.closePath(); ctx.fill()
+                                }
                             }
 
                             MouseArea {
@@ -1484,11 +1816,23 @@ Item {
                             radius: 48
                             color: ThemeValues.primaryCol
 
-                            Text {
+                            Canvas {
                                 anchors.centerIn: parent
-                                text: tidalClient.isPlaying ? "⏸" : "▶"
-                                font.pixelSize: 36
-                                color: ThemeValues.bgCol
+                                width: 36; height: 36
+                                property bool playing: tidalClient.isPlaying
+                                onPaint: {
+                                    var ctx = getContext("2d"); ctx.clearRect(0, 0, width, height)
+                                    ctx.fillStyle = ThemeValues.bgCol.toString()
+                                    if (playing) {
+                                        // Pause bars
+                                        ctx.fillRect(8, 4, 7, 28)
+                                        ctx.fillRect(21, 4, 7, 28)
+                                    } else {
+                                        // Play triangle
+                                        ctx.beginPath(); ctx.moveTo(8, 4); ctx.lineTo(30, 18); ctx.lineTo(8, 32); ctx.closePath(); ctx.fill()
+                                    }
+                                }
+                                onPlayingChanged: requestPaint()
                             }
 
                             MouseArea {
@@ -1505,11 +1849,16 @@ Item {
                             border.color: Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.5)
                             border.width: 2
 
-                            Text {
+                            Canvas {
                                 anchors.centerIn: parent
-                                text: "⏭"
-                                font.pixelSize: 26
-                                color: ThemeValues.primaryCol
+                                width: 24; height: 24
+                                onPaint: {
+                                    var ctx = getContext("2d"); ctx.clearRect(0, 0, width, height)
+                                    ctx.fillStyle = ThemeValues.primaryCol.toString()
+                                    // Next: triangle + bar
+                                    ctx.beginPath(); ctx.moveTo(4, 4); ctx.lineTo(17, 12); ctx.lineTo(4, 20); ctx.closePath(); ctx.fill()
+                                    ctx.fillRect(19, 4, 3, 16)
+                                }
                             }
 
                             MouseArea {
@@ -1524,13 +1873,29 @@ Item {
                             radius: 32
                             color: "transparent"
 
-                            Text {
+                            Canvas {
                                 anchors.centerIn: parent
-                                text: tidalClient.repeatMode === 2 ? "🔂" : "🔁"
-                                color: tidalClient.repeatMode > 0 ? ThemeValues.primaryCol
-                                    : Qt.rgba(ThemeValues.textCol.r, ThemeValues.textCol.g, ThemeValues.textCol.b, 0.4)
-                                font.pixelSize: 22
-                                font.family: ThemeValues.fontFamily
+                                width: 24; height: 24
+                                property int rMode: tidalClient.repeatMode
+                                onPaint: {
+                                    var ctx = getContext("2d"); ctx.clearRect(0, 0, width, height)
+                                    var col = rMode > 0 ? ThemeValues.primaryCol : Qt.rgba(ThemeValues.textCol.r, ThemeValues.textCol.g, ThemeValues.textCol.b, 0.4)
+                                    ctx.strokeStyle = col.toString(); ctx.fillStyle = col.toString()
+                                    ctx.lineWidth = 2; ctx.lineCap = "round"; ctx.lineJoin = "round"
+                                    // Loop arrows
+                                    ctx.beginPath()
+                                    ctx.moveTo(6, 8); ctx.lineTo(18, 8); ctx.arc(18, 12, 4, -Math.PI/2, Math.PI/2)
+                                    ctx.lineTo(6, 16); ctx.arc(6, 12, 4, Math.PI/2, -Math.PI/2, true)
+                                    ctx.stroke()
+                                    // Arrow tip
+                                    ctx.beginPath(); ctx.moveTo(16, 5); ctx.lineTo(20, 8); ctx.lineTo(16, 11); ctx.stroke()
+                                    // "1" for repeat-one
+                                    if (rMode === 2) {
+                                        ctx.font = "bold 9px sans-serif"
+                                        ctx.fillText("1", 10, 15)
+                                    }
+                                }
+                                onRModeChanged: requestPaint()
                             }
 
                             MouseArea {
@@ -1928,12 +2293,376 @@ Item {
         }
     }
 
+    // ── Home View Card Components ──
+
+    // Album card (square art + title + artist)
+    Component {
+        id: homeAlbumCardComponent
+        Item {
+            width: 140
+            height: 170
+
+            Column {
+                anchors.fill: parent
+                spacing: 4
+
+                Rectangle {
+                    width: 132; height: 132
+                    radius: 8
+                    color: Qt.rgba(ThemeValues.cardBgCol.r, ThemeValues.cardBgCol.g, ThemeValues.cardBgCol.b, 0.5)
+                    border.color: homeAlbumMa.pressed ? ThemeValues.primaryCol
+                        : Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.1)
+                    border.width: 1
+
+                    Image {
+                        anchors.fill: parent
+                        anchors.margins: 2
+                        source: itemData.image_url || itemData.image_url_small || ""
+                        fillMode: Image.PreserveAspectCrop
+                        visible: status === Image.Ready
+                        smooth: true
+                    }
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: "♪"
+                        color: ThemeValues.primaryCol
+                        font.pixelSize: 28
+                        opacity: 0.2
+                        visible: parent.children[0].status !== Image.Ready
+                    }
+                }
+
+                Text {
+                    width: 132
+                    text: itemData.title || ""
+                    color: ThemeValues.textCol
+                    font.pixelSize: 13
+                    font.family: ThemeValues.fontFamily
+                    font.weight: Font.Bold
+                    elide: Text.ElideRight
+                }
+
+                Text {
+                    width: 132
+                    text: itemData.artist || ""
+                    color: Qt.rgba(ThemeValues.textCol.r, ThemeValues.textCol.g, ThemeValues.textCol.b, 0.5)
+                    font.pixelSize: 12
+                    font.family: ThemeValues.fontFamily
+                    elide: Text.ElideRight
+                }
+            }
+
+            MouseArea {
+                id: homeAlbumMa
+                anchors.fill: parent
+                onClicked: {
+                    if (itemData.id) tidalClient.getAlbum(itemData.id)
+                }
+            }
+        }
+    }
+
+    // Mix card (square art + title + subtitle)
+    Component {
+        id: homeMixCardComponent
+        Item {
+            width: 140
+            height: 170
+
+            Column {
+                anchors.fill: parent
+                spacing: 4
+
+                Rectangle {
+                    width: 132; height: 132
+                    radius: 8
+                    color: Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.08)
+                    border.color: homeMixMa.pressed ? ThemeValues.primaryCol
+                        : Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.15)
+                    border.width: 1
+
+                    Image {
+                        anchors.fill: parent
+                        anchors.margins: 2
+                        source: itemData.image_url || ""
+                        fillMode: Image.PreserveAspectCrop
+                        visible: status === Image.Ready
+                        smooth: true
+                    }
+
+                    // Fallback: styled mix icon
+                    Column {
+                        anchors.centerIn: parent
+                        spacing: 4
+                        visible: parent.children[0].status !== Image.Ready
+
+                        Text {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            text: "♫"
+                            color: ThemeValues.primaryCol
+                            font.pixelSize: 36
+                            opacity: 0.5
+                        }
+
+                        Text {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            text: "MIX"
+                            color: ThemeValues.primaryCol
+                            font.pixelSize: 12
+                            font.family: ThemeValues.fontFamily
+                            font.weight: Font.Bold
+                            opacity: 0.4
+                        }
+                    }
+                }
+
+                Text {
+                    width: 132
+                    text: itemData.title || ""
+                    color: ThemeValues.textCol
+                    font.pixelSize: 13
+                    font.family: ThemeValues.fontFamily
+                    font.weight: Font.Bold
+                    elide: Text.ElideRight
+                }
+
+                Text {
+                    width: 132
+                    text: itemData.sub_title || ""
+                    color: Qt.rgba(ThemeValues.textCol.r, ThemeValues.textCol.g, ThemeValues.textCol.b, 0.5)
+                    font.pixelSize: 12
+                    font.family: ThemeValues.fontFamily
+                    elide: Text.ElideRight
+                }
+            }
+
+            MouseArea {
+                id: homeMixMa
+                anchors.fill: parent
+                onClicked: {
+                    if (itemData.id) tidalClient.getMix(itemData.id)
+                }
+            }
+        }
+    }
+
+    // Artist card (circular image + name)
+    Component {
+        id: homeArtistCardComponent
+        Item {
+            width: 140
+            height: 170
+
+            Column {
+                anchors.fill: parent
+                spacing: 6
+
+                Rectangle {
+                    width: 120; height: 120
+                    radius: 60
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    color: Qt.rgba(ThemeValues.cardBgCol.r, ThemeValues.cardBgCol.g, ThemeValues.cardBgCol.b, 0.5)
+                    border.color: homeArtistMa.pressed ? ThemeValues.primaryCol
+                        : Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.15)
+                    border.width: 1
+
+                    Image {
+                        anchors.fill: parent
+                        anchors.margins: 2
+                        source: itemData.image_url || ""
+                        fillMode: Image.PreserveAspectCrop
+                        visible: status === Image.Ready
+                        smooth: true
+                    }
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: "♪"
+                        color: ThemeValues.primaryCol
+                        font.pixelSize: 28
+                        opacity: 0.2
+                        visible: parent.children[0].status !== Image.Ready
+                    }
+                }
+
+                Text {
+                    width: parent.width
+                    text: itemData.name || ""
+                    color: ThemeValues.textCol
+                    font.pixelSize: 13
+                    font.family: ThemeValues.fontFamily
+                    font.weight: Font.Bold
+                    horizontalAlignment: Text.AlignHCenter
+                    elide: Text.ElideRight
+                }
+            }
+
+            MouseArea {
+                id: homeArtistMa
+                anchors.fill: parent
+                onClicked: {
+                    if (itemData.id) tidalClient.getArtist(itemData.id)
+                }
+            }
+        }
+    }
+
+    // Playlist card (square art + title + track count)
+    Component {
+        id: homePlaylistCardComponent
+        Item {
+            width: 140
+            height: 170
+
+            Column {
+                anchors.fill: parent
+                spacing: 4
+
+                Rectangle {
+                    width: 132; height: 132
+                    radius: 8
+                    color: Qt.rgba(ThemeValues.cardBgCol.r, ThemeValues.cardBgCol.g, ThemeValues.cardBgCol.b, 0.5)
+                    border.color: homePlaylistMa.pressed ? ThemeValues.primaryCol
+                        : Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.1)
+                    border.width: 1
+
+                    Image {
+                        anchors.fill: parent
+                        anchors.margins: 2
+                        source: itemData.image_url || ""
+                        fillMode: Image.PreserveAspectCrop
+                        visible: status === Image.Ready
+                        smooth: true
+                    }
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: "♪"
+                        color: ThemeValues.primaryCol
+                        font.pixelSize: 28
+                        opacity: 0.2
+                        visible: parent.children[0].status !== Image.Ready
+                    }
+                }
+
+                Text {
+                    width: 132
+                    text: itemData.title || ""
+                    color: ThemeValues.textCol
+                    font.pixelSize: 13
+                    font.family: ThemeValues.fontFamily
+                    font.weight: Font.Bold
+                    elide: Text.ElideRight
+                }
+
+                Text {
+                    width: 132
+                    text: itemData.num_tracks ? itemData.num_tracks + " tracks" : ""
+                    color: Qt.rgba(ThemeValues.textCol.r, ThemeValues.textCol.g, ThemeValues.textCol.b, 0.5)
+                    font.pixelSize: 12
+                    font.family: ThemeValues.fontFamily
+                    elide: Text.ElideRight
+                }
+            }
+
+            MouseArea {
+                id: homePlaylistMa
+                anchors.fill: parent
+                onClicked: {
+                    if (itemData.id) tidalClient.getPlaylist(itemData.id)
+                }
+            }
+        }
+    }
+
+    // Track card (compact horizontal row for tracks section)
+    Component {
+        id: homeTrackCardComponent
+        Rectangle {
+            width: 300
+            height: 72
+            radius: ThemeValues.radius
+            color: homeTrackMa.pressed
+                ? Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.2)
+                : Qt.rgba(ThemeValues.cardBgCol.r, ThemeValues.cardBgCol.g, ThemeValues.cardBgCol.b, 0.3)
+            border.color: Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.1)
+            border.width: 1
+
+            Row {
+                anchors.fill: parent
+                anchors.margins: 8
+                spacing: 10
+
+                Rectangle {
+                    width: 52; height: 52
+                    radius: 6
+                    color: Qt.rgba(ThemeValues.cardBgCol.r, ThemeValues.cardBgCol.g, ThemeValues.cardBgCol.b, 0.6)
+                    anchors.verticalCenter: parent.verticalCenter
+
+                    Image {
+                        anchors.fill: parent
+                        anchors.margins: 1
+                        source: itemData.image_url_small || itemData.image_url || ""
+                        fillMode: Image.PreserveAspectCrop
+                        visible: status === Image.Ready
+                    }
+                }
+
+                Column {
+                    width: parent.width - 62 - homeTrackDur.width - 10
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 3
+
+                    Text {
+                        width: parent.width
+                        text: itemData.title || ""
+                        color: ThemeValues.textCol
+                        font.pixelSize: 14
+                        font.family: ThemeValues.fontFamily
+                        font.weight: Font.Bold
+                        elide: Text.ElideRight
+                    }
+
+                    Text {
+                        width: parent.width
+                        text: itemData.artist || ""
+                        color: Qt.rgba(ThemeValues.textCol.r, ThemeValues.textCol.g, ThemeValues.textCol.b, 0.5)
+                        font.pixelSize: 12
+                        font.family: ThemeValues.fontFamily
+                        elide: Text.ElideRight
+                    }
+                }
+
+                Text {
+                    id: homeTrackDur
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: formatDuration(itemData.duration || 0)
+                    color: Qt.rgba(ThemeValues.textCol.r, ThemeValues.textCol.g, ThemeValues.textCol.b, 0.4)
+                    font.pixelSize: 12
+                    font.family: ThemeValues.fontFamily
+                }
+            }
+
+            MouseArea {
+                id: homeTrackMa
+                anchors.fill: parent
+                onClicked: {
+                    if (itemData.id) {
+                        // Play just this track (could gather section tracks for context, but keeping it simple)
+                        tidalClient.playTrack(itemData.id)
+                    }
+                }
+            }
+        }
+    }
+
     Component.onCompleted: {
         console.log("Tidal screen loaded")
         if (!tidalClient.isConnected) {
             tidalClient.startService()
         } else if (tidalClient.isLoggedIn) {
-            tidalClient.getFavorites()
+            tidalClient.getHome()
         }
     }
 }

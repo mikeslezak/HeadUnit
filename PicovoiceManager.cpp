@@ -9,6 +9,7 @@
 #include <QDateTime>
 #include <QtMath>
 #include <QCoreApplication>
+#include <QTimer>
 
 // Picovoice C API
 extern "C" {
@@ -41,6 +42,7 @@ PicovoiceManager::PicovoiceManager(QObject *parent)
     , m_speechStartTime(0)
     , m_lastVoiceActivityTime(0)
     , m_lastDetectionTime(0)
+    , m_followUpTimer(nullptr)
 {
     qDebug() << "PicovoiceManager: Initializing unified voice pipeline...";
     setStatusMessage("Initializing Picovoice");
@@ -51,6 +53,15 @@ PicovoiceManager::PicovoiceManager(QObject *parent)
             this, &PicovoiceManager::onGoogleTranscriptionReady);
     connect(m_googleSTT, &GoogleSTT::error,
             this, &PicovoiceManager::onGoogleError);
+
+    // Follow-up timer: returns to Listening after 12s silence in follow-up mode
+    m_followUpTimer = new QTimer(this);
+    m_followUpTimer->setSingleShot(true);
+    m_followUpTimer->setInterval(FOLLOW_UP_TIMEOUT_MS);
+    connect(m_followUpTimer, &QTimer::timeout, this, [this]() {
+        qDebug() << "PicovoiceManager: Follow-up timeout, returning to listening";
+        resetToListening();
+    });
 }
 
 PicovoiceManager::~PicovoiceManager()
@@ -198,8 +209,16 @@ void PicovoiceManager::resume()
     }
 
     m_isPaused = false;
-    setStatusMessage(QString("Listening for '%1'...").arg(m_wakeWord));
-    qDebug() << "PicovoiceManager: Resumed";
+
+    if (m_state == WaitingForFollowUp) {
+        // Resuming into follow-up mode — start the timeout now (TTS just finished)
+        m_followUpTimer->start();
+        setStatusMessage("Listening for follow-up...");
+        qDebug() << "PicovoiceManager: Resumed into follow-up mode";
+    } else {
+        setStatusMessage(QString("Listening for '%1'...").arg(m_wakeWord));
+        qDebug() << "PicovoiceManager: Resumed";
+    }
 }
 
 // ========== CONFIGURATION ==========
@@ -400,6 +419,27 @@ void PicovoiceManager::processAudioFrame(const int16_t *frame, int32_t length)
             }
             break;
         }
+
+        case WaitingForFollowUp: {
+            // In follow-up mode: no wake word needed, detect speech directly
+            int16_t energy = calculateFrameEnergy(frame, length);
+
+            if (energy > SILENCE_ENERGY_THRESHOLD) {
+                // Speech detected — stop the timeout and start accumulating
+                m_followUpTimer->stop();
+                qDebug() << "PicovoiceManager: Follow-up speech detected, recording...";
+                m_state = ProcessingSpeech;
+                m_speechStartTime = QDateTime::currentMSecsSinceEpoch();
+                m_lastVoiceActivityTime = m_speechStartTime;
+                m_speechBuffer.clear();
+
+                // Accumulate this frame
+                for (int32_t i = 0; i < length; ++i) {
+                    m_speechBuffer.append(frame[i]);
+                }
+            }
+            break;
+        }
     }
 }
 
@@ -542,6 +582,11 @@ void PicovoiceManager::finalizeLeopardTranscription()
         return;
     }
 
+    // Prevent re-entry while STT is already processing
+    if (m_googleSTT && m_googleSTT->isProcessing()) {
+        return;
+    }
+
     // Try Google STT first (better accuracy for names)
     if (m_googleSTT && !m_googleApiKey.isEmpty()) {
         qDebug() << "PicovoiceManager: Transcribing with Google STT..." << m_speechBuffer.size() << "samples";
@@ -667,9 +712,35 @@ void PicovoiceManager::manualActivate()
     setStatusMessage("Playing ready prompt...");
 }
 
+void PicovoiceManager::enterFollowUpMode()
+{
+    if (!m_isRunning) {
+        qWarning() << "PicovoiceManager: Cannot enter follow-up mode - pipeline not running";
+        return;
+    }
+
+    qDebug() << "PicovoiceManager: Entering follow-up mode (12s timeout)";
+    m_state = WaitingForFollowUp;
+    m_speechBuffer.clear();
+    // Only start the timeout if not paused (TTS might still be playing).
+    // If paused, the timer will start when resume() is called.
+    if (!m_isPaused) {
+        m_followUpTimer->start();
+    }
+    setStatusMessage("Listening for follow-up...");
+}
+
+void PicovoiceManager::cancelAndReset()
+{
+    qDebug() << "PicovoiceManager: Cancel and reset — returning to wake word listening";
+    m_isPaused = false;
+    resetToListening();
+}
+
 void PicovoiceManager::resetToListening()
 {
     m_speechBuffer.clear();
+    m_followUpTimer->stop();
     m_state = Listening;
 
     // Reset Rhino if it was used

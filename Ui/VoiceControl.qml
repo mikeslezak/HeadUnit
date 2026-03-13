@@ -5,7 +5,7 @@ import HeadUnit
 Rectangle {
     id: root
     anchors.fill: parent
-    color: Qt.rgba(0, 0, 0, 0.9)
+    color: Qt.rgba(ThemeValues.bgCol.r, ThemeValues.bgCol.g, ThemeValues.bgCol.b, 0.9)
 
     property var theme: null
     signal closeRequested()
@@ -39,10 +39,24 @@ Rectangle {
                 shadowOpacity: 0.8
             }
 
-            Text {
+            Canvas {
                 anchors.centerIn: parent
-                text: "🎤"
-                font.pixelSize: 60
+                width: 60; height: 60
+                onPaint: {
+                    var ctx = getContext("2d")
+                    ctx.clearRect(0, 0, width, height)
+                    ctx.strokeStyle = ThemeValues.primaryCol.toString()
+                    ctx.fillStyle = ThemeValues.primaryCol.toString()
+                    ctx.lineWidth = 3
+                    ctx.lineCap = "round"
+                    // Mic body
+                    ctx.beginPath(); ctx.roundedRect(21, 6, 18, 28, 9, 9); ctx.stroke()
+                    // Arc below
+                    ctx.beginPath(); ctx.arc(30, 38, 16, 0, Math.PI); ctx.stroke()
+                    // Stand
+                    ctx.beginPath(); ctx.moveTo(30, 54); ctx.lineTo(30, 58); ctx.stroke()
+                    ctx.beginPath(); ctx.moveTo(22, 58); ctx.lineTo(38, 58); ctx.stroke()
+                }
             }
 
             // Pulsing animation

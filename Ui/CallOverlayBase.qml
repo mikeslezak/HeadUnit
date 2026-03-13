@@ -91,9 +91,9 @@ Rectangle {
                 width: statusLabel.width + 48
                 height: 46
                 radius: 23
-                color: Qt.rgba(0, 0, 0, 0.4)
+                color: Qt.rgba(ThemeValues.bgCol.r, ThemeValues.bgCol.g, ThemeValues.bgCol.b, 0.4)
                 border.width: 1.5
-                border.color: Qt.rgba(1, 1, 1, 0.12)
+                border.color: Qt.rgba(ThemeValues.textCol.r, ThemeValues.textCol.g, ThemeValues.textCol.b, 0.12)
 
                 Rectangle {
                     anchors.left: parent.left
@@ -128,7 +128,7 @@ Rectangle {
                     font.pixelSize: 15
                     font.weight: Font.Medium
                     font.letterSpacing: 1.2
-                    font.family: "SF Pro Display"
+                    font.family: ThemeValues.fontFamily
                     color: ThemeValues.textCol
                     opacity: 0.85
                 }
@@ -145,7 +145,7 @@ Rectangle {
                     font.pixelSize: 44
                     font.weight: Font.Light
                     font.letterSpacing: -0.5
-                    font.family: "SF Pro Display"
+                    font.family: ThemeValues.fontFamily
                     color: ThemeValues.textCol
 
                     layer.enabled: true
@@ -164,7 +164,7 @@ Rectangle {
                     font.pixelSize: 28
                     font.weight: Font.Normal
                     font.letterSpacing: 1.5
-                    font.family: "SF Mono"
+                    font.family: ThemeValues.fontFamily
                     color: ThemeValues.textCol
                     opacity: 0.5
                 }

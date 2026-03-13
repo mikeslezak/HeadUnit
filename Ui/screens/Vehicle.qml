@@ -81,7 +81,7 @@ Item {
                         // ECM status indicator
                         Rectangle {
                             width: 10; height: 10; radius: 5
-                            color: ecmLive ? "#00ff88" : ThemeValues.accentCol
+                            color: ecmLive ? ThemeValues.successCol : Qt.rgba(ThemeValues.textCol.r, ThemeValues.textCol.g, ThemeValues.textCol.b, 0.3)
                             anchors.verticalCenter: parent.verticalCenter
 
                             SequentialAnimation on opacity {
@@ -94,7 +94,7 @@ Item {
 
                         Text {
                             text: ecmLive ? "ECM Online" : "ECM Offline"
-                            color: ecmLive ? "#00ff88" : ThemeValues.accentCol
+                            color: ecmLive ? ThemeValues.successCol : Qt.rgba(ThemeValues.textCol.r, ThemeValues.textCol.g, ThemeValues.textCol.b, 0.3)
                             font.pixelSize: ThemeValues.fontSize - 2; font.family: ThemeValues.fontFamily
                             anchors.verticalCenter: parent.verticalCenter
                             opacity: 0.8
@@ -108,14 +108,14 @@ Item {
                         width: modeText.width + 20; height: 28; radius: 6
                         color: {
                             switch(vehicleBusManager.driveMode) {
-                                case 0: return Qt.rgba(0.2, 0.8, 0.2, 0.2)
-                                case 2: return Qt.rgba(1.0, 0.3, 0.1, 0.2)
-                                case 3: return Qt.rgba(1.0, 0.7, 0.0, 0.2)
-                                case 4: return Qt.rgba(0.5, 0.5, 0.5, 0.2)
+                                case 0: return Qt.rgba(ThemeValues.successCol.r, ThemeValues.successCol.g, ThemeValues.successCol.b, 0.2)
+                                case 2: return Qt.rgba(ThemeValues.errorCol.r, ThemeValues.errorCol.g, ThemeValues.errorCol.b, 0.2)
+                                case 3: return Qt.rgba(ThemeValues.warningCol.r, ThemeValues.warningCol.g, ThemeValues.warningCol.b, 0.2)
+                                case 4: return Qt.rgba(ThemeValues.textCol.r, ThemeValues.textCol.g, ThemeValues.textCol.b, 0.15)
                                 default: return Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.15)
                             }
                         }
-                        border.color: Qt.rgba(1, 1, 1, 0.15); border.width: 1
+                        border.color: Qt.rgba(ThemeValues.textCol.r, ThemeValues.textCol.g, ThemeValues.textCol.b, 0.15); border.width: 1
 
                         Text {
                             id: modeText
@@ -300,12 +300,12 @@ Item {
                             spacing: 6
                             Rectangle {
                                 width: 8; height: 8; radius: 4
-                                color: modelData.online ? "#00ff88" : "#555"
+                                color: modelData.online ? ThemeValues.successCol : Qt.rgba(ThemeValues.textCol.r, ThemeValues.textCol.g, ThemeValues.textCol.b, 0.3)
                                 anchors.verticalCenter: parent.verticalCenter
                             }
                             Text {
                                 text: modelData.name
-                                color: modelData.online ? ThemeValues.textCol : "#555"
+                                color: modelData.online ? ThemeValues.textCol : Qt.rgba(ThemeValues.textCol.r, ThemeValues.textCol.g, ThemeValues.textCol.b, 0.3)
                                 font.pixelSize: 11; font.family: ThemeValues.fontFamily
                                 anchors.verticalCenter: parent.verticalCenter
                             }

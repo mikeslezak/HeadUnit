@@ -9,6 +9,7 @@
 #include <QVariantMap>
 #include <QMutex>
 #include <QString>
+#include <QTimer>
 
 // Forward declaration for Google STT
 class GoogleSTT;
@@ -40,6 +41,8 @@ public:
     Q_INVOKABLE void resume();
     Q_INVOKABLE void onReadyPromptFinished();  // Call after TTS prompt completes
     Q_INVOKABLE void manualActivate();          // Button-triggered activation (no wake word needed)
+    Q_INVOKABLE void enterFollowUpMode();       // Listen for reply without wake word (12s timeout)
+    Q_INVOKABLE void cancelAndReset();            // Cancel current interaction, return to wake word listening
 
     // Configuration methods
     void setAccessKey(const QString &key);
@@ -80,7 +83,8 @@ private:
         Listening,            // Listening for wake word
         WaitingForReadyPrompt,// Wake word detected, waiting for TTS ready prompt to finish
         WaitingForCommand,    // Ready prompt finished, processing with Rhino
-        ProcessingSpeech      // Rhino didn't understand, accumulating for Leopard
+        ProcessingSpeech,     // Rhino didn't understand, accumulating for Leopard
+        WaitingForFollowUp    // After response, listening without wake word (12s timeout)
     };
     State m_state;
 
@@ -136,6 +140,10 @@ private:
     // Debouncing
     qint64 m_lastDetectionTime;
     static const int DETECTION_DEBOUNCE_MS = 1000;
+
+    // Follow-up mode
+    QTimer *m_followUpTimer;
+    static const int FOLLOW_UP_TIMEOUT_MS = 12000;  // 12 seconds
 
     // Thread safety
     QMutex m_mutex;

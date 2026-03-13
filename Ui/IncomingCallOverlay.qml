@@ -56,10 +56,23 @@ CallOverlayBase {
                     }
                 }
 
-                Text {
+                Canvas {
                     anchors.centerIn: parent
-                    text: "📞"
-                    font.pixelSize: 64
+                    width: 64; height: 64
+                    onPaint: {
+                        var ctx = getContext("2d")
+                        ctx.clearRect(0, 0, width, height)
+                        ctx.fillStyle = ThemeValues.primaryCol.toString()
+                        ctx.beginPath()
+                        ctx.roundedRect(12, 4, 16, 12, 6, 6)
+                        ctx.fill()
+                        ctx.beginPath()
+                        ctx.roundedRect(12, 48, 16, 12, 6, 6)
+                        ctx.fill()
+                        ctx.beginPath()
+                        ctx.arc(32, 32, 5, 0, Math.PI * 2)
+                        ctx.fill()
+                    }
                     opacity: 0.9
                 }
             }
@@ -71,7 +84,7 @@ CallOverlayBase {
                 font.pixelSize: 18
                 font.weight: Font.Normal
                 font.letterSpacing: 0.5
-                font.family: "SF Pro Display"
+                font.family: ThemeValues.fontFamily
                 color: ThemeValues.textCol
                 opacity: 0.5
             }
@@ -114,12 +127,20 @@ CallOverlayBase {
                         verticalOffset: 8
                     }
 
-                    Text {
+                    Canvas {
                         anchors.centerIn: parent
-                        text: "✖"
-                        font.pixelSize: 56
-                        font.weight: Font.Bold
-                        color: ThemeValues.textCol
+                        width: 56; height: 56
+                        onPaint: {
+                            var ctx = getContext("2d")
+                            ctx.clearRect(0, 0, width, height)
+                            ctx.strokeStyle = ThemeValues.textCol.toString()
+                            ctx.lineWidth = 5
+                            ctx.lineCap = "round"
+                            ctx.beginPath()
+                            ctx.moveTo(14, 14); ctx.lineTo(42, 42)
+                            ctx.moveTo(42, 14); ctx.lineTo(14, 42)
+                            ctx.stroke()
+                        }
                         opacity: 0.9
                     }
 
@@ -230,7 +251,7 @@ CallOverlayBase {
                     font.pixelSize: 16
                     font.weight: Font.Medium
                     font.letterSpacing: 0.5
-                    font.family: "SF Pro Display"
+                    font.family: ThemeValues.fontFamily
                     color: ThemeValues.textCol
                     opacity: 0.6
                 }
@@ -242,7 +263,7 @@ CallOverlayBase {
                     font.pixelSize: 18
                     font.weight: Font.Medium
                     font.letterSpacing: 0.5
-                    font.family: "SF Pro Display"
+                    font.family: ThemeValues.fontFamily
                     color: ThemeValues.textCol
                     opacity: 0.7
                 }

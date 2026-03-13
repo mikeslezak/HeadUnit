@@ -21,6 +21,16 @@
 #include "TidalClient.h"
 #include "SpotifyClient.h"
 #include "UpdateManager.h"
+#include "ContextAggregator.h"
+#include "PlacesSearchManager.h"
+#include "RouteWeatherManager.h"
+#include "CopilotMonitor.h"
+#include "RoadConditionManager.h"
+#include "SpeedLimitManager.h"
+#include "RoadSurfaceManager.h"
+#include "HighwayCameraManager.h"
+#include "AvalancheManager.h"
+#include "BorderWaitManager.h"
 
 void myMessageHandler(QtMsgType type, const QMessageLogContext &context, const QString &msg) {
     QByteArray localMsg = msg.toLocal8Bit();
@@ -73,6 +83,18 @@ int main(int argc, char *argv[])
     SpotifyClient spotifyClient;
     UpdateManager updateManager;
 
+    // Wizard Copilot managers
+    ContextAggregator contextAggregator;
+    PlacesSearchManager placesSearchManager;
+    RouteWeatherManager routeWeatherManager;
+    CopilotMonitor copilotMonitor;
+    RoadConditionManager roadConditionManager;
+    SpeedLimitManager speedLimitManager;
+    RoadSurfaceManager roadSurfaceManager;
+    HighwayCameraManager highwayCameraManager;
+    AvalancheManager avalancheManager;
+    BorderWaitManager borderWaitManager;
+
     // Set API keys from environment variables (loaded via .env)
     googleTTS.setApiKey(qEnvironmentVariable("GOOGLE_API_KEY"));
     picovoiceManager.setAccessKey(qEnvironmentVariable("PICOVOICE_ACCESS_KEY"));
@@ -98,12 +120,32 @@ int main(int argc, char *argv[])
     // Set up BluetoothManager dependencies
     bluetoothManager.setContactManager(&contactManager);
 
+    // Wire Wizard Copilot managers
+    contextAggregator.setWeatherManager(&weatherManager);
+    contextAggregator.setVehicleBusManager(&vehicleBusManager);
+    placesSearchManager.setContextAggregator(&contextAggregator);
+    placesSearchManager.setMapboxToken(qEnvironmentVariable("MAPBOX_TOKEN", ""));
+    placesSearchManager.setGoogleApiKey(qEnvironmentVariable("GOOGLE_API_KEY"));
+    routeWeatherManager.setContextAggregator(&contextAggregator);
+    roadConditionManager.setContextAggregator(&contextAggregator);
+    speedLimitManager.setContextAggregator(&contextAggregator);
+    roadSurfaceManager.setContextAggregator(&contextAggregator);
+    avalancheManager.setContextAggregator(&contextAggregator);
+    borderWaitManager.setContextAggregator(&contextAggregator);
+    copilotMonitor.setContextAggregator(&contextAggregator);
+    copilotMonitor.setVehicleBusManager(&vehicleBusManager);
+    copilotMonitor.setRouteWeatherManager(&routeWeatherManager);
+    copilotMonitor.setRoadConditionManager(&roadConditionManager);
+    copilotMonitor.setSpeedLimitManager(&speedLimitManager);
+    copilotMonitor.setRoadSurfaceManager(&roadSurfaceManager);
+    copilotMonitor.setAvalancheManager(&avalancheManager);
+    copilotMonitor.setBorderWaitManager(&borderWaitManager);
+
     // Connect PicovoiceManager signals to handlers
-    // Wake word detected -> triggers QML UI (handled in Main.qml)
-    // Transcription ready -> send to Claude AI (using lambda to add empty systemContext)
+    // Transcription ready -> send to Claude with live context from ContextAggregator
     QObject::connect(&picovoiceManager, &PicovoiceManager::transcriptionReady,
-                     [&claudeClient](const QString &text) {
-                         claudeClient.sendMessage(text, QString());  // Empty systemContext
+                     [&claudeClient, &contextAggregator](const QString &text) {
+                         claudeClient.sendMessage(text, contextAggregator.buildContext());
                      });
 
     // Provide Claude with contact list for intelligent name matching
@@ -122,6 +164,31 @@ int main(int argc, char *argv[])
         claudeClient.setContactNames(cachedNames);
         picovoiceManager.setSpeechContextHints(cachedNames);
     }
+
+    // Places search: VoiceCommandHandler requests search -> PlacesSearchManager performs it ->
+    // results fed back to Claude as follow-up context
+    QObject::connect(&voiceCommandHandler, &VoiceCommandHandler::placesSearchRequested,
+                     &placesSearchManager, &PlacesSearchManager::searchPlaces);
+    QObject::connect(&placesSearchManager, &PlacesSearchManager::searchCompleted,
+                     [&claudeClient, &contextAggregator](const QString &results) {
+                         QString followUp = QString("[SYSTEM: Places search completed. Present these results to the user "
+                             "conversationally with distance and rating. Ask which one they want directions to. "
+                             "Include expects_reply: true in your JSON.]\n\n%1").arg(results);
+                         claudeClient.sendMessage(followUp, contextAggregator.buildContext());
+                     });
+    QObject::connect(&placesSearchManager, &PlacesSearchManager::searchFailed,
+                     [&claudeClient](const QString &error) {
+                         claudeClient.sendMessage(
+                             QString("Places search failed: %1. Let the user know.").arg(error));
+                     });
+
+    // Follow-up mode: when Claude expects a reply, keep mic open without wake word
+    QObject::connect(&voiceCommandHandler, &VoiceCommandHandler::followUpExpected,
+                     &picovoiceManager, &PicovoiceManager::enterFollowUpMode);
+
+    // Quiet mode: user can silence proactive copilot alerts
+    QObject::connect(&voiceCommandHandler, &VoiceCommandHandler::quietModeRequested,
+                     &copilotMonitor, &CopilotMonitor::setQuietMode);
 
     // Note: Claude response -> Google TTS is handled in Main.qml onResponseReceived
     // to coordinate with UI state changes (avoiding duplicate speak() calls)
@@ -142,6 +209,16 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("tidalClient", &tidalClient);
     engine.rootContext()->setContextProperty("spotifyClient", &spotifyClient);
     engine.rootContext()->setContextProperty("updateManager", &updateManager);
+    engine.rootContext()->setContextProperty("contextAggregator", &contextAggregator);
+    engine.rootContext()->setContextProperty("placesSearchManager", &placesSearchManager);
+    engine.rootContext()->setContextProperty("routeWeatherManager", &routeWeatherManager);
+    engine.rootContext()->setContextProperty("copilotMonitor", &copilotMonitor);
+    engine.rootContext()->setContextProperty("roadConditionManager", &roadConditionManager);
+    engine.rootContext()->setContextProperty("speedLimitManager", &speedLimitManager);
+    engine.rootContext()->setContextProperty("roadSurfaceManager", &roadSurfaceManager);
+    engine.rootContext()->setContextProperty("highwayCameraManager", &highwayCameraManager);
+    engine.rootContext()->setContextProperty("avalancheManager", &avalancheManager);
+    engine.rootContext()->setContextProperty("borderWaitManager", &borderWaitManager);
 
     // Project root directory (for loading large assets like splash videos from filesystem)
     QString projectDir = QCoreApplication::applicationDirPath() + "/..";
@@ -152,6 +229,13 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("mapboxAccessToken", mapboxToken);
     if (mapboxToken.isEmpty()) {
         qWarning() << "MAPBOX_TOKEN not set - map will not load. Set it with: export MAPBOX_TOKEN=pk.your_token";
+    }
+
+    // OpenWeatherMap API key for radar tiles
+    QString owmApiKey = qEnvironmentVariable("OWM_API_KEY", "");
+    engine.rootContext()->setContextProperty("owmApiKey", owmApiKey);
+    if (owmApiKey.isEmpty()) {
+        qWarning() << "OWM_API_KEY not set - radar overlay will use RainViewer fallback";
     }
 
     // Load QML - version compatible approach

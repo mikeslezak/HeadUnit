@@ -61,17 +61,44 @@ CallOverlayBase {
 
                     layer.enabled: true
                     layer.effect: DropShadow {
-                        color: (bluetoothManager && bluetoothManager.isCallMuted) ? Qt.rgba(ThemeValues.errorCol.r, ThemeValues.errorCol.g, ThemeValues.errorCol.b, 0.4) : Qt.rgba(0, 0, 0, 0.3)
+                        color: (bluetoothManager && bluetoothManager.isCallMuted) ? Qt.rgba(ThemeValues.errorCol.r, ThemeValues.errorCol.g, ThemeValues.errorCol.b, 0.4) : Qt.rgba(ThemeValues.bgCol.r, ThemeValues.bgCol.g, ThemeValues.bgCol.b, 0.3)
                         radius: (bluetoothManager && bluetoothManager.isCallMuted) ? 16 : 12
                         samples: 25
                         horizontalOffset: 0
                         verticalOffset: 4
                     }
 
-                    Text {
+                    Canvas {
                         anchors.centerIn: parent
-                        text: (bluetoothManager && bluetoothManager.isCallMuted) ? "🔇" : "🔊"
-                        font.pixelSize: 48
+                        width: 48; height: 48
+                        property bool isMuted: bluetoothManager && bluetoothManager.isCallMuted
+                        onPaint: {
+                            var ctx = getContext("2d")
+                            ctx.clearRect(0, 0, width, height)
+                            ctx.strokeStyle = ThemeValues.textCol.toString()
+                            ctx.fillStyle = ThemeValues.textCol.toString()
+                            ctx.lineWidth = 3
+                            ctx.lineCap = "round"
+                            // Speaker body
+                            ctx.beginPath()
+                            ctx.moveTo(8, 18); ctx.lineTo(16, 18); ctx.lineTo(24, 10); ctx.lineTo(24, 38); ctx.lineTo(16, 30); ctx.lineTo(8, 30); ctx.closePath()
+                            ctx.fill()
+                            if (isMuted) {
+                                // X through speaker
+                                ctx.strokeStyle = ThemeValues.errorCol.toString()
+                                ctx.lineWidth = 4
+                                ctx.beginPath()
+                                ctx.moveTo(30, 16); ctx.lineTo(42, 32)
+                                ctx.moveTo(42, 16); ctx.lineTo(30, 32)
+                                ctx.stroke()
+                            } else {
+                                // Sound waves
+                                ctx.beginPath(); ctx.arc(26, 24, 8, -0.8, 0.8); ctx.stroke()
+                                ctx.beginPath(); ctx.arc(26, 24, 14, -0.7, 0.7); ctx.stroke()
+                                ctx.beginPath(); ctx.arc(26, 24, 20, -0.6, 0.6); ctx.stroke()
+                            }
+                        }
+                        onIsMutedChanged: requestPaint()
                         opacity: 0.8
                     }
 
@@ -172,12 +199,21 @@ CallOverlayBase {
                 spacing: 10
                 opacity: 0.4
 
-                Text {
+                Canvas {
                     anchors.verticalCenter: parent.verticalCenter
-                    text: "\u{f293}"
-                    font.family: "Font Awesome 6 Free"
-                    font.pixelSize: 14
-                    color: ThemeValues.textCol
+                    width: 14; height: 14
+                    onPaint: {
+                        var ctx = getContext("2d")
+                        ctx.clearRect(0, 0, width, height)
+                        ctx.strokeStyle = ThemeValues.textCol.toString()
+                        ctx.lineWidth = 1.5
+                        ctx.lineCap = "round"
+                        ctx.beginPath()
+                        ctx.moveTo(5, 2); ctx.lineTo(9, 5); ctx.lineTo(5, 8)
+                        ctx.moveTo(5, 6); ctx.lineTo(9, 9); ctx.lineTo(5, 12)
+                        ctx.moveTo(7, 2); ctx.lineTo(7, 12)
+                        ctx.stroke()
+                    }
                 }
 
                 Text {
@@ -186,7 +222,7 @@ CallOverlayBase {
                     font.pixelSize: 15
                     font.weight: Font.Normal
                     font.letterSpacing: 0.3
-                    font.family: "SF Pro Display"
+                    font.family: ThemeValues.fontFamily
                     color: ThemeValues.textCol
                 }
             }

@@ -74,7 +74,7 @@ Flickable {
             anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
             width: 60; height: 30; color: isOn ? ThemeValues.primaryCol : Qt.rgba(ThemeValues.textCol.r, ThemeValues.textCol.g, ThemeValues.textCol.b, 0.3)
             radius: 15; border.color: isOn ? ThemeValues.primaryCol : Qt.rgba(ThemeValues.textCol.r, ThemeValues.textCol.g, ThemeValues.textCol.b, 0.5); border.width: 2
-            Rectangle { width: 22; height: 22; radius: 11; color: "white"; x: isOn ? parent.width - width - 4 : 4; anchors.verticalCenter: parent.verticalCenter; Behavior on x { NumberAnimation { duration: 150 } } }
+            Rectangle { width: 22; height: 22; radius: 11; color: ThemeValues.textCol; x: isOn ? parent.width - width - 4 : 4; anchors.verticalCenter: parent.verticalCenter; Behavior on x { NumberAnimation { duration: 150 } } }
             MouseArea { anchors.fill: parent; onClicked: parent.parent.toggled() }
         }
     }

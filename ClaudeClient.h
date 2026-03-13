@@ -9,6 +9,7 @@
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QMutex>
+#include <QTimer>
 
 /**
  * ClaudeClient - Claude API Integration for Sammy Voice Assistant
@@ -287,6 +288,9 @@ private:
     // Streaming
     QString m_streamBuffer;
     QString m_currentResponse;
+
+    // Conversation inactivity timeout
+    QTimer *m_conversationTimer;
 
     // Thread Safety
     QMutex m_mutex;

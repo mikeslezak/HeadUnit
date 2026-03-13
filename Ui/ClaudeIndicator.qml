@@ -1,5 +1,6 @@
 import QtQuick 2.15
 import Qt5Compat.GraphicalEffects
+import HeadUnit
 
 /**
  * ClaudeIndicator - Siri-like glowing shimmer overlay for Claude AI
@@ -9,7 +10,7 @@ import Qt5Compat.GraphicalEffects
 Rectangle {
     id: root
     anchors.fill: parent
-    color: "#000000"
+    color: ThemeValues.bgCol
 
     // -------- API --------
     property var theme: null  // Optional, not required
@@ -18,10 +19,10 @@ Rectangle {
     property string state: "listening"  // "listening", "processing", "speaking"
     property bool isActive: false
 
-    // -------- State Colors --------
-    readonly property color listeningColor: "#0A84FF"   // iOS blue
-    readonly property color processingColor: "#BF5AF2"  // iOS purple
-    readonly property color speakingColor: "#64D2FF"    // iOS cyan
+    // -------- State Colors (derived from theme) --------
+    readonly property color listeningColor: ThemeValues.primaryCol
+    readonly property color processingColor: ThemeValues.accentCol
+    readonly property color speakingColor: Qt.lighter(ThemeValues.primaryCol, 1.4)
 
     readonly property color currentColor: {
         switch(state) {
@@ -192,7 +193,7 @@ Rectangle {
         width: statusText.width + 40
         height: statusText.height + 20
         radius: height / 2
-        color: Qt.rgba(0, 0, 0, 0.7)
+        color: Qt.rgba(ThemeValues.bgCol.r, ThemeValues.bgCol.g, ThemeValues.bgCol.b, 0.7)
         border.width: 2
         border.color: root.currentColor
 
@@ -219,7 +220,8 @@ Rectangle {
 
             font.pixelSize: 28
             font.weight: Font.Medium
-            color: "#FFFFFF"
+            font.family: ThemeValues.fontFamily
+            color: ThemeValues.textCol
 
             // Subtle pulsing
             SequentialAnimation on opacity {
@@ -239,7 +241,8 @@ Rectangle {
 
         text: "Tap anywhere else to cancel"
         font.pixelSize: 16
-        color: "#FFFFFF"
+        font.family: ThemeValues.fontFamily
+        color: ThemeValues.textCol
         opacity: 0.5
     }
 
@@ -251,7 +254,7 @@ Rectangle {
     }
 
     function hide() {
-        console.log("ClaudeIndicator: Hiding")
+        console.log("ClaudeIndicator: Hiding - caller trace:", new Error().stack)
         isActive = false
         opacity = 0.0
     }

@@ -60,7 +60,7 @@ Flickable {
 
     component ThemeOption: Rectangle {
         width: 200; height: 80
-        color: isActive ? Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.2) : Qt.rgba(0, 0, 0, 0.3)
+        color: isActive ? Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.2) : Qt.rgba(ThemeValues.bgCol.r, ThemeValues.bgCol.g, ThemeValues.bgCol.b, 0.3)
         border.color: isActive ? ThemeValues.primaryCol : Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.5)
         border.width: 2; radius: 8
 

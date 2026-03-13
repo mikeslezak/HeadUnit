@@ -77,6 +77,7 @@ Item {
                     Text {
                         text: weatherManager.weatherIcon
                         font.pixelSize: 72
+                        font.family: ThemeValues.fontFamily
                         anchors.verticalCenter: parent.verticalCenter
                     }
 
@@ -175,7 +176,7 @@ Item {
 
                             Rectangle {
                                 width: 65; height: 90
-                                color: index === 0 ? Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.15) : Qt.rgba(0, 0, 0, 0.3)
+                                color: index === 0 ? Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.15) : Qt.rgba(ThemeValues.bgCol.r, ThemeValues.bgCol.g, ThemeValues.bgCol.b, 0.3)
                                 border.color: index === 0 ? ThemeValues.primaryCol : Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.3)
                                 border.width: 1; radius: 8
 

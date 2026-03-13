@@ -51,6 +51,16 @@ qt_add_executable(appHeadUnit
     TidalClient.cpp
     SpotifyClient.cpp
     UpdateManager.cpp
+    ContextAggregator.cpp
+    PlacesSearchManager.cpp
+    RouteWeatherManager.cpp
+    CopilotMonitor.cpp
+    RoadConditionManager.cpp
+    SpeedLimitManager.cpp
+    RoadSurfaceManager.cpp
+    HighwayCameraManager.cpp
+    AvalancheManager.cpp
+    BorderWaitManager.cpp
 )
 
 target_sources(appHeadUnit PRIVATE
@@ -72,6 +82,16 @@ target_sources(appHeadUnit PRIVATE
     TidalClient.h
     SpotifyClient.h
     UpdateManager.h
+    ContextAggregator.h
+    PlacesSearchManager.h
+    RouteWeatherManager.h
+    CopilotMonitor.h
+    RoadConditionManager.h
+    SpeedLimitManager.h
+    RoadSurfaceManager.h
+    HighwayCameraManager.h
+    AvalancheManager.h
+    BorderWaitManager.h
 )
 
 set_source_files_properties(ThemeValues.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
@@ -101,8 +121,10 @@ qt_add_qml_module(appHeadUnit
         Ui/ActiveCallOverlay.qml
         Ui/IncomingCallOverlay.qml
         Ui/MiniPlayer.qml
+        Ui/GlancePanel.qml
         Ui/BluetoothHandler.qml
         Ui/AppGridOverlay.qml
+        Ui/screens/AppGrid.qml
         Ui/screens/Home.qml
         Ui/screens/Music.qml
         Ui/screens/Maps.qml
@@ -145,6 +167,10 @@ qt_add_qml_module(appHeadUnit
         themes/Cyberpunk/icons/tuning_cyber.svg
         themes/Cyberpunk/icons/tidal_cyber.svg
         themes/Cyberpunk/icons/spotify_cyber.svg
+        themes/Cyberpunk/icons/radio_cyber.png
+        themes/Cyberpunk/icons/podcast_cyber.png
+        themes/Cyberpunk/icons/climate_cyber.png
+        themes/Cyberpunk/icons/camera_cyber.png
         themes/RetroVFD/icons/home_vfd.svg
         themes/RetroVFD/icons/music_vfd.svg
         themes/RetroVFD/icons/maps_vfd.svg
@@ -162,6 +188,10 @@ qt_add_qml_module(appHeadUnit
         themes/RetroVFD/icons/tuning_vfd.svg
         themes/RetroVFD/icons/tidal_vfd.svg
         themes/RetroVFD/icons/spotify_vfd.svg
+        themes/RetroVFD/icons/radio_vfd.svg
+        themes/RetroVFD/icons/podcasts_vfd.svg
+        themes/RetroVFD/icons/climate_vfd.svg
+        themes/RetroVFD/icons/camera_vfd.svg
         themes/Monochrome/tokens.json
         themes/Monochrome/fonts/InterDisplay-Regular.ttf
         themes/Monochrome/logo.svg
@@ -182,6 +212,10 @@ qt_add_qml_module(appHeadUnit
         themes/Monochrome/icons/tuning_mono.svg
         themes/Monochrome/icons/tidal_mono.svg
         themes/Monochrome/icons/spotify_mono.svg
+        themes/Monochrome/icons/radio_mono.svg
+        themes/Monochrome/icons/podcasts_mono.svg
+        themes/Monochrome/icons/climate_mono.svg
+        themes/Monochrome/icons/camera_mono.svg
 )
 
 # GStreamer (for Tidal audio playback via playbin)

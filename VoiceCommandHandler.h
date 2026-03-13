@@ -83,6 +83,30 @@ signals:
      */
     void confirmationRequested(const QString &action, const QString &details);
 
+    /**
+     * Emitted when a navigation command is recognized
+     * @param destination: The place or address to navigate to
+     */
+    void navigationRequested(const QString &destination);
+
+    /**
+     * Emitted when a places search is requested
+     * @param query: Search query (e.g. "tacos")
+     * @param category: Optional category filter
+     */
+    void placesSearchRequested(const QString &query, const QString &category);
+
+    /**
+     * Emitted when Claude's response includes expects_reply: true
+     */
+    void followUpExpected();
+
+    /**
+     * Emitted when quiet mode should be toggled
+     * @param enabled: true to silence proactive alerts
+     */
+    void quietModeRequested(bool enabled);
+
 private:
     void setStatusMessage(const QString &msg);
     void setAwaitingConfirmation(bool awaiting);
@@ -106,6 +130,9 @@ private:
     void executeCallCommand(const QVariantMap &command);
     void executeMessageCommand(const QVariantMap &command);
     void executeReadMessagesCommand(const QVariantMap &command);
+    void executeNavigateCommand(const QVariantMap &command);
+    void executeSearchPlacesCommand(const QVariantMap &command);
+    void executeQuietModeCommand(const QVariantMap &command);
 
     /**
      * Helper methods

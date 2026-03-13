@@ -1,10 +1,12 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
+import Qt5Compat.GraphicalEffects
 import HeadUnit
 
 Item {
     id: root
     anchors.fill: parent
+    clip: true
     property var theme: null
 
     // View stack: "home", "search", "favorites", "album", "artist", "playlist", "nowplaying"
@@ -166,11 +168,16 @@ Item {
                             anchors.margins: 10
                             spacing: 8
 
-                            Text {
-                                text: "🔍"
-                                font.pixelSize: 16
+                            Canvas {
+                                width: 16; height: 16
                                 anchors.verticalCenter: parent.verticalCenter
                                 opacity: 0.5
+                                onPaint: {
+                                    var ctx = getContext("2d"); ctx.clearRect(0, 0, width, height)
+                                    ctx.strokeStyle = ThemeValues.textCol.toString(); ctx.lineWidth = 1.5; ctx.lineCap = "round"
+                                    ctx.beginPath(); ctx.arc(7, 7, 5, 0, Math.PI * 2); ctx.stroke()
+                                    ctx.beginPath(); ctx.moveTo(11, 11); ctx.lineTo(15, 15); ctx.stroke()
+                                }
                             }
 
                             TextInput {
@@ -561,7 +568,7 @@ Item {
                                     Rectangle {
                                         anchors.fill: parent
                                         radius: 6
-                                        color: Qt.rgba(0, 0, 0, 0.55)
+                                        color: Qt.rgba(ThemeValues.bgCol.r, ThemeValues.bgCol.g, ThemeValues.bgCol.b, 0.55)
                                         visible: isCurrentTrack
 
                                         Row {
@@ -1508,13 +1515,20 @@ Item {
                             radius: 32
                             color: "transparent"
 
-                            Text {
+                            Canvas {
                                 anchors.centerIn: parent
-                                text: "⇄"
-                                color: spotifyClient.shuffleEnabled ? ThemeValues.primaryCol
-                                    : Qt.rgba(ThemeValues.textCol.r, ThemeValues.textCol.g, ThemeValues.textCol.b, 0.4)
-                                font.pixelSize: 24
-                                font.family: ThemeValues.fontFamily
+                                width: 24; height: 24
+                                property bool active: spotifyClient.shuffleEnabled
+                                onPaint: {
+                                    var ctx = getContext("2d"); ctx.clearRect(0, 0, width, height)
+                                    ctx.strokeStyle = (active ? ThemeValues.primaryCol : Qt.rgba(ThemeValues.textCol.r, ThemeValues.textCol.g, ThemeValues.textCol.b, 0.4)).toString()
+                                    ctx.lineWidth = 2; ctx.lineCap = "round"
+                                    ctx.beginPath(); ctx.moveTo(2, 6); ctx.lineTo(22, 18); ctx.stroke()
+                                    ctx.beginPath(); ctx.moveTo(2, 18); ctx.lineTo(22, 6); ctx.stroke()
+                                    ctx.beginPath(); ctx.moveTo(18, 4); ctx.lineTo(22, 6); ctx.lineTo(18, 8); ctx.stroke()
+                                    ctx.beginPath(); ctx.moveTo(18, 16); ctx.lineTo(22, 18); ctx.lineTo(18, 20); ctx.stroke()
+                                }
+                                onActiveChanged: requestPaint()
                             }
 
                             MouseArea {
@@ -1532,19 +1546,27 @@ Item {
                             border.width: 2
 
                             Image {
+                                id: spPrevIcon
                                 anchors.centerIn: parent
                                 source: iconSource("previous")
                                 width: 24; height: 24
                                 fillMode: Image.PreserveAspectFit
                                 smooth: true
+                                visible: status === Image.Ready
+                                layer.enabled: true
+                                layer.effect: ColorOverlay { color: ThemeValues.primaryCol }
                             }
 
-                            Text {
+                            Canvas {
                                 anchors.centerIn: parent
-                                text: "⏮"
-                                font.pixelSize: 26
-                                color: ThemeValues.primaryCol
-                                visible: iconSource("previous") === ""
+                                width: 24; height: 24
+                                visible: spPrevIcon.status !== Image.Ready
+                                onPaint: {
+                                    var ctx = getContext("2d"); ctx.clearRect(0, 0, width, height)
+                                    ctx.fillStyle = ThemeValues.primaryCol.toString()
+                                    ctx.fillRect(2, 4, 3, 16)
+                                    ctx.beginPath(); ctx.moveTo(20, 4); ctx.lineTo(7, 12); ctx.lineTo(20, 20); ctx.closePath(); ctx.fill()
+                                }
                             }
 
                             MouseArea {
@@ -1559,11 +1581,21 @@ Item {
                             radius: 48
                             color: ThemeValues.primaryCol
 
-                            Text {
+                            Canvas {
                                 anchors.centerIn: parent
-                                text: spotifyClient.isPlaying ? "⏸" : "▶"
-                                font.pixelSize: 36
-                                color: ThemeValues.bgCol
+                                width: 36; height: 36
+                                property bool playing: spotifyClient.isPlaying
+                                onPaint: {
+                                    var ctx = getContext("2d"); ctx.clearRect(0, 0, width, height)
+                                    ctx.fillStyle = ThemeValues.bgCol.toString()
+                                    if (playing) {
+                                        ctx.fillRect(8, 4, 7, 28)
+                                        ctx.fillRect(21, 4, 7, 28)
+                                    } else {
+                                        ctx.beginPath(); ctx.moveTo(8, 4); ctx.lineTo(30, 18); ctx.lineTo(8, 32); ctx.closePath(); ctx.fill()
+                                    }
+                                }
+                                onPlayingChanged: requestPaint()
                             }
 
                             MouseArea {
@@ -1580,11 +1612,15 @@ Item {
                             border.color: Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.5)
                             border.width: 2
 
-                            Text {
+                            Canvas {
                                 anchors.centerIn: parent
-                                text: "⏭"
-                                font.pixelSize: 26
-                                color: ThemeValues.primaryCol
+                                width: 24; height: 24
+                                onPaint: {
+                                    var ctx = getContext("2d"); ctx.clearRect(0, 0, width, height)
+                                    ctx.fillStyle = ThemeValues.primaryCol.toString()
+                                    ctx.beginPath(); ctx.moveTo(4, 4); ctx.lineTo(17, 12); ctx.lineTo(4, 20); ctx.closePath(); ctx.fill()
+                                    ctx.fillRect(19, 4, 3, 16)
+                                }
                             }
 
                             MouseArea {
@@ -1599,13 +1635,26 @@ Item {
                             radius: 32
                             color: "transparent"
 
-                            Text {
+                            Canvas {
                                 anchors.centerIn: parent
-                                text: spotifyClient.repeatMode === 2 ? "🔂" : "🔁"
-                                color: spotifyClient.repeatMode > 0 ? ThemeValues.primaryCol
-                                    : Qt.rgba(ThemeValues.textCol.r, ThemeValues.textCol.g, ThemeValues.textCol.b, 0.4)
-                                font.pixelSize: 22
-                                font.family: ThemeValues.fontFamily
+                                width: 24; height: 24
+                                property int rMode: spotifyClient.repeatMode
+                                onPaint: {
+                                    var ctx = getContext("2d"); ctx.clearRect(0, 0, width, height)
+                                    var col = rMode > 0 ? ThemeValues.primaryCol : Qt.rgba(ThemeValues.textCol.r, ThemeValues.textCol.g, ThemeValues.textCol.b, 0.4)
+                                    ctx.strokeStyle = col.toString(); ctx.fillStyle = col.toString()
+                                    ctx.lineWidth = 2; ctx.lineCap = "round"; ctx.lineJoin = "round"
+                                    ctx.beginPath()
+                                    ctx.moveTo(6, 8); ctx.lineTo(18, 8); ctx.arc(18, 12, 4, -Math.PI/2, Math.PI/2)
+                                    ctx.lineTo(6, 16); ctx.arc(6, 12, 4, Math.PI/2, -Math.PI/2, true)
+                                    ctx.stroke()
+                                    ctx.beginPath(); ctx.moveTo(16, 5); ctx.lineTo(20, 8); ctx.lineTo(16, 11); ctx.stroke()
+                                    if (rMode === 2) {
+                                        ctx.font = "bold 9px sans-serif"
+                                        ctx.fillText("1", 10, 15)
+                                    }
+                                }
+                                onRModeChanged: requestPaint()
                             }
 
                             MouseArea {

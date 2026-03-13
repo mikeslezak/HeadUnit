@@ -1,5 +1,6 @@
 import QtQuick 2.15
 import Qt5Compat.GraphicalEffects
+import HeadUnit
 
 Rectangle {
   id: root
@@ -10,17 +11,18 @@ Rectangle {
   property string activeKey: "home"
   property var recentApps: []
 
-  signal appGridRequested()
-
   readonly property var allApps: ({
     "home":     { key: "home",     icon: "home" },
     "music":    { key: "music",    icon: "music" },
-    "maps":     { key: "maps",     icon: "maps" },
     "settings": { key: "settings", icon: "settings" },
     "phone":    { key: "phone",    icon: "phone" },
     "messages": { key: "messages", icon: "messages" },
     "contacts": { key: "contacts", icon: "contacts" },
-    "weather":  { key: "weather",  icon: "weather" }
+    "weather":  { key: "weather",  icon: "weather" },
+    "tidal":    { key: "tidal",    icon: "tidal" },
+    "spotify":  { key: "spotify",  icon: "spotify" },
+    "vehicle":  { key: "vehicle",  icon: "vehicle" },
+    "tuning":   { key: "tuning",   icon: "tuning" }
   })
 
   // -------- Theme tokens with safe fallbacks --------
@@ -28,10 +30,10 @@ Rectangle {
   readonly property int _pad: theme?.navbar?.pad !== undefined ? Number(theme.navbar.pad) : 8
   readonly property int _iconSz: theme?.navbar?.iconSize !== undefined ? Number(theme.navbar.iconSize) : 28
   readonly property real _pressS: theme?.navbar?.pressScale !== undefined ? Number(theme.navbar.pressScale) : 0.92
-  readonly property int _dur: theme?.motion?.dur !== undefined ? Number(theme.motion.dur) : 150
-  readonly property color _iconCol: theme?.navbar?.text ?? "#FFFFFF"
-  readonly property color _accent: theme?.palette?.primary ?? "#00f0ff"
-  readonly property color _bg: theme?.navbar?.bg ?? "#000000"
+  readonly property int _dur: theme?.motion?.duration !== undefined ? Number(theme.motion.duration) : 150
+  readonly property color _iconCol: theme?.navbar?.text ?? ThemeValues.textCol
+  readonly property color _accent: theme?.palette?.primary ?? ThemeValues.primaryCol
+  readonly property color _bg: theme?.navbar?.bg ?? ThemeValues.bgCol
 
   width: theme?.navbar?.width !== undefined ? Number(theme.navbar.width) : 70
   height: parent ? parent.height : 430
@@ -130,57 +132,9 @@ Rectangle {
     }
   }
 
-  // -------- App Grid Button --------
-  Item {
-    id: gridSlot
-    anchors.bottom: homeSlot.top
-    anchors.horizontalCenter: parent.horizontalCenter
-    anchors.bottomMargin: _pad
-    width: root.width
-    height: root.slotSize
-
-    Rectangle {
-      id: gridButtonRect
-      anchors.centerIn: parent
-      width: root._iconSz + 12
-      height: root._iconSz + 12
-      color: "transparent"
-      radius: 8
-
-      property bool isPressed: false
-
-      opacity: isPressed ? 0.7 : 1.0
-      Behavior on opacity {
-        NumberAnimation { duration: root._dur }
-      }
-
-      // 2x2 dot grid icon
-      Grid {
-        anchors.centerIn: parent
-        columns: 2
-        spacing: 6
-
-        Repeater {
-          model: 4
-          Rectangle {
-            width: 6; height: 6
-            radius: 3
-            color: root._iconCol
-            opacity: 0.6
-          }
-        }
-      }
-
-      MouseArea {
-        anchors.fill: parent
-        onPressed: gridButtonRect.isPressed = true
-        onReleased: gridButtonRect.isPressed = false
-        onClicked: root.appGridRequested()
-      }
-    }
-  }
-
   // -------- Home Button (bottom, always visible) --------
+  // Tap: if on home → open app grid, else → go home
+  // Long press: voice assistant
   Item {
     id: homeSlot
     anchors.bottom: parent.bottom
@@ -271,8 +225,13 @@ Rectangle {
 
           if (longPressTimer.running) {
             longPressTimer.stop()
-            root.activeKey = "home"
-            root.selected("home")
+            if (root.activeKey === "home") {
+              root.activeKey = "appgrid"
+              root.selected("appgrid")
+            } else {
+              root.activeKey = "home"
+              root.selected("home")
+            }
           }
         }
 

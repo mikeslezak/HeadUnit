@@ -59,7 +59,7 @@ Item {
                         anchors.horizontalCenter: parent.horizontalCenter
                         width: 220
                         height: 220
-                        color: Qt.rgba(0, 0, 0, 0.5)
+                        color: Qt.rgba(ThemeValues.bgCol.r, ThemeValues.bgCol.g, ThemeValues.bgCol.b, 0.5)
                         border.color: ThemeValues.primaryCol
                         border.width: 2
                         radius: 10
@@ -191,7 +191,7 @@ Item {
                         Rectangle {
                             width: sourceText.width + 16
                             height: 20
-                            color: Qt.rgba(0, 0, 0, 0.4)
+                            color: Qt.rgba(ThemeValues.bgCol.r, ThemeValues.bgCol.g, ThemeValues.bgCol.b, 0.4)
                             border.color: ThemeValues.primaryCol
                             border.width: 1
                             radius: 10
@@ -230,7 +230,7 @@ Item {
                         }
 
                         ActionIcon {
-                            iconText: "🔁"
+                            iconText: "↻"
                             isActive: mediaController.repeatMode !== 0
                             onClicked: mediaController.cycleRepeatMode()
                         }
@@ -266,7 +266,7 @@ Item {
                     Rectangle {
                         width: parent.width
                         height: 8
-                        color: Qt.rgba(0, 0, 0, 0.5)
+                        color: Qt.rgba(ThemeValues.bgCol.r, ThemeValues.bgCol.g, ThemeValues.bgCol.b, 0.5)
                         border.color: ThemeValues.primaryCol
                         border.width: 1
                         radius: 4

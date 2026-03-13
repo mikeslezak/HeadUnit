@@ -1,5 +1,6 @@
 import QtQuick 2.15
 import Qt5Compat.GraphicalEffects
+import HeadUnit
 
 Rectangle {
     id: root
@@ -17,29 +18,29 @@ Rectangle {
 
     // Internal
     readonly property color _bg: {
-        if (filled) return theme?.palette?.primary ?? "#00f0ff"
+        if (filled) return theme?.button?.bg ?? theme?.palette?.primary ?? ThemeValues.primaryCol
         return "transparent"
     }
     readonly property color _fg: {
-        if (filled) return theme?.palette?.bg ?? "#0a0a0f"
-        return theme?.palette?.text ?? "#39ff14"
+        if (filled) return theme?.palette?.bg ?? ThemeValues.bgCol
+        return theme?.button?.fg ?? theme?.palette?.text ?? ThemeValues.textCol
     }
-    readonly property color _border: theme?.palette?.primary ?? "#00f0ff"
-    readonly property int   _borderW: filled ? 0 : 2
-    readonly property int   _rad: theme?.borderRadius ?? 8
+    readonly property color _border: theme?.button?.border ?? theme?.palette?.primary ?? ThemeValues.primaryCol
+    readonly property int   _borderW: filled ? 0 : (theme?.button?.borderWidth ?? 2)
+    readonly property int   _rad: theme?.button?.radius ?? theme?.shape?.radius ?? 8
 
-    readonly property int _padH: theme?.spacing?.padding ?? 16
-    readonly property int _padV: theme?.spacing?.padding ?? 12
-    readonly property int _gap: theme?.spacing?.gap ?? 8
+    readonly property int _padH: theme?.button?.padH ?? 16
+    readonly property int _padV: theme?.button?.padV ?? 12
+    readonly property int _gap: theme?.button?.gap ?? 8
 
-    readonly property int _iconSize: theme?.iconSize ?? 24
+    readonly property int _iconSize: theme?.button?.iconSize ?? 24
     readonly property int _fontSize: theme?.typography?.fontSize ?? 16
     readonly property string _fontFamily: theme?.typography?.fontFamily ?? "Noto Sans"
 
-    readonly property int _animDur: theme?.animation?.duration ?? 150
+    readonly property int _animDur: theme?.button?.dur ?? theme?.motion?.duration ?? 150
 
-    readonly property int _themeW: theme?.buttonWidth  ?? 0
-    readonly property int _themeH: theme?.buttonHeight ?? 0
+    readonly property int _themeW: theme?.button?.width  ?? 0
+    readonly property int _themeH: theme?.button?.height ?? 0
 
     // Glow state
     property bool isPressed: false
@@ -59,7 +60,7 @@ Rectangle {
     // Glow effect when pressed
     layer.enabled: isPressed
     layer.effect: Glow {
-        color: theme?.palette?.primary ?? "#00f0ff"
+        color: theme?.palette?.primary ?? _border
         spread: 0.5
         radius: 8
         samples: 17

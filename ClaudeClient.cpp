@@ -12,7 +12,7 @@ ClaudeClient::ClaudeClient(QObject *parent)
     , m_networkManager(new QNetworkAccessManager(this))
     , m_currentReply(nullptr)
     , m_model(DEFAULT_MODEL)
-    , m_maxTokens(1024)
+    , m_maxTokens(256)
     , m_temperature(0.7)
     , m_isConnected(false)
     , m_isProcessing(false)
@@ -44,6 +44,17 @@ ClaudeClient::ClaudeClient(QObject *parent)
     // Connect network manager signals
     connect(m_networkManager, &QNetworkAccessManager::finished,
             this, &ClaudeClient::onNetworkReply);
+
+    // Conversation inactivity timeout — clear history after 60s of no messages
+    m_conversationTimer = new QTimer(this);
+    m_conversationTimer->setSingleShot(true);
+    m_conversationTimer->setInterval(60 * 1000);
+    connect(m_conversationTimer, &QTimer::timeout, this, [this]() {
+        if (!m_conversationHistory.isEmpty()) {
+            qDebug() << "ClaudeClient: Conversation timed out, clearing history";
+            clearConversation();
+        }
+    });
 
     qDebug() << "ClaudeClient: Using model" << m_model;
 }
@@ -131,8 +142,14 @@ void ClaudeClient::sendMessage(const QString &message, const QString &systemCont
     emit processingChanged();
     setStatusMessage("Sending request to Claude...");
 
-    // Build system prompt
-    QString systemPrompt = systemContext.isEmpty() ? buildSystemPrompt() : systemContext;
+    // Reset conversation inactivity timer
+    m_conversationTimer->start();
+
+    // Build system prompt — always use buildSystemPrompt, inject live context if provided
+    QString systemPrompt = buildSystemPrompt();
+    if (!systemContext.isEmpty()) {
+        systemPrompt += "\nLIVE CONTEXT:\n" + systemContext;
+    }
 
     // Build request
     QJsonObject request = buildRequest(message, systemPrompt);
@@ -340,87 +357,62 @@ QJsonObject ClaudeClient::buildRequest(const QString &userMessage, const QString
 
 QString ClaudeClient::buildSystemPrompt() const
 {
-    QString prompt = "You are Sammy, a friendly and helpful AI assistant integrated into a vehicle's head unit system. ";
-    prompt += "You have a warm, professional female voice and personality. ";
-    prompt += "Your role is to help the driver with navigation, phone calls, messaging, music control, ";
-    prompt += "and general queries while prioritizing safety.\n\n";
+    QString prompt;
 
-    prompt += "IMPORTANT SAFETY RULES:\n";
-    prompt += "- Always prioritize driver safety and minimize distraction\n";
-    prompt += "- Keep responses concise and clear for voice interaction\n";
-    prompt += "- Confirm potentially dangerous actions (like calling while driving)\n";
-    prompt += "- Never engage in lengthy conversations while the vehicle is moving\n\n";
+    // Identity
+    prompt += "You are Jarvis, an AI copilot integrated into a truck's head unit. ";
+    prompt += "You have full situational awareness: GPS, weather, vehicle telemetry, and active route data. ";
+    prompt += "You are proactive, concise, and safety-focused.\n\n";
 
-    // Add system context if available
-    if (!m_systemContext.isEmpty()) {
-        prompt += "CURRENT SYSTEM STATUS:\n";
+    // Voice output rules
+    prompt += "VOICE OUTPUT RULES:\n";
+    prompt += "- Responses are spoken via TTS. Keep them SHORT: 1-3 sentences max.\n";
+    prompt += "- NEVER use markdown (no **, ##, bullets, numbered lists) or emojis.\n";
+    prompt += "- Write in natural, conversational spoken English.\n";
+    prompt += "- Use the live context below to give informed, location-aware answers.\n";
+    prompt += "- If asked about location, weather, or route, reference the actual data.\n\n";
 
-        if (m_systemContext.contains("speed")) {
-            prompt += QString("- Vehicle speed: %1 mph\n").arg(m_systemContext["speed"].toInt());
-        }
-        if (m_systemContext.contains("fuel")) {
-            prompt += QString("- Fuel level: %1%\n").arg(m_systemContext["fuel"].toInt());
-        }
-        if (m_systemContext.contains("location")) {
-            prompt += QString("- Current location: %1\n").arg(m_systemContext["location"].toString());
-        }
-        if (m_systemContext.contains("time")) {
-            prompt += QString("- Current time: %1\n").arg(m_systemContext["time"].toString());
-        }
-        if (m_systemContext.contains("weather")) {
-            prompt += QString("- Weather: %1\n").arg(m_systemContext["weather"].toString());
-        }
-        if (m_systemContext.contains("destination")) {
-            prompt += QString("- Navigation destination: %1\n").arg(m_systemContext["destination"].toString());
-        }
-        if (m_systemContext.contains("eta")) {
-            prompt += QString("- ETA: %1\n").arg(m_systemContext["eta"].toString());
-        }
-
-        prompt += "\n";
-    }
-
+    // Actions
     prompt += "AVAILABLE ACTIONS:\n";
-    prompt += "- Make phone calls to contacts\n";
-    prompt += "- Send messages (with voice dictation)\n";
-    prompt += "- Control music playback (play, pause, skip, search)\n";
-    prompt += "- Navigate to destinations\n";
-    prompt += "- Read incoming messages and notifications\n";
-    prompt += "- Answer questions and provide information\n\n";
-
-    prompt += "VOICE COMMAND EXECUTION:\n";
-    prompt += "When the user requests a phone action (call, text, read messages), respond with BOTH:\n";
-    prompt += "1. A natural language response acknowledging the request\n";
-    prompt += "2. A JSON command block in this exact format:\n\n";
+    prompt += "When the user requests an action, respond with a brief spoken acknowledgment AND a JSON command block:\n\n";
     prompt += "```json\n";
     prompt += "{\n";
-    prompt += "  \"action\": \"call|message|read_messages\",\n";
+    prompt += "  \"action\": \"call|message|read_messages|navigate|search_places\",\n";
     prompt += "  \"contact_name\": \"Contact Name\",\n";
-    prompt += "  \"message_body\": \"Message text here\",\n";
-    prompt += "  \"phone_number\": \"+1234567890\"\n";
+    prompt += "  \"message_body\": \"Message text\",\n";
+    prompt += "  \"phone_number\": \"+1234567890\",\n";
+    prompt += "  \"destination\": \"Place or address\",\n";
+    prompt += "  \"query\": \"search query for places\",\n";
+    prompt += "  \"category\": \"restaurant|gas_station|hotel|etc\",\n";
+    prompt += "  \"expects_reply\": true\n";
     prompt += "}\n";
     prompt += "```\n\n";
-    prompt += "CRITICAL: For contact_name, use EXACTLY what the user said - do not try to guess or expand the name.\n";
-    prompt += "The system will search the user's contacts for matches. Examples:\n";
-    prompt += "- If user says 'call Garlon', use contact_name: 'Garlon' (NOT 'Paul Garland' or any guess)\n";
-    prompt += "- If user says 'call Ari', use contact_name: 'Ari' (the system will find contacts with Ari in the name)\n";
-    prompt += "- If user says 'text mom', use contact_name: 'mom'\n\n";
-    prompt += "Examples:\n";
-    prompt += "- User: \"Call Mom\" → Response: \"Sure, I'll call Mom for you.\" + {\"action\": \"call\", \"contact_name\": \"Mom\"}\n";
-    prompt += "- User: \"Text John I'm running late\" → Response: \"I'll send that message to John.\" + {\"action\": \"message\", \"contact_name\": \"John\", \"message_body\": \"I'm running late\"}\n";
-    prompt += "- User: \"Call Garlon\" → Response: \"I'll call Garlon for you.\" + {\"action\": \"call\", \"contact_name\": \"Garlon\"}\n\n";
 
-    prompt += "When the user requests an action, clearly state what you're about to do and ask for confirmation if it's safety-critical. ";
-    prompt += "Keep all responses brief and natural for voice conversation.\n\n";
+    prompt += "ACTION RULES:\n";
+    prompt += "- navigate: ALWAYS emit this action when the user wants to go somewhere, even if GPS is unavailable. Set destination to what the user said. The system will geocode the text. Examples: 'Starbucks', '123 Main St', 'GoodLife Fitness in Okotoks'.\n";
+    prompt += "- call/message: Use contact_name EXACTLY as the user said.\n";
+    prompt += "- search_places: Use when user wants to find nearby places (food, gas, hotels, etc). Set query to the search term and category if obvious.\n";
+    prompt += "- quiet_mode: Use when user says 'stop alerts', 'quiet mode', 'be quiet', or similar. Set enabled to true to silence proactive alerts, false to re-enable.\n";
+    prompt += "- expects_reply: Set to true when you ask a question (\"Want directions?\", \"Which one?\"). This keeps the mic open for a follow-up without the wake word.\n\n";
 
-    // Add contact names if available
+    prompt += "EXAMPLES:\n";
+    prompt += "- \"Navigate to Starbucks\" -> \"Navigating to Starbucks.\" + {\"action\": \"navigate\", \"destination\": \"Starbucks\"}\n";
+    prompt += "- \"Find tacos nearby\" -> \"Searching for tacos near you.\" + {\"action\": \"search_places\", \"query\": \"tacos\", \"category\": \"restaurant\"}\n";
+    prompt += "- \"Call Mom\" -> \"Calling Mom.\" + {\"action\": \"call\", \"contact_name\": \"Mom\"}\n";
+    prompt += "- \"Where am I?\" -> Reference GPS coordinates and location name from context. No JSON needed.\n";
+    prompt += "- \"What's the weather ahead?\" -> Reference route weather data from context. No JSON needed.\n\n";
+
+    prompt += "MULTI-TURN CONVERSATIONS:\n";
+    prompt += "- When presenting search results or options, set expects_reply to true.\n";
+    prompt += "- After presenting places, if user says a number or name, navigate to that choice.\n";
+    prompt += "- If the user says 'yes' after you ask about directions, emit a navigate action.\n";
+    prompt += "- If user says 'goodbye', 'thanks', 'that's all', or 'never mind', just respond briefly. No action needed.\n\n";
+
+    // Contact names
     if (!m_contactNames.isEmpty()) {
-        prompt += "USER'S CONTACTS (for matching spoken names):\n";
-        // Include all contacts - this helps Claude understand partial matches
-        // The list is comma-separated to minimize token usage
+        prompt += "USER'S CONTACTS:\n";
         prompt += m_contactNames.join(", ");
-        prompt += "\n\nWhen the user mentions a name, use your knowledge of these contacts to find the best match. ";
-        prompt += "For example, if user says 'call Garlon' and there's a contact 'Andrew Garlon Slezak', use 'Andrew Garlon Slezak' as contact_name.\n";
+        prompt += "\nMatch spoken names to the closest contact. E.g., 'call Garlon' -> 'Andrew Garlon Slezak'.\n\n";
     }
 
     return prompt;

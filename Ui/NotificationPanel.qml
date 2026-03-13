@@ -5,7 +5,7 @@ import HeadUnit
 Rectangle {
     id: root
     anchors.fill: parent
-    color: Qt.rgba(0, 0, 0, 0.85)
+    color: Qt.rgba(ThemeValues.bgCol.r, ThemeValues.bgCol.g, ThemeValues.bgCol.b, 0.85)
 
     property var theme: null
     signal closeRequested()
@@ -47,7 +47,7 @@ Rectangle {
             Rectangle {
                 width: parent.width
                 height: 60
-                color: Qt.rgba(0, 0, 0, 0.5)
+                color: Qt.rgba(ThemeValues.bgCol.r, ThemeValues.bgCol.g, ThemeValues.bgCol.b, 0.5)
                 border.color: ThemeValues.primaryCol
                 border.width: 1
 
@@ -145,7 +145,7 @@ Rectangle {
                 delegate: Rectangle {
                     width: ListView.view.width
                     height: 100
-                    color: Qt.rgba(0, 0, 0, 0.3)
+                    color: Qt.rgba(ThemeValues.bgCol.r, ThemeValues.bgCol.g, ThemeValues.bgCol.b, 0.3)
                     border.color: Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.3)
                     border.width: 1
 

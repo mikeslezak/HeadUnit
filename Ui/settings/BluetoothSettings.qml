@@ -55,7 +55,7 @@ Flickable {
         Row {
             width: parent.width; spacing: 8
             Text {
-                text: bluetoothManager.isScanning ? "🔍 Scanning..." : "Devices"
+                text: bluetoothManager.isScanning ? "Scanning..." : "Devices"
                 color: ThemeValues.primaryCol; font.pixelSize: ThemeValues.fontSize + 2; font.family: ThemeValues.fontFamily; font.weight: Font.Bold
             }
             Text {
@@ -120,14 +120,14 @@ Flickable {
             anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
             width: 60; height: 30; color: isOn ? ThemeValues.primaryCol : Qt.rgba(ThemeValues.textCol.r, ThemeValues.textCol.g, ThemeValues.textCol.b, 0.3)
             radius: 15; border.color: isOn ? ThemeValues.primaryCol : Qt.rgba(ThemeValues.textCol.r, ThemeValues.textCol.g, ThemeValues.textCol.b, 0.5); border.width: 2
-            Rectangle { width: 22; height: 22; radius: 11; color: "white"; x: isOn ? parent.width - width - 4 : 4; anchors.verticalCenter: parent.verticalCenter; Behavior on x { NumberAnimation { duration: 150 } } }
+            Rectangle { width: 22; height: 22; radius: 11; color: ThemeValues.textCol; x: isOn ? parent.width - width - 4 : 4; anchors.verticalCenter: parent.verticalCenter; Behavior on x { NumberAnimation { duration: 150 } } }
             MouseArea { anchors.fill: parent; onClicked: parent.parent.toggled() }
         }
     }
 
     component BluetoothDeviceItem: Rectangle {
         height: 100
-        color: isConnected ? Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.15) : Qt.rgba(0, 0, 0, 0.3)
+        color: isConnected ? Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.15) : Qt.rgba(ThemeValues.bgCol.r, ThemeValues.bgCol.g, ThemeValues.bgCol.b, 0.3)
         border.color: isConnected ? ThemeValues.primaryCol : Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.4)
         border.width: isConnected ? 2 : 1; radius: 8
         property string deviceName: ""; property string deviceAddress: ""
@@ -140,10 +140,27 @@ Flickable {
                 width: 48; height: 48; radius: 24
                 color: Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.2)
                 border.color: ThemeValues.primaryCol; border.width: 2; anchors.verticalCenter: parent.verticalCenter
-                Text { anchors.centerIn: parent; text: isPaired ? "📱" : "🔍"; font.pixelSize: 28 }
+                Canvas {
+                    anchors.centerIn: parent; width: 28; height: 28
+                    property bool paired: isPaired
+                    onPaint: {
+                        var ctx = getContext("2d"); ctx.clearRect(0, 0, width, height)
+                        ctx.strokeStyle = ThemeValues.primaryCol.toString(); ctx.lineWidth = 2; ctx.lineCap = "round"
+                        if (paired) {
+                            // Phone icon
+                            ctx.beginPath(); ctx.roundedRect(7, 2, 14, 24, 3, 3); ctx.stroke()
+                            ctx.beginPath(); ctx.arc(14, 22, 2, 0, Math.PI * 2); ctx.stroke()
+                        } else {
+                            // Search/discover icon
+                            ctx.beginPath(); ctx.arc(12, 12, 8, 0, Math.PI * 2); ctx.stroke()
+                            ctx.beginPath(); ctx.moveTo(18, 18); ctx.lineTo(25, 25); ctx.stroke()
+                        }
+                    }
+                    onPairedChanged: requestPaint()
+                }
                 Rectangle {
                     visible: isConnected; width: 16; height: 16; radius: 8; color: ThemeValues.successCol
-                    border.color: "white"; border.width: 2; anchors.right: parent.right; anchors.top: parent.top; anchors.margins: -4
+                    border.color: ThemeValues.textCol; border.width: 2; anchors.right: parent.right; anchors.top: parent.top; anchors.margins: -4
                     SequentialAnimation on opacity {
                         running: isConnected; loops: Animation.Infinite
                         NumberAnimation { from: 1.0; to: 0.3; duration: 1000 }
@@ -159,7 +176,16 @@ Flickable {
                 Row {
                     spacing: 10
                     Text { text: isConnected ? "● Connected" : (isPaired ? "● Paired" : "○ Not Paired"); color: isConnected ? ThemeValues.successCol : (isPaired ? ThemeValues.primaryCol : ThemeValues.textCol); font.pixelSize: ThemeValues.fontSize - 1; font.family: ThemeValues.fontFamily; opacity: 0.9 }
-                    Text { visible: isPaired && signalStrength > -100; text: "📶"; font.pixelSize: ThemeValues.fontSize - 1; opacity: signalStrength > -70 ? 1.0 : signalStrength > -80 ? 0.7 : 0.4; anchors.verticalCenter: parent.verticalCenter }
+                    Canvas {
+                        visible: isPaired && signalStrength > -100; width: ThemeValues.fontSize; height: ThemeValues.fontSize
+                        opacity: signalStrength > -70 ? 1.0 : signalStrength > -80 ? 0.7 : 0.4; anchors.verticalCenter: parent.verticalCenter
+                        onPaint: {
+                            var ctx = getContext("2d"); ctx.clearRect(0, 0, width, height)
+                            ctx.fillStyle = ThemeValues.primaryCol.toString()
+                            var bw = 2; var gap = 1; var x = 1
+                            for (var i = 0; i < 4; i++) { var h = 3 + i * 3; ctx.fillRect(x, height - h, bw, h); x += bw + gap }
+                        }
+                    }
                 }
             }
 

@@ -11,21 +11,14 @@ Item {
 
     signal screenSelected(string key)
 
-    Loader {
-        id: homeLoader
-        anchors.fill: parent
-        visible: root.currentScreen === "home"
-        active: true
-        asynchronous: true
-        source: "screens/Home.qml"
-        onLoaded: {
-            item.theme = root.theme
-            item.mapboxToken = Qt.binding(function() { return root.mapboxToken })
-            if (item.appSelected) {
-                item.appSelected.connect(function(key) { root.screenSelected(key) })
-            }
-        }
-    }
+    // Navigation state from Maps (exposed for GlancePanel)
+    readonly property bool navActive: mapsLoader.item ? mapsLoader.item.routeActive : false
+    readonly property string navManeuver: mapsLoader.item ? mapsLoader.item.nextManeuver : ""
+    readonly property string navInstruction: mapsLoader.item ? mapsLoader.item.nextInstruction : ""
+    readonly property string navStepDistance: mapsLoader.item ? mapsLoader.item.nextStepDistance : ""
+    readonly property string navRouteDuration: mapsLoader.item ? mapsLoader.item.routeDuration : ""
+
+    // Home screen IS the map — no separate Home.qml needed
 
     Loader {
         id: settingsLoader
@@ -61,8 +54,8 @@ Item {
     Loader {
         id: mapsLoader
         anchors.fill: parent
-        visible: root.currentScreen === "maps"
-        active: false
+        visible: root.currentScreen === "home"
+        active: true
         asynchronous: true
         source: "screens/Maps.qml"
         onLoaded: {
@@ -163,11 +156,42 @@ Item {
         onLoaded: { item.theme = root.theme }
     }
 
+    Loader {
+        id: appGridLoader
+        anchors.fill: parent
+        visible: root.currentScreen === "appgrid"
+        active: false
+        asynchronous: true
+        source: "screens/AppGrid.qml"
+        onLoaded: {
+            item.theme = root.theme
+            item.appSelected.connect(function(key) { root.screenSelected(key) })
+        }
+    }
+
+    // Use Google Places for voice navigation (much better at resolving business names)
+    Connections {
+        target: placesSearchManager
+        function onGeocodeCompleted(lat, lon, name) {
+            console.log("ScreenContainer: Google geocode result:", name, "at", lat, lon)
+            if (mapsLoader.item) {
+                mapsLoader.item.getDirections(lat, lon, name)
+            }
+        }
+    }
+
+    function navigateTo(destination) {
+        if (!mapsLoader.item) {
+            console.warn("ScreenContainer: Maps not loaded, cannot navigate")
+            return
+        }
+        // Use Google Places Text Search for accurate business/POI resolution
+        placesSearchManager.geocodePlace(destination)
+    }
+
     function show(key) {
-        homeLoader.active = (key === "home")
         settingsLoader.active = (key === "settings")
         musicLoader.active = (key === "music")
-        mapsLoader.active = (key === "maps")
         phoneLoader.active = (key === "phone")
         messagesLoader.active = (key === "messages")
         contactsLoader.active = (key === "contacts")
@@ -176,5 +200,6 @@ Item {
         tuningLoader.active = (key === "tuning")
         tidalLoader.active = (key === "tidal")
         spotifyLoader.active = (key === "spotify")
+        appGridLoader.active = (key === "appgrid")
     }
 }

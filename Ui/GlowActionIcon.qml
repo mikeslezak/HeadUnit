@@ -1,5 +1,6 @@
 import QtQuick 2.15
 import Qt5Compat.GraphicalEffects
+import HeadUnit
 
 // Centralized action icon component with glow effect (for text-based icons like ♥, ↑, etc.)
 Rectangle {
@@ -13,10 +14,9 @@ Rectangle {
     property bool isActive: false
     property bool enabled: true
     property var theme
-    property color activeColor: theme?.palette?.primary ?? "#00f0ff"
-    property color inactiveColor: Qt.rgba(textCol.r, textCol.g, textCol.b, 0.5)
-    property color textCol: theme?.palette?.text ?? "#39ff14"
-    property int fontSize: theme?.typography?.fontSize ?? 16
+    property color activeColor: ThemeValues.primaryCol
+    property color inactiveColor: Qt.rgba(ThemeValues.textCol.r, ThemeValues.textCol.g, ThemeValues.textCol.b, 0.5)
+    property int fontSize: ThemeValues.fontSize
 
     signal clicked()
 
@@ -45,6 +45,7 @@ Rectangle {
         color: root.isActive ? root.activeColor : root.inactiveColor
         font.pixelSize: root.fontSize + 12
         font.weight: Font.Bold
+        font.family: ThemeValues.fontFamily
     }
 
     MouseArea {

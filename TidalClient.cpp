@@ -620,6 +620,11 @@ void TidalClient::setTrackFromQueue(int index)
     m_position = 0;
     m_duration = m_trackDuration * 1000; // seconds to ms
 
+    qDebug() << "TidalClient::setTrackFromQueue:" << index
+             << "title:" << m_trackTitle
+             << "artist:" << m_artist
+             << "keys:" << track.keys();
+
     emit trackChanged();
     emit positionChanged();
     emit durationChanged();
@@ -685,6 +690,15 @@ void TidalClient::getHome()
     setLoading(true);
     QJsonObject cmd;
     cmd["cmd"] = "home";
+    sendCommand(cmd);
+}
+
+void TidalClient::getMix(const QString &mixId)
+{
+    setLoading(true);
+    QJsonObject cmd;
+    cmd["cmd"] = "get_mix";
+    cmd["mix_id"] = mixId;
     sendCommand(cmd);
 }
 
@@ -910,6 +924,29 @@ void TidalClient::handleResponse(const QJsonObject &response)
         QString quality = data["quality"].toString();
         m_audioQuality = quality;
 
+        // Update metadata from stream response (always available)
+        QString title = data["title"].toString();
+        QString artist = data["artist"].toString();
+        QString album = data["album"].toString();
+        QString imageUrl = data["image_url"].toString();
+        int duration = data["duration"].toInt();
+
+        if (!title.isEmpty()) {
+            m_trackTitle = title;
+            m_artist = artist;
+            m_album = album;
+            if (!imageUrl.isEmpty()) m_albumArtUrl = imageUrl;
+            if (duration > 0) {
+                m_trackDuration = duration;
+                m_duration = duration * 1000;
+                emit durationChanged();
+            }
+            m_position = 0;
+            emit trackChanged();
+            emit positionChanged();
+            qDebug() << "TidalClient: Track metadata from stream:" << m_trackTitle << "-" << m_artist;
+        }
+
         emit streamReady(m_streamUrl, codec, quality);
         setLoading(false);
         setStatusMessage("Playing (" + quality + ")");
@@ -971,11 +1008,33 @@ void TidalClient::handleResponse(const QJsonObject &response)
 
     // ── home ──
     else if (cmd == "home") {
-        QVariantList mixes;
-        for (const QJsonValue &val : response["data"].toArray()) {
-            mixes.append(val.toObject().toVariantMap());
+        QJsonObject data = response["data"].toObject();
+        QVariantList sections;
+        for (const QJsonValue &val : data["sections"].toArray()) {
+            QJsonObject sec = val.toObject();
+            QVariantMap sectionMap;
+            sectionMap["title"] = sec["title"].toString();
+            sectionMap["type"] = sec["type"].toString();
+            QVariantList items;
+            for (const QJsonValue &item : sec["items"].toArray()) {
+                items.append(item.toObject().toVariantMap());
+            }
+            sectionMap["items"] = items;
+            sections.append(sectionMap);
         }
-        emit homeReceived(mixes);
+        emit homeReceived(sections);
+        setLoading(false);
+    }
+
+    // ── get_mix ──
+    else if (cmd == "get_mix") {
+        QJsonObject data = response["data"].toObject();
+        QVariantMap mix = data["mix"].toObject().toVariantMap();
+        QVariantList tracks;
+        for (const QJsonValue &val : data["tracks"].toArray()) {
+            tracks.append(val.toObject().toVariantMap());
+        }
+        emit mixReceived(mix, tracks);
         setLoading(false);
     }
 

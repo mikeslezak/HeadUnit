@@ -2,6 +2,7 @@ import QtQuick 2.15
 import QtQuick.Window 2.15
 import QtQuick.Effects
 import QtCore
+import HeadUnit
 import "Ui"
 
 Window {
@@ -15,7 +16,7 @@ Window {
     visible: true
     title: "HeadUnit"
     visibility: Window.FullScreen
-    color:"#000000"
+    color: ThemeValues.bgCol
 
     Theme { id: theme }
 
@@ -55,7 +56,6 @@ Window {
 
     property var appActivity: ({
         "music": { active: false, lastUsed: 0 },
-        "maps": { active: false, lastUsed: 0 },
         "phone": { active: false, lastUsed: 0 },
         "weather": { active: false, lastUsed: 0 }
     })
@@ -154,6 +154,7 @@ Window {
 
         updateRecentApps(key)
         screenContainer.show(key)
+        navBar.activeKey = key
     }
 
     function updateRecentApps(appKey) {
@@ -291,10 +292,6 @@ Window {
                     showScreen(key)
                 }
 
-                onAppGridRequested: {
-                    appGridOverlay.show()
-                }
-
                 onHomeLongPressed: {
                     voicePipeline.activate()
                 }
@@ -349,8 +346,12 @@ Window {
                 onLoaded: {
                     item.theme = theme
                     item.closeRequested.connect(function() {
+                        console.log("ClaudeIndicator: closeRequested fired — canceling voice pipeline")
                         claudeIndicatorLoader.active = false
                         claudeClient.cancelRequest()
+                        googleTTS.stop()
+                        picovoiceManager.cancelAndReset()
+                        voicePipeline.cancelInteraction()
                     })
                     console.log("ClaudeIndicator loaded with theme:", theme.name)
                 }
@@ -394,6 +395,7 @@ Window {
                 claudeIndicatorLoader: claudeIndicatorLoader
                 voiceControlLoader: voiceControlLoader
                 theme: theme
+                screenContainer: screenContainer
                 onNotificationRequested: function(message, type) {
                     var notification = {
                         appName: "Voice",
@@ -402,6 +404,10 @@ Window {
                         priority: type === "error" ? 3 : 1
                     }
                     notificationBanner.showNotification(notification)
+                }
+                onNavigateToDestination: function(destination) {
+                    showScreen("home")
+                    screenContainer.navigateTo(destination)
                 }
             }
 
@@ -444,34 +450,36 @@ Window {
                     right: parent.right
                     top: statusBar.bottom
                     bottom: parent.bottom
-                    bottomMargin: 100
                 }
                 onScreenSelected: function(key) {
                     showScreen(key)
                 }
             }
 
-            // App Grid Overlay
-            AppGridOverlay {
-                id: appGridOverlay
-                theme: rootPage.theme
-                z: 998
-                onAppSelected: function(key) {
-                    showScreen(key)
-                }
-            }
+            // Glance Panel — right-side overlay on home screen
+            GlancePanel {
+                id: glancePanel
+                anchors.top: statusBar.bottom
+                anchors.bottom: parent.bottom
+                width: 280
+                z: 10
 
-            // Mini Player - Bottom Bar
-            MiniPlayer {
-                id: miniPlayer
                 theme: rootPage.theme
+                isHomeScreen: mainWindow.currentScreen === "home"
                 audioSource: mainWindow.activeAudioSource
-                anchors {
-                    left: navBar.right
-                    right: parent.right
-                    bottom: parent.bottom
+
+                navActive: screenContainer.navActive
+                maneuver: screenContainer.navManeuver
+                instruction: screenContainer.navInstruction
+                stepDistance: screenContainer.navStepDistance
+                routeDuration: screenContainer.navRouteDuration
+
+                onNavTapped: showScreen("home")
+                onMusicTapped: {
+                    if (activeAudioSource === "tidal") showScreen("tidal")
+                    else if (activeAudioSource === "spotify") showScreen("spotify")
+                    else showScreen("music")
                 }
-                z: 997  // Above screens, below overlays
             }
         }
     }

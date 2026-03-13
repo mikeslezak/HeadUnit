@@ -101,7 +101,7 @@ Flickable {
 
                 Rectangle {
                     width: parent.width; height: 40
-                    color: Qt.rgba(0, 0, 0, 0.3)
+                    color: Qt.rgba(ThemeValues.bgCol.r, ThemeValues.bgCol.g, ThemeValues.bgCol.b, 0.3)
                     border.color: Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.5)
                     border.width: 1; radius: 6
 
@@ -287,14 +287,14 @@ Flickable {
             anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
             width: 60; height: 30; color: isOn ? ThemeValues.primaryCol : Qt.rgba(ThemeValues.textCol.r, ThemeValues.textCol.g, ThemeValues.textCol.b, 0.3)
             radius: 15; border.color: isOn ? ThemeValues.primaryCol : Qt.rgba(ThemeValues.textCol.r, ThemeValues.textCol.g, ThemeValues.textCol.b, 0.5); border.width: 2
-            Rectangle { width: 22; height: 22; radius: 11; color: "white"; x: isOn ? parent.width - width - 4 : 4; anchors.verticalCenter: parent.verticalCenter; Behavior on x { NumberAnimation { duration: 150 } } }
+            Rectangle { width: 22; height: 22; radius: 11; color: ThemeValues.textCol; x: isOn ? parent.width - width - 4 : 4; anchors.verticalCenter: parent.verticalCenter; Behavior on x { NumberAnimation { duration: 150 } } }
             MouseArea { anchors.fill: parent; onClicked: parent.parent.toggled() }
         }
     }
 
     component VoiceButton: Rectangle {
         width: (parent.width - 12) / 2; height: 48
-        color: isActive ? Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.3) : Qt.rgba(0, 0, 0, 0.3)
+        color: isActive ? Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.3) : Qt.rgba(ThemeValues.bgCol.r, ThemeValues.bgCol.g, ThemeValues.bgCol.b, 0.3)
         border.color: isActive ? ThemeValues.primaryCol : Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.5)
         border.width: isActive ? 2 : 1; radius: 8
         property string text: ""; property string voiceName: ""; property bool isActive: false

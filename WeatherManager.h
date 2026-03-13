@@ -24,6 +24,8 @@ class WeatherManager : public QObject
     Q_PROPERTY(QJsonArray hourlyForecast READ hourlyForecast NOTIFY weatherUpdated)
     Q_PROPERTY(QJsonArray dailyForecast READ dailyForecast NOTIFY weatherUpdated)
     Q_PROPERTY(QString lastUpdated READ lastUpdated NOTIFY weatherUpdated)
+    Q_PROPERTY(double latitude READ latitude NOTIFY locationUpdated)
+    Q_PROPERTY(double longitude READ longitude NOTIFY locationUpdated)
 
 public:
     explicit WeatherManager(QObject *parent = nullptr);
@@ -43,6 +45,8 @@ public:
     QJsonArray hourlyForecast() const { return m_hourlyForecast; }
     QJsonArray dailyForecast() const { return m_dailyForecast; }
     QString lastUpdated() const { return m_lastUpdated; }
+    double latitude() const { return m_latitude; }
+    double longitude() const { return m_longitude; }
 
     Q_INVOKABLE void refresh();
     Q_INVOKABLE void setLocation(double lat, double lon);

@@ -1,5 +1,6 @@
 import QtQuick 2.15
 import Qt5Compat.GraphicalEffects
+import HeadUnit
 
 // Centralized button component with glow effect
 Rectangle {
@@ -13,8 +14,8 @@ Rectangle {
     property url iconSource: ""
     property bool enabled: true
     property var theme
-    property color glowColor: theme?.palette?.primary ?? "#00f0ff"
-    property color iconColor: theme?.palette?.primary ?? "#00f0ff"
+    property color glowColor: ThemeValues.primaryCol
+    property color iconColor: ThemeValues.primaryCol
     property int iconSize: 56
 
     signal clicked()

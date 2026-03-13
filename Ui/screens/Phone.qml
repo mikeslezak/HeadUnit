@@ -214,9 +214,23 @@ Item {
                             anchors.centerIn: parent
                             spacing: 12
 
-                            Text {
-                                text: "📞"
-                                font.pixelSize: 32
+                            Canvas {
+                                width: 32; height: 32
+                                anchors.verticalCenter: parent.verticalCenter
+                                onPaint: {
+                                    var ctx = getContext("2d")
+                                    ctx.clearRect(0, 0, width, height)
+                                    ctx.fillStyle = (phoneNumber.length > 0 ? ThemeValues.successCol : Qt.rgba(ThemeValues.successCol.r, ThemeValues.successCol.g, ThemeValues.successCol.b, 0.4)).toString()
+                                    ctx.beginPath()
+                                    ctx.roundedRect(4, 2, 10, 8, 4, 4)
+                                    ctx.fill()
+                                    ctx.beginPath()
+                                    ctx.roundedRect(4, 22, 10, 8, 4, 4)
+                                    ctx.fill()
+                                    ctx.beginPath()
+                                    ctx.arc(16, 16, 3, 0, Math.PI * 2)
+                                    ctx.fill()
+                                }
                             }
 
                             Text {
@@ -263,9 +277,28 @@ Item {
                             anchors.centerIn: parent
                             spacing: 12
 
-                            Text {
-                                text: "📵"
-                                font.pixelSize: 32
+                            Canvas {
+                                width: 32; height: 32
+                                anchors.verticalCenter: parent.verticalCenter
+                                onPaint: {
+                                    var ctx = getContext("2d")
+                                    ctx.clearRect(0, 0, width, height)
+                                    ctx.fillStyle = ThemeValues.errorCol.toString()
+                                    ctx.save()
+                                    ctx.translate(16, 16)
+                                    ctx.rotate(135 * Math.PI / 180)
+                                    ctx.translate(-16, -16)
+                                    ctx.beginPath()
+                                    ctx.roundedRect(4, 2, 10, 8, 4, 4)
+                                    ctx.fill()
+                                    ctx.beginPath()
+                                    ctx.roundedRect(4, 22, 10, 8, 4, 4)
+                                    ctx.fill()
+                                    ctx.beginPath()
+                                    ctx.arc(16, 16, 3, 0, Math.PI * 2)
+                                    ctx.fill()
+                                    ctx.restore()
+                                }
                             }
 
                             Text {

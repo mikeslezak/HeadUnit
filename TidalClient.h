@@ -131,6 +131,7 @@ public slots:
     void getPlaylist(const QString &playlistId);
     void getFavorites();
     void getHome();
+    void getMix(const QString &mixId);
 
     // ========== FAVORITES ==========
     void addFavorite(int trackId);
@@ -157,7 +158,8 @@ signals:
     void artistReceived(const QVariantMap &artist, const QVariantList &topTracks, const QVariantList &albums);
     void playlistReceived(const QVariantMap &playlist, const QVariantList &tracks);
     void favoritesReceived(const QVariantList &tracks);
-    void homeReceived(const QVariantList &mixes);
+    void homeReceived(const QVariantList &sections);
+    void mixReceived(const QVariantMap &mix, const QVariantList &tracks);
     void streamReady(const QString &url, const QString &codec, const QString &quality);
     void favoriteAdded(int trackId);
     void favoriteRemoved(int trackId);
