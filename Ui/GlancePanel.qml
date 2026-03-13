@@ -13,6 +13,8 @@ Item {
     property string instruction: ""
     property string stepDistance: ""
     property string routeDuration: ""
+    property string routeDistance: ""
+    property string routeDestinationName: ""
 
     // Audio state
     property string audioSource: "none"
@@ -116,7 +118,7 @@ Item {
             Rectangle {
                 id: navCard
                 width: parent.width
-                height: 130
+                height: 170
                 radius: ThemeValues.radius
                 color: Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.08)
                 border.color: Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.2)
@@ -184,24 +186,58 @@ Item {
                         elide: Text.ElideRight
                     }
 
-                    // ETA badge
-                    Rectangle {
-                        width: etaText.width + 16
-                        height: 22
-                        radius: 4
-                        color: Qt.rgba(ThemeValues.accentCol.r, ThemeValues.accentCol.g, ThemeValues.accentCol.b, 0.15)
-                        border.color: Qt.rgba(ThemeValues.accentCol.r, ThemeValues.accentCol.g, ThemeValues.accentCol.b, 0.3)
-                        border.width: 1
+                    // Route summary row: distance, duration, ETA
+                    Row {
+                        width: parent.width
+                        spacing: 8
 
-                        Text {
-                            id: etaText
-                            anchors.centerIn: parent
-                            text: "ETA " + computeETA(root.routeDuration)
-                            color: ThemeValues.accentCol
-                            font.pixelSize: ThemeValues.fontSize - 3
-                            font.family: ThemeValues.fontFamily
-                            font.weight: Font.Bold
+                        // Distance badge
+                        Rectangle {
+                            width: distText.width + 12
+                            height: 22
+                            radius: 4
+                            color: Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.15)
+
+                            Text {
+                                id: distText
+                                anchors.centerIn: parent
+                                text: root.routeDistance + "  " + root.routeDuration
+                                color: ThemeValues.primaryCol
+                                font.pixelSize: ThemeValues.fontSize - 3
+                                font.family: ThemeValues.fontFamily
+                                font.weight: Font.Bold
+                            }
                         }
+
+                        // ETA badge
+                        Rectangle {
+                            width: etaText.width + 12
+                            height: 22
+                            radius: 4
+                            color: Qt.rgba(ThemeValues.accentCol.r, ThemeValues.accentCol.g, ThemeValues.accentCol.b, 0.15)
+
+                            Text {
+                                id: etaText
+                                anchors.centerIn: parent
+                                text: "ETA " + computeETA(root.routeDuration)
+                                color: ThemeValues.accentCol
+                                font.pixelSize: ThemeValues.fontSize - 3
+                                font.family: ThemeValues.fontFamily
+                                font.weight: Font.Bold
+                            }
+                        }
+                    }
+
+                    // Destination name
+                    Text {
+                        width: parent.width
+                        text: root.routeDestinationName
+                        color: ThemeValues.textCol
+                        font.pixelSize: ThemeValues.fontSize - 3
+                        font.family: ThemeValues.fontFamily
+                        opacity: 0.4
+                        elide: Text.ElideRight
+                        visible: root.routeDestinationName !== ""
                     }
                 }
 

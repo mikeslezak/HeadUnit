@@ -17,6 +17,8 @@ Item {
     readonly property string navInstruction: mapsLoader.item ? mapsLoader.item.nextInstruction : ""
     readonly property string navStepDistance: mapsLoader.item ? mapsLoader.item.nextStepDistance : ""
     readonly property string navRouteDuration: mapsLoader.item ? mapsLoader.item.routeDuration : ""
+    readonly property string navRouteDistance: mapsLoader.item ? mapsLoader.item.routeDistance : ""
+    readonly property string navRouteDestinationName: mapsLoader.item ? (mapsLoader.item.routeDestination ? mapsLoader.item.routeDestination.name : "") : ""
 
     // Home screen IS the map — no separate Home.qml needed
 

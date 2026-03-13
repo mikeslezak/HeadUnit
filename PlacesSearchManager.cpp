@@ -202,9 +202,21 @@ void PlacesSearchManager::geocodePlace(const QString &query)
     qDebug() << "PlacesSearchManager: Geocoding place:" << query << "near" << lat << lon;
 
     // OSM Nominatim — community-edited POI coordinates, most accurate building positions
+    // Strip filler words that Nominatim can't handle (e.g. "GoodLife Fitness in Okotoks" -> "GoodLife Fitness Okotoks")
+    static const QStringList fillerWords = {"in", "near", "at", "to", "the", "a", "an", "on", "by"};
+    QStringList words = query.split(QRegularExpression("\\s+"), Qt::SkipEmptyParts);
+    QStringList cleanWords;
+    for (const QString &w : words) {
+        if (!fillerWords.contains(w.toLower())) {
+            cleanWords.append(w);
+        }
+    }
+    QString cleanQuery = cleanWords.join(" ");
+    qDebug() << "PlacesSearchManager: Clean query:" << cleanQuery;
+
     QUrl url("https://nominatim.openstreetmap.org/search");
     QUrlQuery params;
-    params.addQueryItem("q", query);
+    params.addQueryItem("q", cleanQuery);
     params.addQueryItem("format", "json");
     params.addQueryItem("limit", "10");
     params.addQueryItem("countrycodes", "ca");
@@ -213,29 +225,85 @@ void PlacesSearchManager::geocodePlace(const QString &query)
 
     QNetworkRequest req(url);
     req.setRawHeader("User-Agent", "HeadUnit/1.0");
+    req.setAttribute(QNetworkRequest::User, "nominatim"); // Tag source
     m_geocodeNetwork->get(req);
 }
 
 void PlacesSearchManager::onGeocodeReply(QNetworkReply *reply)
 {
     reply->deleteLater();
+    QString source = reply->request().attribute(QNetworkRequest::User).toString();
 
     if (reply->error() != QNetworkReply::NoError) {
-        qWarning() << "PlacesSearchManager: Geocode failed:" << reply->errorString();
+        qWarning() << "PlacesSearchManager: Geocode failed (" << source << "):" << reply->errorString();
         emit searchFailed("Place search failed: " + reply->errorString());
         return;
     }
 
-    QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
-    QJsonArray results = doc.array();
+    QByteArray data = reply->readAll();
+    QJsonDocument doc = QJsonDocument::fromJson(data);
 
-    if (results.isEmpty()) {
-        qDebug() << "PlacesSearchManager: No geocode results";
+    if (source == "nominatim") {
+        QJsonArray results = doc.array();
+        if (results.isEmpty()) {
+            // Fallback to Google Places (New)
+            qDebug() << "PlacesSearchManager: Nominatim returned no results, falling back to Google";
+            geocodeFallbackGoogle();
+            return;
+        }
+        parseNominatimResults(results);
+    } else if (source == "google") {
+        QJsonArray places = doc.object()["places"].toArray();
+        if (places.isEmpty()) {
+            qDebug() << "PlacesSearchManager: Google also returned no results";
+            emit searchFailed("Place not found");
+            return;
+        }
+        parseGoogleResults(places);
+    }
+}
+
+void PlacesSearchManager::geocodeFallbackGoogle()
+{
+    if (m_googleApiKey.isEmpty()) {
+        qDebug() << "PlacesSearchManager: No Google API key for fallback";
         emit searchFailed("Place not found");
         return;
     }
 
-    // Score results against query words
+    double lat = m_context ? m_context->gpsLatitude() : 0.0;
+    double lon = m_context ? m_context->gpsLongitude() : 0.0;
+
+    QUrl url("https://places.googleapis.com/v1/places:searchText");
+    QNetworkRequest req(url);
+    req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    req.setRawHeader("X-Goog-Api-Key", m_googleApiKey.toUtf8());
+    req.setRawHeader("X-Goog-FieldMask",
+        "places.displayName,places.location,places.formattedAddress");
+    req.setAttribute(QNetworkRequest::User, "google"); // Tag source
+
+    QJsonObject body;
+    body["textQuery"] = m_lastGeocodeQuery;
+    body["maxResultCount"] = 5;
+    body["languageCode"] = "en";
+
+    if (lat != 0.0 || lon != 0.0) {
+        QJsonObject circle;
+        QJsonObject center;
+        center["latitude"] = lat;
+        center["longitude"] = lon;
+        circle["center"] = center;
+        circle["radius"] = 50000.0;
+        QJsonObject locationBias;
+        locationBias["circle"] = circle;
+        body["locationBias"] = locationBias;
+    }
+
+    m_geocodeNetwork->post(req, QJsonDocument(body).toJson(QJsonDocument::Compact));
+}
+
+void PlacesSearchManager::parseNominatimResults(const QJsonArray &results)
+{
     int bestIdx = 0;
     QString queryLower = m_lastGeocodeQuery.toLower();
 
@@ -258,9 +326,8 @@ void PlacesSearchManager::onGeocodeReply(QNetworkReply *reply)
             if (name.contains(word)) score += 2;
             else if (displayName.contains(word)) score += 1;
         }
-        qDebug() << "PlacesSearchManager: Result" << i << r["name"].toString()
-                 << "score:" << score << "at" << r["lat"].toString() << r["lon"].toString()
-                 << r["display_name"].toString().left(80);
+        qDebug() << "PlacesSearchManager: Nominatim result" << i << r["name"].toString()
+                 << "score:" << score << "at" << r["lat"].toString() << r["lon"].toString();
         if (score > bestScore) {
             bestScore = score;
             bestIdx = i;
@@ -271,14 +338,53 @@ void PlacesSearchManager::onGeocodeReply(QNetworkReply *reply)
     double lat = best["lat"].toString().toDouble();
     double lon = best["lon"].toString().toDouble();
     QString name = best["name"].toString();
-    QString displayName = best["display_name"].toString();
-
-    // If Nominatim name is empty, extract from display_name
     if (name.isEmpty()) {
-        name = displayName.section(',', 0, 0).trimmed();
+        name = best["display_name"].toString().section(',', 0, 0).trimmed();
     }
 
-    qDebug() << "PlacesSearchManager: Geocoded" << name << "at" << lat << lon << displayName.left(80);
+    qDebug() << "PlacesSearchManager: Geocoded (Nominatim)" << name << "at" << lat << lon;
+    emit geocodeCompleted(lat, lon, name);
+}
+
+void PlacesSearchManager::parseGoogleResults(const QJsonArray &places)
+{
+    int bestIdx = 0;
+    QString queryLower = m_lastGeocodeQuery.toLower();
+
+    static const QStringList skipWords = {"in", "the", "to", "at", "on", "near", "a", "an"};
+    QStringList queryWords;
+    for (const QString &word : queryLower.split(QRegularExpression("\\W+"), Qt::SkipEmptyParts)) {
+        if (!skipWords.contains(word) && word.length() > 2) {
+            queryWords.append(word);
+        }
+    }
+
+    int bestScore = -1;
+    for (int i = 0; i < places.size(); ++i) {
+        QJsonObject place = places[i].toObject();
+        QString name = place["displayName"].toObject()["text"].toString().toLower();
+        QString addr = place["formattedAddress"].toString().toLower();
+
+        int score = 0;
+        for (const QString &word : queryWords) {
+            if (name.contains(word)) score += 2;
+            else if (addr.contains(word)) score += 1;
+        }
+        qDebug() << "PlacesSearchManager: Google result" << i
+                 << place["displayName"].toObject()["text"].toString() << "score:" << score;
+        if (score > bestScore) {
+            bestScore = score;
+            bestIdx = i;
+        }
+    }
+
+    QJsonObject place = places[bestIdx].toObject();
+    QJsonObject location = place["location"].toObject();
+    double lat = location["latitude"].toDouble();
+    double lon = location["longitude"].toDouble();
+    QString name = place["displayName"].toObject()["text"].toString();
+
+    qDebug() << "PlacesSearchManager: Geocoded (Google fallback)" << name << "at" << lat << lon;
     emit geocodeCompleted(lat, lon, name);
 }
 

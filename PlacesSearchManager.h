@@ -47,6 +47,9 @@ private:
 
     QString formatResults(const QList<PlaceResult> &results) const;
     void enrichWithGoogle(QList<PlaceResult> results);
+    void geocodeFallbackGoogle();
+    void parseNominatimResults(const QJsonArray &results);
+    void parseGoogleResults(const QJsonArray &places);
     double haversineDistance(double lat1, double lon1, double lat2, double lon2) const;
 
     QNetworkAccessManager *m_mapboxNetwork;

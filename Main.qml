@@ -473,6 +473,8 @@ Window {
                 instruction: screenContainer.navInstruction
                 stepDistance: screenContainer.navStepDistance
                 routeDuration: screenContainer.navRouteDuration
+                routeDistance: screenContainer.navRouteDistance
+                routeDestinationName: screenContainer.navRouteDestinationName
 
                 onNavTapped: showScreen("home")
                 onMusicTapped: {
