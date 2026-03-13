@@ -52,7 +52,10 @@ private:
 
     void processEvents();
     void buildSummary();
-    bool isNearRoute(double lat, double lon, double radiusKm) const;
+    bool isOnRoute(double lat, double lon) const;
+    double pointToSegmentDistanceKm(double pLat, double pLon,
+                                     double aLat, double aLon,
+                                     double bLat, double bLon) const;
     double haversineKm(double lat1, double lon1, double lat2, double lon2) const;
     QString shortenDescription(const QString &desc) const;
 

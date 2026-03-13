@@ -29,6 +29,9 @@ Item {
     // ScreenContainer reference for reading GPS/route data
     property var screenContainer: null
 
+    // Queue for proactive alerts that arrive while TTS is speaking
+    property var pendingAlerts: []
+
     // Track which music source was playing when Jarvis activated, so we can resume after
     property string pausedAudioSource: ""
 
@@ -145,6 +148,19 @@ Item {
                 // Claude response finished speaking
                 hideClaudeTimer.stop()
 
+                // Check for queued alerts — send to Claude for natural delivery
+                if (root.pendingAlerts.length > 0) {
+                    var alerts = root.pendingAlerts
+                    root.pendingAlerts = []
+                    var alertContext = "The following alerts just came in. Briefly mention them in a natural, conversational way: " + alerts.join(". ")
+                    console.log("VoicePipeline: Sending queued alerts to Claude:", alertContext)
+                    if (claudeIndicatorLoader && claudeIndicatorLoader.item) {
+                        claudeIndicatorLoader.item.setState("thinking")
+                    }
+                    claudeClient.sendMessage(alertContext, "")
+                    return
+                }
+
                 if (root.pendingFollowUp) {
                     // Follow-up expected — keep indicator visible, enter follow-up mode
                     console.log("TTS response finished, entering follow-up mode")
@@ -152,8 +168,9 @@ Item {
                     if (claudeIndicatorLoader && claudeIndicatorLoader.item) {
                         claudeIndicatorLoader.item.setState("listening")
                     }
-                    // PicovoiceManager.enterFollowUpMode() is called via C++ signal
-                    // Just resume audio processing after echo delay
+                    // Enter follow-up mode so PicovoiceManager listens without wake word
+                    picovoiceManager.enterFollowUpMode()
+                    // Resume audio processing after echo delay
                     resumeAfterTTSTimer.start()
                 } else {
                     // No follow-up — hide indicator, resume wake word and music
@@ -262,40 +279,56 @@ Item {
         }
     }
 
-    // CopilotMonitor proactive alerts — speak them via TTS
+    // CopilotMonitor proactive alerts — queue if TTS is busy, otherwise speak
     Connections {
         target: copilotMonitor
 
         function onProactiveAlert(message) {
             console.log("Copilot proactive alert:", message)
 
-            // Pause music for alert
-            root.pausedAudioSource = ""
-            if (tidalClient && tidalClient.isPlaying) {
-                tidalClient.pause()
-                root.pausedAudioSource = "tidal"
-            } else if (spotifyClient && spotifyClient.isPlaying) {
-                spotifyClient.pause()
-                root.pausedAudioSource = "spotify"
-            } else if (mediaController && mediaController.isPlaying) {
-                mediaController.pause()
-                root.pausedAudioSource = "music"
+            // If TTS is currently speaking, queue the alert for after it finishes
+            if (googleTTS.isSpeaking || root.pendingSpeechType !== "") {
+                console.log("VoicePipeline: TTS busy, queuing alert")
+                var alerts = root.pendingAlerts
+                alerts.push(message)
+                root.pendingAlerts = alerts
+                return
             }
 
-            // Show Claude indicator for alert
-            if (claudeIndicatorLoader) {
-                claudeIndicatorLoader.active = true
-                if (claudeIndicatorLoader.item) {
-                    claudeIndicatorLoader.item.show()
-                    claudeIndicatorLoader.item.setState("speaking")
-                }
-            }
-
-            root.pendingSpeechType = "response"
-            root.pendingFollowUp = false
-            googleTTS.speak(message)
-            hideClaudeTimer.start()
+            speakAlert(message)
         }
+    }
+
+    // Send a proactive alert through Claude for natural conversational delivery
+    function speakAlert(message) {
+        // Pause music for alert
+        root.pausedAudioSource = ""
+        if (tidalClient && tidalClient.isPlaying) {
+            tidalClient.pause()
+            root.pausedAudioSource = "tidal"
+        } else if (spotifyClient && spotifyClient.isPlaying) {
+            spotifyClient.pause()
+            root.pausedAudioSource = "spotify"
+        } else if (mediaController && mediaController.isPlaying) {
+            mediaController.pause()
+            root.pausedAudioSource = "music"
+        }
+
+        // Show Claude indicator
+        if (claudeIndicatorLoader) {
+            claudeIndicatorLoader.active = true
+            if (claudeIndicatorLoader.item) {
+                claudeIndicatorLoader.item.show()
+                claudeIndicatorLoader.item.setState("thinking")
+            }
+        }
+
+        // Send to Claude so Jarvis delivers it conversationally
+        var prompt = "The following road conditions have been detected along the driver's current route. Give them a brief, natural heads-up about all of these. Be conversational, not robotic. Here are the conditions: " + message
+        root.pendingSpeechType = "response"
+        root.pendingFollowUp = false
+        claudeClient.sendMessage(prompt, "")
+        hideClaudeTimer.start()
     }
 
     // Forward route state from ScreenContainer to ContextAggregator

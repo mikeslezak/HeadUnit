@@ -12,7 +12,7 @@ GoogleTTS::GoogleTTS(QObject *parent)
     : QObject(parent)
     , m_networkManager(new QNetworkAccessManager(this))
     , m_currentReply(nullptr)
-    , m_voiceName("en-US-Neural2-F")  // Default: Female US English neural voice
+    , m_voiceName("en-US-Studio-O")  // Studio: highest quality female US English voice
     , m_languageCode("en-US")
     , m_speakingRate(1.0)
     , m_pitch(0.0)

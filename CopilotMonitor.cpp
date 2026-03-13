@@ -13,11 +13,17 @@
 CopilotMonitor::CopilotMonitor(QObject *parent)
     : QObject(parent)
     , m_checkTimer(new QTimer(this))
+    , m_routeAlertBatchTimer(new QTimer(this))
 {
     // Check every 60 seconds
     m_checkTimer->setInterval(60 * 1000);
     connect(m_checkTimer, &QTimer::timeout, this, &CopilotMonitor::checkConditions);
     m_checkTimer->start();
+
+    // Batch timer: collect all route-related alerts for 3 seconds, then emit as one
+    m_routeAlertBatchTimer->setSingleShot(true);
+    m_routeAlertBatchTimer->setInterval(3000);
+    connect(m_routeAlertBatchTimer, &QTimer::timeout, this, &CopilotMonitor::flushRouteAlerts);
 
     qDebug() << "CopilotMonitor: Initialized";
 }
@@ -105,13 +111,13 @@ void CopilotMonitor::setRoadConditionManager(RoadConditionManager *roadCondition
 void CopilotMonitor::onRouteWeatherAlert(const QString &message)
 {
     if (!m_enabled || m_quietMode) return;
-    emitAlert("route_weather", message);
+    queueRouteAlert(message);
 }
 
 void CopilotMonitor::onRoadConditionAlert(const QString &message)
 {
     if (!m_enabled || m_quietMode) return;
-    emitAlert("road_condition", message);
+    queueRouteAlert(message);
 }
 
 void CopilotMonitor::setSpeedLimitManager(SpeedLimitManager *speedLimit)
@@ -153,25 +159,26 @@ void CopilotMonitor::setBorderWaitManager(BorderWaitManager *borderWait)
 void CopilotMonitor::onSpeedLimitAlert(const QString &message)
 {
     if (!m_enabled || m_quietMode) return;
+    // Speed limit is immediate/urgent — don't batch
     emitAlert("speed_limit", message);
 }
 
 void CopilotMonitor::onRoadSurfaceAlert(const QString &message)
 {
     if (!m_enabled || m_quietMode) return;
-    emitAlert("road_surface", message);
+    queueRouteAlert(message);
 }
 
 void CopilotMonitor::onAvalancheAlert(const QString &message)
 {
     if (!m_enabled || m_quietMode) return;
-    emitAlert("avalanche", message);
+    queueRouteAlert(message);
 }
 
 void CopilotMonitor::onBorderWaitAlert(const QString &message)
 {
     if (!m_enabled || m_quietMode) return;
-    emitAlert("border_wait", message);
+    queueRouteAlert(message);
 }
 
 bool CopilotMonitor::shouldThrottle(const QString &alertType)
@@ -206,4 +213,36 @@ void CopilotMonitor::emitAlert(const QString &alertType, const QString &message)
 
     qDebug() << "CopilotMonitor: Alert -" << alertType << ":" << message;
     emit proactiveAlert(message);
+}
+
+void CopilotMonitor::queueRouteAlert(const QString &message)
+{
+    m_pendingRouteAlerts.append(message);
+    // Start/restart the 3-second batch timer — collects all alerts that arrive
+    // within a short window so they can be delivered as one cohesive update
+    m_routeAlertBatchTimer->start();
+    qDebug() << "CopilotMonitor: Queued route alert (" << m_pendingRouteAlerts.size() << "pending):" << message;
+}
+
+void CopilotMonitor::flushRouteAlerts()
+{
+    if (m_pendingRouteAlerts.isEmpty()) return;
+
+    // Throttle the combined batch as "route_alerts"
+    if (shouldThrottle("route_alerts")) {
+        qDebug() << "CopilotMonitor: Throttled batch of" << m_pendingRouteAlerts.size() << "route alerts";
+        m_pendingRouteAlerts.clear();
+        return;
+    }
+
+    // Combine all pending alerts into one message
+    QString combined = m_pendingRouteAlerts.join(" ");
+    m_pendingRouteAlerts.clear();
+
+    qint64 now = QDateTime::currentMSecsSinceEpoch();
+    m_lastAlertTime["route_alerts"] = now;
+    m_lastAnyAlertTime = now;
+
+    qDebug() << "CopilotMonitor: Flushing batched route alerts:" << combined;
+    emit proactiveAlert(combined);
 }

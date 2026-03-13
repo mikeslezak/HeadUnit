@@ -101,7 +101,7 @@ int main(int argc, char *argv[])
     picovoiceManager.setGoogleApiKey(qEnvironmentVariable("GOOGLE_API_KEY"));
 
     // Set default TTS preferences (can be changed in Settings)
-    googleTTS.setVoiceName("en-US-Neural2-F");  // Female US English neural voice
+    googleTTS.setVoiceName("en-US-Studio-O");  // Studio: highest quality female US English voice
     googleTTS.setSpeakingRate(1.0);  // Normal speed
     googleTTS.setPitch(0.0);  // Normal pitch
 

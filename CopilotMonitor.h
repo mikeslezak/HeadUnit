@@ -57,6 +57,8 @@ private slots:
 private:
     bool shouldThrottle(const QString &alertType);
     void emitAlert(const QString &alertType, const QString &message);
+    void queueRouteAlert(const QString &message);
+    void flushRouteAlerts();
 
     ContextAggregator *m_context = nullptr;
     VehicleBusManager *m_vehicle = nullptr;
@@ -70,6 +72,10 @@ private:
     QTimer *m_checkTimer;
     bool m_enabled = true;
     bool m_quietMode = false;
+
+    // Batch route alerts: collect for 3 seconds then emit as one
+    QTimer *m_routeAlertBatchTimer;
+    QStringList m_pendingRouteAlerts;
 
     // Driving duration tracking
     QElapsedTimer m_drivingTimer;

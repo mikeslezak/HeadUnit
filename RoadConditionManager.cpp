@@ -99,15 +99,15 @@ void RoadConditionManager::fetchConditions()
             minLon = qMin(minLon, pt.lon);
             maxLon = qMax(maxLon, pt.lon);
         }
-        // Add padding (roughly 50km)
-        minLat -= 0.5; maxLat += 0.5;
-        minLon -= 0.5; maxLon += 0.5;
+        // Add padding (roughly 15km)
+        minLat -= 0.15; maxLat += 0.15;
+        minLon -= 0.15; maxLon += 0.15;
     } else if (m_context && m_context->gpsLatitude() != 0.0) {
-        // No route — use GPS position with 100km radius
+        // No route — use GPS position with ~20km radius
         double lat = m_context->gpsLatitude();
         double lon = m_context->gpsLongitude();
-        minLat = lat - 1.0; maxLat = lat + 1.0;
-        minLon = lon - 1.0; maxLon = lon + 1.0;
+        minLat = lat - 0.2; maxLat = lat + 0.2;
+        minLon = lon - 0.2; maxLon = lon + 0.2;
     } else {
         return; // No location data
     }
@@ -230,9 +230,9 @@ void RoadConditionManager::processEvents()
 {
     m_routeEvents.clear();
 
-    // Filter events near route (within 10km of any route sample point)
+    // Filter events that are actually ON the route (within 200m of the route line)
     for (const auto &ev : m_allEvents) {
-        if (isNearRoute(ev.lat, ev.lon, 10.0)) {
+        if (isOnRoute(ev.lat, ev.lon)) {
             m_routeEvents.append(ev);
         }
     }
@@ -242,18 +242,20 @@ void RoadConditionManager::processEvents()
 
     buildSummary();
 
-    // Emit alerts for significant events near route
-    for (const auto &ev : m_routeEvents) {
-        if (ev.fullClosure) {
-            emit alertDetected(QString("Road closure ahead on %1. %2")
-                .arg(ev.roadName.isEmpty() ? "your route" : ev.roadName,
-                     shortenDescription(ev.description)));
-        } else if (ev.severity == "MAJOR" || ev.severity == "Major") {
-            emit alertDetected(QString("Major %1 ahead on %2. %3")
-                .arg(ev.eventType,
-                     ev.roadName.isEmpty() ? "your route" : ev.roadName,
-                     shortenDescription(ev.description)));
+    // Emit a single comprehensive alert with ALL on-route events.
+    // This gets sent to Claude who delivers it conversationally.
+    if (!m_routeEvents.isEmpty()) {
+        QString alert;
+        for (const auto &ev : m_routeEvents) {
+            QString road = ev.roadName.isEmpty() ? "unknown road" : ev.roadName;
+            alert += QString("%1 on %2: %3").arg(ev.eventType, road, shortenDescription(ev.description));
+            if (!ev.severity.isEmpty() && ev.severity != "None")
+                alert += QString(" (severity: %1)").arg(ev.severity);
+            if (ev.fullClosure)
+                alert += " (FULL CLOSURE)";
+            alert += ". ";
         }
+        emit alertDetected(alert.trimmed());
     }
 }
 
@@ -285,22 +287,66 @@ void RoadConditionManager::buildSummary()
     qDebug() << "RoadConditionManager: Summary updated," << m_routeEvents.size() << "route events";
 }
 
-bool RoadConditionManager::isNearRoute(double lat, double lon, double radiusKm) const
+bool RoadConditionManager::isOnRoute(double lat, double lon) const
 {
-    // Check against GPS position first
-    if (m_context && m_context->gpsLatitude() != 0.0) {
-        if (haversineKm(lat, lon, m_context->gpsLatitude(), m_context->gpsLongitude()) < radiusKm) {
-            return true;
+    // Check perpendicular distance from the event to each segment of the actual route polyline.
+    // Only events within 200m of the route line itself are considered "on route".
+    const double ON_ROUTE_THRESHOLD_KM = 0.2; // 200 meters
+
+    int numCoords = m_routeCoordinates.size();
+    if (numCoords >= 2) {
+        // Walk every segment of the full route polyline
+        // For performance, step through every 5th coordinate (routes can have thousands of points)
+        int step = qMax(1, numCoords / 500);
+        for (int i = 0; i < numCoords - step; i += step) {
+            QJsonArray a = m_routeCoordinates[i].toArray();
+            int j = qMin(i + step, numCoords - 1);
+            QJsonArray b = m_routeCoordinates[j].toArray();
+            if (a.size() >= 2 && b.size() >= 2) {
+                double dist = pointToSegmentDistanceKm(
+                    lat, lon,
+                    a[1].toDouble(), a[0].toDouble(),  // lat, lon (GeoJSON is lon,lat)
+                    b[1].toDouble(), b[0].toDouble());
+                if (dist < ON_ROUTE_THRESHOLD_KM) {
+                    return true;
+                }
+            }
         }
+        return false;
     }
 
-    // Check against sampled route points
-    for (const auto &pt : m_routePoints) {
-        if (haversineKm(lat, lon, pt.lat, pt.lon) < radiusKm) {
-            return true;
-        }
+    // No route — check GPS position with 200m radius
+    if (m_context && m_context->gpsLatitude() != 0.0) {
+        return haversineKm(lat, lon, m_context->gpsLatitude(), m_context->gpsLongitude()) < ON_ROUTE_THRESHOLD_KM;
     }
+
     return false;
+}
+
+double RoadConditionManager::pointToSegmentDistanceKm(double pLat, double pLon,
+                                                       double aLat, double aLon,
+                                                       double bLat, double bLon) const
+{
+    // Project point P onto line segment AB using flat-earth approximation (fine for short segments)
+    // Returns distance in km from P to the closest point on segment AB
+    double dx = bLon - aLon;
+    double dy = bLat - aLat;
+    double lenSq = dx * dx + dy * dy;
+
+    if (lenSq < 1e-12) {
+        // A and B are the same point
+        return haversineKm(pLat, pLon, aLat, aLon);
+    }
+
+    // Parameter t of the projection of P onto AB, clamped to [0,1]
+    double t = ((pLon - aLon) * dx + (pLat - aLat) * dy) / lenSq;
+    t = qBound(0.0, t, 1.0);
+
+    // Closest point on segment
+    double closestLat = aLat + t * dy;
+    double closestLon = aLon + t * dx;
+
+    return haversineKm(pLat, pLon, closestLat, closestLon);
 }
 
 double RoadConditionManager::haversineKm(double lat1, double lon1, double lat2, double lon2) const
