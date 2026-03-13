@@ -3,7 +3,6 @@
 
 #include <QObject>
 #include <QString>
-#include <QTimer>
 
 class WeatherManager;
 class VehicleBusManager;

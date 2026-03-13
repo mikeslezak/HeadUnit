@@ -1,4 +1,5 @@
 #include "HighwayCameraManager.h"
+#include "GeoUtils.h"
 #include <QDebug>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -235,20 +236,10 @@ bool HighwayCameraManager::isNearRoute(double lat, double lon, double radiusKm) 
 {
     // Check against sampled route points
     for (const auto &pt : m_routePoints) {
-        if (haversineKm(lat, lon, pt.lat, pt.lon) < radiusKm) {
+        if (GeoUtils::haversineKm(lat, lon, pt.lat, pt.lon) < radiusKm) {
             return true;
         }
     }
     return false;
 }
 
-double HighwayCameraManager::haversineKm(double lat1, double lon1, double lat2, double lon2) const
-{
-    const double R = 6371.0;
-    double dLat = qDegreesToRadians(lat2 - lat1);
-    double dLon = qDegreesToRadians(lon2 - lon1);
-    double a = qSin(dLat / 2) * qSin(dLat / 2)
-             + qCos(qDegreesToRadians(lat1)) * qCos(qDegreesToRadians(lat2))
-             * qSin(dLon / 2) * qSin(dLon / 2);
-    return R * 2 * qAtan2(qSqrt(a), qSqrt(1 - a));
-}

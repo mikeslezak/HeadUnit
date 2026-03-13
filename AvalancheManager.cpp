@@ -31,6 +31,7 @@ void AvalancheManager::setRouteCoordinates(const QJsonArray &coordinates, double
         return;
     }
 
+    ++m_generation;
     sampleMountainPoints(coordinates, durationSec);
 
     m_active = true;
@@ -44,6 +45,7 @@ void AvalancheManager::setRouteCoordinates(const QJsonArray &coordinates, double
 
 void AvalancheManager::clearRoute()
 {
+    ++m_generation;
     m_active = false;
     m_points.clear();
     m_summary.clear();
@@ -102,6 +104,7 @@ void AvalancheManager::fetchForecasts()
         QUrl requestUrl(url);
         QNetworkRequest req(requestUrl);
         req.setAttribute(QNetworkRequest::User, i);
+        req.setAttribute(QNetworkRequest::UserMax, m_generation);
         m_network->get(req);
     }
 }
@@ -109,6 +112,11 @@ void AvalancheManager::fetchForecasts()
 void AvalancheManager::onForecastReply(QNetworkReply *reply)
 {
     reply->deleteLater();
+
+    // Discard stale replies from a previous route
+    if (reply->request().attribute(QNetworkRequest::UserMax).toInt() != m_generation) {
+        return;
+    }
 
     int idx = reply->request().attribute(QNetworkRequest::User).toInt();
     if (idx < 0 || idx >= m_points.size()) return;

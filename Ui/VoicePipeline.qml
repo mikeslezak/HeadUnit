@@ -56,25 +56,7 @@ Item {
             hideClaudeTimer.stop()
 
             // Pause any playing music so Jarvis can be heard
-            root.pausedAudioSource = ""
-            console.log("VoicePipeline: Checking music state - tidal:", tidalClient ? tidalClient.isPlaying : "null",
-                        "spotify:", spotifyClient ? spotifyClient.isPlaying : "null",
-                        "media:", mediaController ? mediaController.isPlaying : "null")
-            if (tidalClient && tidalClient.isPlaying) {
-                console.log("VoicePipeline: Pausing Tidal")
-                tidalClient.pause()
-                root.pausedAudioSource = "tidal"
-            } else if (spotifyClient && spotifyClient.isPlaying) {
-                console.log("VoicePipeline: Pausing Spotify")
-                spotifyClient.pause()
-                root.pausedAudioSource = "spotify"
-            } else if (mediaController && mediaController.isPlaying) {
-                console.log("VoicePipeline: Pausing MediaController")
-                mediaController.pause()
-                root.pausedAudioSource = "music"
-            } else {
-                console.log("VoicePipeline: No music source detected as playing")
-            }
+            pauseMusic()
 
             // Activate Claude indicator (same as long-press home button)
             if (claudeIndicatorLoader) {
@@ -131,6 +113,10 @@ Item {
             // Pause wake word detection while TTS is playing to prevent
             // the speaker output from triggering false "jarvis" detections
             picovoiceManager.pause()
+
+            // TTS is actively playing — cancel the silent-failure fallback timer.
+            // onSpeechFinished will handle cleanup when playback completes.
+            hideClaudeTimer.stop()
         }
 
         function onSpeechFinished() {
@@ -157,7 +143,7 @@ Item {
                     if (claudeIndicatorLoader && claudeIndicatorLoader.item) {
                         claudeIndicatorLoader.item.setState("thinking")
                     }
-                    claudeClient.sendMessage(alertContext, "")
+                    claudeClient.sendMessage(alertContext, contextAggregator.buildContext())
                     return
                 }
 
@@ -302,17 +288,7 @@ Item {
     // Send a proactive alert through Claude for natural conversational delivery
     function speakAlert(message) {
         // Pause music for alert
-        root.pausedAudioSource = ""
-        if (tidalClient && tidalClient.isPlaying) {
-            tidalClient.pause()
-            root.pausedAudioSource = "tidal"
-        } else if (spotifyClient && spotifyClient.isPlaying) {
-            spotifyClient.pause()
-            root.pausedAudioSource = "spotify"
-        } else if (mediaController && mediaController.isPlaying) {
-            mediaController.pause()
-            root.pausedAudioSource = "music"
-        }
+        pauseMusic()
 
         // Show Claude indicator
         if (claudeIndicatorLoader) {
@@ -327,11 +303,14 @@ Item {
         var prompt = "The following road conditions have been detected along the driver's current route. Give them a brief, natural heads-up about all of these. Be conversational, not robotic. Here are the conditions: " + message
         root.pendingSpeechType = "response"
         root.pendingFollowUp = false
-        claudeClient.sendMessage(prompt, "")
+        claudeClient.sendMessage(prompt, contextAggregator.buildContext())
         hideClaudeTimer.start()
     }
 
-    // Forward route state from ScreenContainer to ContextAggregator
+    // Forward route state from ScreenContainer to ContextAggregator.
+    // Polls every 5s because ScreenContainer's nav properties are populated by
+    // a Loader'd Maps.qml — there's no direct signal path from the map item to
+    // this pipeline without adding cross-component wiring through Main.qml.
     Timer {
         id: routeForwardTimer
         interval: 5000
@@ -351,9 +330,12 @@ Item {
         interval: 30000
         repeat: false
         onTriggered: {
+            console.log("VoicePipeline: hideClaudeTimer fired (TTS silent failure fallback)")
             if (claudeIndicatorLoader && claudeIndicatorLoader.item) {
                 claudeIndicatorLoader.item.hide()
             }
+            googleTTS.stop()
+            picovoiceManager.resume()
             resumeMusic()
         }
     }
@@ -446,6 +428,24 @@ Item {
         }
     }
 
+    // Pause any playing music so Jarvis can be heard
+    function pauseMusic() {
+        root.pausedAudioSource = ""
+        if (tidalClient && tidalClient.isPlaying) {
+            console.log("VoicePipeline: Pausing Tidal")
+            tidalClient.pause()
+            root.pausedAudioSource = "tidal"
+        } else if (spotifyClient && spotifyClient.isPlaying) {
+            console.log("VoicePipeline: Pausing Spotify")
+            spotifyClient.pause()
+            root.pausedAudioSource = "spotify"
+        } else if (mediaController && mediaController.isPlaying) {
+            console.log("VoicePipeline: Pausing MediaController")
+            mediaController.pause()
+            root.pausedAudioSource = "music"
+        }
+    }
+
     // Resume music that was paused when Jarvis activated
     function resumeMusic() {
         if (root.pausedAudioSource === "tidal" && tidalClient) {
@@ -463,17 +463,7 @@ Item {
         console.log("Claude AI activated via manual trigger")
 
         // Pause music
-        root.pausedAudioSource = ""
-        if (tidalClient && tidalClient.isPlaying) {
-            tidalClient.pause()
-            root.pausedAudioSource = "tidal"
-        } else if (spotifyClient && spotifyClient.isPlaying) {
-            spotifyClient.pause()
-            root.pausedAudioSource = "spotify"
-        } else if (mediaController && mediaController.isPlaying) {
-            mediaController.pause()
-            root.pausedAudioSource = "music"
-        }
+        pauseMusic()
 
         if (claudeIndicatorLoader) {
             claudeIndicatorLoader.active = true
@@ -489,10 +479,12 @@ Item {
 
     // Cancel current voice interaction (called when user taps to dismiss)
     function cancelInteraction() {
-        console.log("VoicePipeline: Canceling interaction, resuming music")
+        console.log("VoicePipeline: Canceling interaction, stopping TTS, resetting voice pipeline")
         root.pendingSpeechType = ""
         root.pendingFollowUp = false
         hideClaudeTimer.stop()
+        googleTTS.stop()
+        picovoiceManager.cancelAndReset()
         resumeMusic()
     }
 }

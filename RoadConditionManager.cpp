@@ -1,5 +1,6 @@
 #include "RoadConditionManager.h"
 #include "ContextAggregator.h"
+#include "GeoUtils.h"
 #include <QDebug>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -35,6 +36,7 @@ void RoadConditionManager::setRouteCoordinates(const QJsonArray &coordinates, do
         return;
     }
 
+    ++m_generation;
     m_routeCoordinates = coordinates;
     sampleRoutePoints(coordinates);
 
@@ -49,6 +51,7 @@ void RoadConditionManager::setRouteCoordinates(const QJsonArray &coordinates, do
 
 void RoadConditionManager::clearRoute()
 {
+    ++m_generation;
     m_active = false;
     m_routeCoordinates = QJsonArray();
     m_routePoints.clear();
@@ -117,6 +120,7 @@ void RoadConditionManager::fetchConditions()
     QUrl abUrl("https://prod-ab.ibi511.com/api/v2/get/event");
     QNetworkRequest abReq(abUrl);
     abReq.setRawHeader("Accept", "application/json");
+    abReq.setAttribute(QNetworkRequest::UserMax, m_generation);
     m_albertaNetwork->get(abReq);
 
     // DriveBC — fetch active events with bounding box
@@ -127,6 +131,7 @@ void RoadConditionManager::fetchConditions()
         .arg(maxLon, 0, 'f', 4).arg(maxLat, 0, 'f', 4);
     QUrl bcUrl(bcUrlStr);
     QNetworkRequest bcReq(bcUrl);
+    bcReq.setAttribute(QNetworkRequest::UserMax, m_generation);
     m_drivebcNetwork->get(bcReq);
 
     qDebug() << "RoadConditionManager: Fetching conditions, bbox:"
@@ -136,6 +141,11 @@ void RoadConditionManager::fetchConditions()
 void RoadConditionManager::onAlbertaReply(QNetworkReply *reply)
 {
     reply->deleteLater();
+
+    // Discard stale replies from a previous route
+    if (reply->request().attribute(QNetworkRequest::UserMax).toInt() != m_generation) {
+        return;
+    }
 
     if (reply->error() != QNetworkReply::NoError) {
         qWarning() << "RoadConditionManager: Alberta fetch failed:" << reply->errorString();
@@ -178,6 +188,11 @@ void RoadConditionManager::onAlbertaReply(QNetworkReply *reply)
 void RoadConditionManager::onDriveBCReply(QNetworkReply *reply)
 {
     reply->deleteLater();
+
+    // Discard stale replies from a previous route
+    if (reply->request().attribute(QNetworkRequest::UserMax).toInt() != m_generation) {
+        return;
+    }
 
     if (reply->error() != QNetworkReply::NoError) {
         qWarning() << "RoadConditionManager: DriveBC fetch failed:" << reply->errorString();
@@ -317,7 +332,7 @@ bool RoadConditionManager::isOnRoute(double lat, double lon) const
 
     // No route — check GPS position with 200m radius
     if (m_context && m_context->gpsLatitude() != 0.0) {
-        return haversineKm(lat, lon, m_context->gpsLatitude(), m_context->gpsLongitude()) < ON_ROUTE_THRESHOLD_KM;
+        return GeoUtils::haversineKm(lat, lon, m_context->gpsLatitude(), m_context->gpsLongitude()) < ON_ROUTE_THRESHOLD_KM;
     }
 
     return false;
@@ -335,7 +350,7 @@ double RoadConditionManager::pointToSegmentDistanceKm(double pLat, double pLon,
 
     if (lenSq < 1e-12) {
         // A and B are the same point
-        return haversineKm(pLat, pLon, aLat, aLon);
+        return GeoUtils::haversineKm(pLat, pLon, aLat, aLon);
     }
 
     // Parameter t of the projection of P onto AB, clamped to [0,1]
@@ -346,18 +361,7 @@ double RoadConditionManager::pointToSegmentDistanceKm(double pLat, double pLon,
     double closestLat = aLat + t * dy;
     double closestLon = aLon + t * dx;
 
-    return haversineKm(pLat, pLon, closestLat, closestLon);
-}
-
-double RoadConditionManager::haversineKm(double lat1, double lon1, double lat2, double lon2) const
-{
-    const double R = 6371.0;
-    double dLat = qDegreesToRadians(lat2 - lat1);
-    double dLon = qDegreesToRadians(lon2 - lon1);
-    double a = qSin(dLat / 2) * qSin(dLat / 2)
-             + qCos(qDegreesToRadians(lat1)) * qCos(qDegreesToRadians(lat2))
-             * qSin(dLon / 2) * qSin(dLon / 2);
-    return R * 2 * qAtan2(qSqrt(a), qSqrt(1 - a));
+    return GeoUtils::haversineKm(pLat, pLon, closestLat, closestLon);
 }
 
 QString RoadConditionManager::shortenDescription(const QString &desc) const

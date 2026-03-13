@@ -1,5 +1,6 @@
 #include "RoadSurfaceManager.h"
 #include "ContextAggregator.h"
+#include "GeoUtils.h"
 #include <QDebug>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -35,6 +36,7 @@ void RoadSurfaceManager::setRouteCoordinates(const QJsonArray &coordinates, doub
         return;
     }
 
+    ++m_generation;
     m_routeCoordinates = coordinates;
     sampleRoutePoints(coordinates);
 
@@ -49,6 +51,7 @@ void RoadSurfaceManager::setRouteCoordinates(const QJsonArray &coordinates, doub
 
 void RoadSurfaceManager::clearRoute()
 {
+    ++m_generation;
     m_active = false;
     m_routeCoordinates = QJsonArray();
     m_routePoints.clear();
@@ -94,6 +97,7 @@ void RoadSurfaceManager::fetchConditions()
     QUrl abUrl("https://511.alberta.ca/api/v2/get/winterroads");
     QNetworkRequest abReq(abUrl);
     abReq.setRawHeader("Accept", "application/json");
+    abReq.setAttribute(QNetworkRequest::UserMax, m_generation);
     m_albertaNetwork->get(abReq);
 
     // DriveBC Weather Stations — returns all stations, filter by proximity later
@@ -101,6 +105,7 @@ void RoadSurfaceManager::fetchConditions()
     QUrl bcUrl("https://www.drivebc.ca/api/weather/current/");
     QNetworkRequest bcReq(bcUrl);
     bcReq.setRawHeader("Accept", "application/json");
+    bcReq.setAttribute(QNetworkRequest::UserMax, m_generation);
     m_drivebcNetwork->get(bcReq);
 
     qDebug() << "RoadSurfaceManager: Fetching surface conditions from 511AB + DriveBC";
@@ -109,6 +114,11 @@ void RoadSurfaceManager::fetchConditions()
 void RoadSurfaceManager::onAlbertaReply(QNetworkReply *reply)
 {
     reply->deleteLater();
+
+    // Discard stale replies from a previous route
+    if (reply->request().attribute(QNetworkRequest::UserMax).toInt() != m_generation) {
+        return;
+    }
 
     if (reply->error() != QNetworkReply::NoError) {
         qWarning() << "RoadSurfaceManager: Alberta fetch failed:" << reply->errorString();
@@ -159,6 +169,11 @@ void RoadSurfaceManager::onAlbertaReply(QNetworkReply *reply)
 void RoadSurfaceManager::onDriveBCReply(QNetworkReply *reply)
 {
     reply->deleteLater();
+
+    // Discard stale replies from a previous route
+    if (reply->request().attribute(QNetworkRequest::UserMax).toInt() != m_generation) {
+        return;
+    }
 
     if (reply->error() != QNetworkReply::NoError) {
         qWarning() << "RoadSurfaceManager: DriveBC fetch failed:" << reply->errorString();
@@ -254,9 +269,9 @@ void RoadSurfaceManager::processResults()
 {
     m_routeReports.clear();
 
-    // Filter reports near route (within 15km of any route sample point)
+    // Filter reports near route (within 200m of route polyline)
     for (const auto &rpt : m_allReports) {
-        if (isNearRoute(rpt.lat, rpt.lon, 15.0)) {
+        if (isNearRoute(rpt.lat, rpt.lon)) {
             m_routeReports.append(rpt);
         }
     }
@@ -266,23 +281,28 @@ void RoadSurfaceManager::processResults()
 
     buildSummary();
 
-    // Emit alerts for dangerous conditions near route
+    // Collect all alert strings and emit a single combined alert (same pattern as RoadConditionManager)
+    QString combinedAlert;
     for (const auto &rpt : m_routeReports) {
+        QString road = rpt.roadName.isEmpty() ? "your route" : rpt.roadName;
+
         bool dangerousCondition =
             rpt.condition.contains("Ice", Qt::CaseInsensitive) ||
             rpt.condition.contains("Covered Snow", Qt::CaseInsensitive) ||
             rpt.condition.contains("Packed", Qt::CaseInsensitive);
 
         if (dangerousCondition) {
-            emit alertDetected(QString("Icy road conditions reported on %1 ahead")
-                .arg(rpt.roadName.isEmpty() ? "your route" : rpt.roadName));
+            combinedAlert += QString("Icy road conditions reported on %1 ahead. ").arg(road);
         }
 
         if (!std::isnan(rpt.pavementTempC) && rpt.pavementTempC < -5.0) {
-            emit alertDetected(QString("Road surface temperature is %1°C near %2 — watch for black ice")
+            combinedAlert += QString("Road surface temperature is %1°C near %2 — watch for black ice. ")
                 .arg(rpt.pavementTempC, 0, 'f', 0)
-                .arg(rpt.roadName.isEmpty() ? "your route" : rpt.roadName));
+                .arg(road);
         }
+    }
+    if (!combinedAlert.isEmpty()) {
+        emit alertDetected(combinedAlert.trimmed());
     }
 }
 
@@ -317,31 +337,65 @@ void RoadSurfaceManager::buildSummary()
     qDebug() << "RoadSurfaceManager: Summary updated," << m_routeReports.size() << "route reports";
 }
 
-bool RoadSurfaceManager::isNearRoute(double lat, double lon, double radiusKm) const
+bool RoadSurfaceManager::isNearRoute(double lat, double lon) const
 {
-    // Check against GPS position first
-    if (m_context && m_context->gpsLatitude() != 0.0) {
-        if (haversineKm(lat, lon, m_context->gpsLatitude(), m_context->gpsLongitude()) < radiusKm) {
-            return true;
+    // Check perpendicular distance from the report to each segment of the actual route polyline.
+    // Only reports within 200m of the route line itself are considered "near route".
+    const double ON_ROUTE_THRESHOLD_KM = 0.2; // 200 meters
+
+    int numCoords = m_routeCoordinates.size();
+    if (numCoords >= 2) {
+        // Walk every segment of the full route polyline
+        // For performance, step through every 5th coordinate (routes can have thousands of points)
+        int step = qMax(1, numCoords / 500);
+        for (int i = 0; i < numCoords - step; i += step) {
+            QJsonArray a = m_routeCoordinates[i].toArray();
+            int j = qMin(i + step, numCoords - 1);
+            QJsonArray b = m_routeCoordinates[j].toArray();
+            if (a.size() >= 2 && b.size() >= 2) {
+                double dist = pointToSegmentDistanceKm(
+                    lat, lon,
+                    a[1].toDouble(), a[0].toDouble(),  // lat, lon (GeoJSON is lon,lat)
+                    b[1].toDouble(), b[0].toDouble());
+                if (dist < ON_ROUTE_THRESHOLD_KM) {
+                    return true;
+                }
+            }
         }
+        return false;
     }
 
-    // Check against sampled route points
-    for (const auto &pt : m_routePoints) {
-        if (haversineKm(lat, lon, pt.lat, pt.lon) < radiusKm) {
-            return true;
-        }
+    // No route — check GPS position with 200m radius
+    if (m_context && m_context->gpsLatitude() != 0.0) {
+        return GeoUtils::haversineKm(lat, lon, m_context->gpsLatitude(), m_context->gpsLongitude()) < ON_ROUTE_THRESHOLD_KM;
     }
+
     return false;
 }
 
-double RoadSurfaceManager::haversineKm(double lat1, double lon1, double lat2, double lon2) const
+double RoadSurfaceManager::pointToSegmentDistanceKm(double pLat, double pLon,
+                                                       double aLat, double aLon,
+                                                       double bLat, double bLon) const
 {
-    const double R = 6371.0;
-    double dLat = qDegreesToRadians(lat2 - lat1);
-    double dLon = qDegreesToRadians(lon2 - lon1);
-    double a = qSin(dLat / 2) * qSin(dLat / 2)
-             + qCos(qDegreesToRadians(lat1)) * qCos(qDegreesToRadians(lat2))
-             * qSin(dLon / 2) * qSin(dLon / 2);
-    return R * 2 * qAtan2(qSqrt(a), qSqrt(1 - a));
+    // Project point P onto line segment AB using flat-earth approximation (fine for short segments)
+    // Returns distance in km from P to the closest point on segment AB
+    double dx = bLon - aLon;
+    double dy = bLat - aLat;
+    double lenSq = dx * dx + dy * dy;
+
+    if (lenSq < 1e-12) {
+        // A and B are the same point
+        return GeoUtils::haversineKm(pLat, pLon, aLat, aLon);
+    }
+
+    // Parameter t of the projection of P onto AB, clamped to [0,1]
+    double t = ((pLon - aLon) * dx + (pLat - aLat) * dy) / lenSq;
+    t = qBound(0.0, t, 1.0);
+
+    // Closest point on segment
+    double closestLat = aLat + t * dy;
+    double closestLon = aLon + t * dx;
+
+    return GeoUtils::haversineKm(pLat, pLon, closestLat, closestLon);
 }
+

@@ -164,6 +164,7 @@ private:
     void processWakeWord(const int16_t *frame);
     void processRhinoIntent(const int16_t *frame);
     void finalizeLeopardTranscription();
+    QString transcribeWithLeopard(const QVector<int16_t> &audioBuffer);
 
     // Helper methods
     static QString basePath();

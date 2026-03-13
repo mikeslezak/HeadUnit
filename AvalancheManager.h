@@ -66,6 +66,7 @@ private:
 
     QList<ForecastPoint> m_points;
     int m_pendingRequests = 0;
+    int m_generation = 0;
 };
 
 #endif // AVALANCHEMANAGER_H

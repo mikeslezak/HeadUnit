@@ -1,5 +1,6 @@
 #include "BorderWaitManager.h"
 #include "ContextAggregator.h"
+#include "GeoUtils.h"
 #include <QDebug>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -58,6 +59,7 @@ void BorderWaitManager::setRouteCoordinates(const QJsonArray &coordinates, doubl
         return;
     }
 
+    ++m_generation;
     m_routeCoordinates = coordinates;
     sampleRoutePoints(coordinates);
 
@@ -81,6 +83,7 @@ void BorderWaitManager::setRouteCoordinates(const QJsonArray &coordinates, doubl
 
 void BorderWaitManager::clearRoute()
 {
+    ++m_generation;
     m_active = false;
     m_routeCoordinates = QJsonArray();
     m_routePoints.clear();
@@ -122,7 +125,7 @@ bool BorderWaitManager::isNearBorder() const
     const auto crossings = knownCrossings();
     for (const auto &pt : m_routePoints) {
         for (const auto &cx : crossings) {
-            if (haversineKm(pt.lat, pt.lon, cx.lat, cx.lon) < 50.0) {
+            if (GeoUtils::haversineKm(pt.lat, pt.lon, cx.lat, cx.lon) < 50.0) {
                 return true;
             }
         }
@@ -140,12 +143,14 @@ void BorderWaitManager::fetchWaitTimes()
     QUrl cbpUrl("https://bwt.cbp.gov/api/waittimes");
     QNetworkRequest cbpReq(cbpUrl);
     cbpReq.setRawHeader("Accept", "application/json");
+    cbpReq.setAttribute(QNetworkRequest::UserMax, m_generation);
     m_cbpNetwork->get(cbpReq);
 
     // CBSA — CSV wait times
     m_pendingRequests++;
     QUrl cbsaUrl("https://www.cbsa-asfc.gc.ca/bwt-taf/bwt-eng.csv");
     QNetworkRequest cbsaReq(cbsaUrl);
+    cbsaReq.setAttribute(QNetworkRequest::UserMax, m_generation);
     m_cbsaNetwork->get(cbsaReq);
 
     qDebug() << "BorderWaitManager: Fetching wait times from CBP and CBSA";
@@ -154,6 +159,11 @@ void BorderWaitManager::fetchWaitTimes()
 void BorderWaitManager::onCbpReply(QNetworkReply *reply)
 {
     reply->deleteLater();
+
+    // Discard stale replies from a previous route
+    if (reply->request().attribute(QNetworkRequest::UserMax).toInt() != m_generation) {
+        return;
+    }
 
     if (reply->error() != QNetworkReply::NoError) {
         qWarning() << "BorderWaitManager: CBP fetch failed:" << reply->errorString();
@@ -213,6 +223,11 @@ void BorderWaitManager::onCbpReply(QNetworkReply *reply)
 void BorderWaitManager::onCbsaReply(QNetworkReply *reply)
 {
     reply->deleteLater();
+
+    // Discard stale replies from a previous route
+    if (reply->request().attribute(QNetworkRequest::UserMax).toInt() != m_generation) {
+        return;
+    }
 
     if (reply->error() != QNetworkReply::NoError) {
         qWarning() << "BorderWaitManager: CBSA fetch failed:" << reply->errorString();
@@ -295,7 +310,7 @@ void BorderWaitManager::processResults()
     QList<WaitTimeData> nearRoute;
     for (const auto &wd : m_waitData) {
         for (const auto &pt : m_routePoints) {
-            if (haversineKm(wd.lat, wd.lon, pt.lat, pt.lon) < 50.0) {
+            if (GeoUtils::haversineKm(wd.lat, wd.lon, pt.lat, pt.lon) < 50.0) {
                 nearRoute.append(wd);
                 break;
             }
@@ -309,7 +324,7 @@ void BorderWaitManager::processResults()
 
     for (const auto &wd : nearRoute) {
         for (const auto &pt : m_routePoints) {
-            double dist = haversineKm(wd.lat, wd.lon, pt.lat, pt.lon);
+            double dist = GeoUtils::haversineKm(wd.lat, wd.lon, pt.lat, pt.lon);
             if (dist < minDist) {
                 minDist = dist;
                 m_nearestCrossing = wd.crossingName;
@@ -368,13 +383,3 @@ void BorderWaitManager::buildSummary()
     qDebug() << "BorderWaitManager: Summary updated," << m_waitData.size() << "crossings";
 }
 
-double BorderWaitManager::haversineKm(double lat1, double lon1, double lat2, double lon2) const
-{
-    const double R = 6371.0;
-    double dLat = qDegreesToRadians(lat2 - lat1);
-    double dLon = qDegreesToRadians(lon2 - lon1);
-    double a = qSin(dLat / 2) * qSin(dLat / 2)
-             + qCos(qDegreesToRadians(lat1)) * qCos(qDegreesToRadians(lat2))
-             * qSin(dLon / 2) * qSin(dLon / 2);
-    return R * 2 * qAtan2(qSqrt(a), qSqrt(1 - a));
-}

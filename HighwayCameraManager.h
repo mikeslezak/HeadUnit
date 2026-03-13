@@ -52,7 +52,6 @@ private:
     void processResults();
     void sampleRoutePoints(const QJsonArray &coordinates);
     bool isNearRoute(double lat, double lon, double radiusKm) const;
-    double haversineKm(double lat1, double lon1, double lat2, double lon2) const;
 
     QNetworkAccessManager *m_albertaNetwork;
     QNetworkAccessManager *m_drivebcNetwork;

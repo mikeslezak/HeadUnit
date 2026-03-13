@@ -1,5 +1,6 @@
 #include "RouteWeatherManager.h"
 #include "ContextAggregator.h"
+#include "GeoUtils.h"
 #include <QDebug>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -30,6 +31,7 @@ void RouteWeatherManager::setRouteCoordinates(const QJsonArray &coordinates, dou
         return;
     }
 
+    ++m_generation;
     m_routeCoordinates = coordinates;
     m_totalDurationSec = durationSec;
     sampleRoutePoints(coordinates, durationSec);
@@ -46,6 +48,7 @@ void RouteWeatherManager::setRouteCoordinates(const QJsonArray &coordinates, dou
 
 void RouteWeatherManager::clearRoute()
 {
+    ++m_generation;
     m_active = false;
     m_routeCoordinates = QJsonArray();
     m_points.clear();
@@ -81,7 +84,7 @@ void RouteWeatherManager::sampleRoutePoints(const QJsonArray &coordinates, doubl
         double lat = c[1].toDouble();
         double lon = c[0].toDouble();
         if (i > 0) {
-            routeTotalKm += haversineKm(prevLat, prevLon, lat, lon);
+            routeTotalKm += GeoUtils::haversineKm(prevLat, prevLon, lat, lon);
         }
         prevLat = lat;
         prevLon = lon;
@@ -103,7 +106,7 @@ void RouteWeatherManager::sampleRoutePoints(const QJsonArray &coordinates, doubl
         double lon = c[0].toDouble();
 
         if (i > 0) {
-            totalDistKm += haversineKm(prevLat, prevLon, lat, lon);
+            totalDistKm += GeoUtils::haversineKm(prevLat, prevLon, lat, lon);
         }
         prevLat = lat;
         prevLon = lon;
@@ -162,13 +165,21 @@ void RouteWeatherManager::fetchWeather()
     QUrl requestUrl(url);
     requestUrl.setQuery(params);
 
+    QNetworkRequest req(requestUrl);
+    req.setAttribute(QNetworkRequest::UserMax, m_generation);
+
     qDebug() << "RouteWeatherManager: Fetching weather for" << m_points.size() << "points";
-    m_network->get(QNetworkRequest(requestUrl));
+    m_network->get(req);
 }
 
 void RouteWeatherManager::onWeatherReply(QNetworkReply *reply)
 {
     reply->deleteLater();
+
+    // Discard stale replies from a previous route
+    if (reply->request().attribute(QNetworkRequest::UserMax).toInt() != m_generation) {
+        return;
+    }
 
     if (reply->error() != QNetworkReply::NoError) {
         qWarning() << "RouteWeatherManager: Fetch failed:" << reply->errorString();
@@ -326,13 +337,3 @@ bool RouteWeatherManager::isSevereWeather(int code) const
         || code >= 73;
 }
 
-double RouteWeatherManager::haversineKm(double lat1, double lon1, double lat2, double lon2) const
-{
-    const double R = 6371.0;
-    double dLat = qDegreesToRadians(lat2 - lat1);
-    double dLon = qDegreesToRadians(lon2 - lon1);
-    double a = qSin(dLat / 2) * qSin(dLat / 2)
-             + qCos(qDegreesToRadians(lat1)) * qCos(qDegreesToRadians(lat2))
-             * qSin(dLon / 2) * qSin(dLon / 2);
-    return R * 2 * qAtan2(qSqrt(a), qSqrt(1 - a));
-}

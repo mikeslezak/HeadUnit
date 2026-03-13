@@ -8,11 +8,10 @@
 #include <QJsonArray>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
-#include <QMutex>
 #include <QTimer>
 
 /**
- * ClaudeClient - Claude API Integration for Sammy Voice Assistant
+ * ClaudeClient - Claude API Integration for Jarvis Voice Assistant
  *
  * This class handles all communication with Anthropic's Claude API for
  * natural language understanding and intelligent responses.
@@ -132,13 +131,6 @@ public slots:
     void sendMessage(const QString &message, const QString &systemContext = QString());
 
     /**
-     * Send message with full system context
-     * Automatically includes vehicle status, location, time, etc.
-     * @param message: User's message
-     */
-    void sendMessageWithContext(const QString &message);
-
-    /**
      * Clear conversation history
      * Starts a fresh conversation
      */
@@ -150,13 +142,6 @@ public slots:
     void cancelRequest();
 
     // ========== SYSTEM CONTEXT ==========
-
-    /**
-     * Update system context information
-     * @param contextJson: JSON object with current system state
-     *   Example: {"speed": 65, "fuel": 45, "location": "Highway 101", ...}
-     */
-    void updateSystemContext(const QJsonObject &context);
 
     /**
      * Set available tools/functions Claude can call
@@ -187,19 +172,6 @@ signals:
      * @param toolCalls: Any tool/function calls requested (JSON array)
      */
     void responseReceived(const QString &response, const QJsonArray &toolCalls);
-
-    /**
-     * Emitted for streaming text chunks
-     * @param chunk: Partial response text
-     */
-    void responseChunk(const QString &chunk);
-
-    /**
-     * Emitted when tool/function call is requested
-     * @param toolName: Name of tool to execute
-     * @param parameters: Tool parameters (JSON object)
-     */
-    void toolCallRequested(const QString &toolName, const QJsonObject &parameters);
 
     /**
      * Emitted on errors
@@ -247,12 +219,6 @@ private:
     void parseResponse(const QJsonObject &json);
 
     /**
-     * Parse streaming SSE chunk
-     * @param chunk: Server-sent event data
-     */
-    void parseStreamChunk(const QString &chunk);
-
-    /**
      * Set status message and emit signal
      */
     void setStatusMessage(const QString &msg);
@@ -281,7 +247,6 @@ private:
 
     // Conversation
     QJsonArray m_conversationHistory;
-    QJsonObject m_systemContext;
     QJsonArray m_availableTools;
     QStringList m_contactNames;
 
@@ -291,9 +256,6 @@ private:
 
     // Conversation inactivity timeout
     QTimer *m_conversationTimer;
-
-    // Thread Safety
-    QMutex m_mutex;
 
     // Constants
     static constexpr const char* API_ENDPOINT = "https://api.anthropic.com/v1/messages";

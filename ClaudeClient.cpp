@@ -12,7 +12,7 @@ ClaudeClient::ClaudeClient(QObject *parent)
     , m_networkManager(new QNetworkAccessManager(this))
     , m_currentReply(nullptr)
     , m_model(DEFAULT_MODEL)
-    , m_maxTokens(256)
+    , m_maxTokens(1024)
     , m_temperature(0.7)
     , m_isConnected(false)
     , m_isProcessing(false)
@@ -135,6 +135,7 @@ void ClaudeClient::sendMessage(const QString &message, const QString &systemCont
 
     if (m_isProcessing) {
         qWarning() << "ClaudeClient: Already processing a request";
+        emit error("Voice assistant is busy, try again in a moment");
         return;
     }
 
@@ -160,6 +161,7 @@ void ClaudeClient::sendMessage(const QString &message, const QString &systemCont
     networkRequest.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
     networkRequest.setRawHeader("x-api-key", m_apiKey.toUtf8());
     networkRequest.setRawHeader("anthropic-version", API_VERSION);
+    networkRequest.setTransferTimeout(30000);
 
     // Enable HTTP/2
     networkRequest.setAttribute(QNetworkRequest::Http2AllowedAttribute, true);
@@ -178,11 +180,6 @@ void ClaudeClient::sendMessage(const QString &message, const QString &systemCont
 
     // Add user message to history
     addToHistory("user", message);
-}
-
-void ClaudeClient::sendMessageWithContext(const QString &message)
-{
-    sendMessage(message, buildSystemPrompt());
 }
 
 void ClaudeClient::clearConversation()
@@ -210,12 +207,6 @@ void ClaudeClient::cancelRequest()
 // ========================================================================
 // SYSTEM CONTEXT
 // ========================================================================
-
-void ClaudeClient::updateSystemContext(const QJsonObject &context)
-{
-    m_systemContext = context;
-    qDebug() << "ClaudeClient: System context updated with" << context.keys().size() << "fields";
-}
 
 void ClaudeClient::setAvailableTools(const QJsonArray &tools)
 {
@@ -309,6 +300,9 @@ void ClaudeClient::onNetworkError(QNetworkReply::NetworkError error)
 
     QString errorMsg = m_currentReply->errorString();
     qWarning() << "ClaudeClient: Network error:" << errorMsg;
+
+    // Null out so the finished handler (onNetworkReply) skips re-processing
+    m_currentReply = nullptr;
 
     m_isProcessing = false;
     emit processingChanged();
@@ -454,11 +448,6 @@ void ClaudeClient::parseResponse(const QJsonObject &json)
             responseText += contentObj["text"].toString();
         } else if (type == "tool_use") {
             toolCalls.append(contentObj);
-
-            // Emit individual tool call
-            QString toolName = contentObj["name"].toString();
-            QJsonObject toolParams = contentObj["input"].toObject();
-            emit toolCallRequested(toolName, toolParams);
         }
     }
 
@@ -471,12 +460,6 @@ void ClaudeClient::parseResponse(const QJsonObject &json)
 
     setStatusMessage("Response received");
     qDebug() << "ClaudeClient: Response:" << responseText;
-}
-
-void ClaudeClient::parseStreamChunk(const QString &chunk)
-{
-    // For future streaming implementation
-    Q_UNUSED(chunk);
 }
 
 // ========================================================================
@@ -502,8 +485,11 @@ void ClaudeClient::addToHistory(const QString &role, const QString &content)
     emit conversationActiveChanged();
 
     // Limit history to last 10 messages (5 exchanges)
+    // Remove in pairs to maintain user/assistant ordering
     while (m_conversationHistory.size() > 10) {
         m_conversationHistory.removeFirst();
+        if (!m_conversationHistory.isEmpty())
+            m_conversationHistory.removeFirst();
     }
 
     qDebug() << "ClaudeClient: Added to history:" << role << "-" << content.left(50) << "...";

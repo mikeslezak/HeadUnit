@@ -35,7 +35,7 @@ void CopilotMonitor::setRouteWeatherManager(RouteWeatherManager *routeWeather)
     m_routeWeather = routeWeather;
     if (m_routeWeather) {
         connect(m_routeWeather, &RouteWeatherManager::alertDetected,
-                this, &CopilotMonitor::onRouteWeatherAlert);
+                this, &CopilotMonitor::onRouteAlert);
     }
 }
 
@@ -52,6 +52,14 @@ void CopilotMonitor::setQuietMode(bool quiet)
     m_quietMode = quiet;
     emit quietModeChanged();
     qDebug() << "CopilotMonitor: Quiet mode" << (quiet ? "enabled" : "disabled");
+}
+
+void CopilotMonitor::clearPendingAlerts()
+{
+    m_pendingRouteAlerts.clear();
+    m_routeAlertBatchTimer->stop();
+    m_routeAlertBatchTimer->setInterval(3000); // reset to default
+    qDebug() << "CopilotMonitor: Pending route alerts cleared";
 }
 
 void CopilotMonitor::checkConditions()
@@ -104,17 +112,11 @@ void CopilotMonitor::setRoadConditionManager(RoadConditionManager *roadCondition
     m_roadConditions = roadConditions;
     if (m_roadConditions) {
         connect(m_roadConditions, &RoadConditionManager::alertDetected,
-                this, &CopilotMonitor::onRoadConditionAlert);
+                this, &CopilotMonitor::onRouteAlert);
     }
 }
 
-void CopilotMonitor::onRouteWeatherAlert(const QString &message)
-{
-    if (!m_enabled || m_quietMode) return;
-    queueRouteAlert(message);
-}
-
-void CopilotMonitor::onRoadConditionAlert(const QString &message)
+void CopilotMonitor::onRouteAlert(const QString &message)
 {
     if (!m_enabled || m_quietMode) return;
     queueRouteAlert(message);
@@ -134,7 +136,7 @@ void CopilotMonitor::setRoadSurfaceManager(RoadSurfaceManager *roadSurface)
     m_roadSurface = roadSurface;
     if (m_roadSurface) {
         connect(m_roadSurface, &RoadSurfaceManager::alertDetected,
-                this, &CopilotMonitor::onRoadSurfaceAlert);
+                this, &CopilotMonitor::onRouteAlert);
     }
 }
 
@@ -143,7 +145,7 @@ void CopilotMonitor::setAvalancheManager(AvalancheManager *avalanche)
     m_avalanche = avalanche;
     if (m_avalanche) {
         connect(m_avalanche, &AvalancheManager::alertDetected,
-                this, &CopilotMonitor::onAvalancheAlert);
+                this, &CopilotMonitor::onRouteAlert);
     }
 }
 
@@ -152,33 +154,29 @@ void CopilotMonitor::setBorderWaitManager(BorderWaitManager *borderWait)
     m_borderWait = borderWait;
     if (m_borderWait) {
         connect(m_borderWait, &BorderWaitManager::alertDetected,
-                this, &CopilotMonitor::onBorderWaitAlert);
+                this, &CopilotMonitor::onRouteAlert);
     }
 }
 
 void CopilotMonitor::onSpeedLimitAlert(const QString &message)
 {
     if (!m_enabled || m_quietMode) return;
-    // Speed limit is immediate/urgent — don't batch
-    emitAlert("speed_limit", message);
-}
 
-void CopilotMonitor::onRoadSurfaceAlert(const QString &message)
-{
-    if (!m_enabled || m_quietMode) return;
-    queueRouteAlert(message);
-}
+    // Speed limit is urgent — bypass global throttle, only apply per-type cooldown
+    qint64 now = QDateTime::currentMSecsSinceEpoch();
+    if (m_lastAlertTime.contains("speed_limit")) {
+        if (now - m_lastAlertTime["speed_limit"] < ALERT_COOLDOWN_MS) {
+            qDebug() << "CopilotMonitor: Speed limit alert per-type cooldown active";
+            return;
+        }
+    }
 
-void CopilotMonitor::onAvalancheAlert(const QString &message)
-{
-    if (!m_enabled || m_quietMode) return;
-    queueRouteAlert(message);
-}
+    m_lastAlertTime["speed_limit"] = now;
+    // Intentionally NOT updating m_lastAnyAlertTime — speed limits should not
+    // push back the global throttle window for other alert types
 
-void CopilotMonitor::onBorderWaitAlert(const QString &message)
-{
-    if (!m_enabled || m_quietMode) return;
-    queueRouteAlert(message);
+    qDebug() << "CopilotMonitor: Alert - speed_limit:" << message;
+    emit proactiveAlert(message);
 }
 
 bool CopilotMonitor::shouldThrottle(const QString &alertType)
@@ -230,14 +228,18 @@ void CopilotMonitor::flushRouteAlerts()
 
     // Throttle the combined batch as "route_alerts"
     if (shouldThrottle("route_alerts")) {
-        qDebug() << "CopilotMonitor: Throttled batch of" << m_pendingRouteAlerts.size() << "route alerts";
-        m_pendingRouteAlerts.clear();
+        qDebug() << "CopilotMonitor: Throttled batch, will retry";
+        m_routeAlertBatchTimer->setInterval(60000); // retry in 60s
+        m_routeAlertBatchTimer->start();
         return;
     }
 
     // Combine all pending alerts into one message
     QString combined = m_pendingRouteAlerts.join(" ");
     m_pendingRouteAlerts.clear();
+
+    // Reset batch timer interval back to normal for next batch
+    m_routeAlertBatchTimer->setInterval(3000);
 
     qint64 now = QDateTime::currentMSecsSinceEpoch();
     m_lastAlertTime["route_alerts"] = now;

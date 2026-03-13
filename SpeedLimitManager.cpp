@@ -1,5 +1,6 @@
 #include "SpeedLimitManager.h"
 #include "ContextAggregator.h"
+#include "GeoUtils.h"
 #include <QDebug>
 #include <QJsonObject>
 #include <QtMath>
@@ -87,7 +88,7 @@ void SpeedLimitManager::updateGpsPosition(double lat, double lon, double speedKm
     // Search forward from last index, up to 30 segments
     int searchEnd = qMin(m_lastSegmentIndex + 30, m_segments.size());
     for (int i = m_lastSegmentIndex; i < searchEnd; ++i) {
-        double d = haversineKm(lat, lon, m_segments[i].lat, m_segments[i].lon);
+        double d = GeoUtils::haversineKm(lat, lon, m_segments[i].lat, m_segments[i].lon);
         if (d < bestDist) {
             bestDist = d;
             bestIdx = i;
@@ -97,7 +98,7 @@ void SpeedLimitManager::updateGpsPosition(double lat, double lon, double speedKm
     // If nothing close found in forward window, do a full search
     if (bestIdx < 0 || bestDist > 1.0) {
         for (int i = 0; i < m_segments.size(); ++i) {
-            double d = haversineKm(lat, lon, m_segments[i].lat, m_segments[i].lon);
+            double d = GeoUtils::haversineKm(lat, lon, m_segments[i].lat, m_segments[i].lon);
             if (d < bestDist) {
                 bestDist = d;
                 bestIdx = i;
@@ -220,13 +221,3 @@ void SpeedLimitManager::buildSummary()
              << withData << "with data";
 }
 
-double SpeedLimitManager::haversineKm(double lat1, double lon1, double lat2, double lon2) const
-{
-    const double R = 6371.0;
-    double dLat = qDegreesToRadians(lat2 - lat1);
-    double dLon = qDegreesToRadians(lon2 - lon1);
-    double a = qSin(dLat / 2) * qSin(dLat / 2)
-             + qCos(qDegreesToRadians(lat1)) * qCos(qDegreesToRadians(lat2))
-             * qSin(dLon / 2) * qSin(dLon / 2);
-    return R * 2 * qAtan2(qSqrt(a), qSqrt(1 - a));
-}

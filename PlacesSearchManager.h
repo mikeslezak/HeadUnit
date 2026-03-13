@@ -50,8 +50,6 @@ private:
     void geocodeFallbackGoogle();
     void parseNominatimResults(const QJsonArray &results);
     void parseGoogleResults(const QJsonArray &places);
-    double haversineDistance(double lat1, double lon1, double lat2, double lon2) const;
-
     QNetworkAccessManager *m_mapboxNetwork;
     QNetworkAccessManager *m_googleNetwork;
     QNetworkAccessManager *m_geocodeNetwork;

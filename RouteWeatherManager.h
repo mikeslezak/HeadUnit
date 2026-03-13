@@ -55,8 +55,6 @@ private:
     void buildSummary();
     QString descriptionForCode(int code) const;
     bool isSevereWeather(int code) const;
-    double haversineKm(double lat1, double lon1, double lat2, double lon2) const;
-
     QNetworkAccessManager *m_network;
     QTimer *m_refreshTimer;
     ContextAggregator *m_context = nullptr;
@@ -66,6 +64,7 @@ private:
     QList<RoutePoint> m_points;
     QJsonArray m_routeCoordinates;
     double m_totalDurationSec = 0.0;
+    int m_generation = 0;
 
     static constexpr double SAMPLE_INTERVAL_KM = 15.0;   // sample every 15km
     static constexpr double LOOKAHEAD_HOURS = 2.0;        // only look 2 hours ahead

@@ -56,7 +56,6 @@ private:
     double pointToSegmentDistanceKm(double pLat, double pLon,
                                      double aLat, double aLon,
                                      double bLat, double bLon) const;
-    double haversineKm(double lat1, double lon1, double lat2, double lon2) const;
     QString shortenDescription(const QString &desc) const;
 
     QNetworkAccessManager *m_albertaNetwork;
@@ -71,6 +70,7 @@ private:
     QList<RoadEvent> m_routeEvents;  // filtered to route proximity
     QJsonArray m_routeCoordinates;
     int m_pendingRequests = 0;
+    int m_generation = 0;
 
     // Sample points along route for proximity checks
     struct RoutePoint { double lat; double lon; };

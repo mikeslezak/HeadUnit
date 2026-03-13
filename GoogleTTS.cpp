@@ -6,7 +6,6 @@
 #include <QJsonArray>
 #include <QSettings>
 #include <QBuffer>
-#include <QCoreApplication>
 
 GoogleTTS::GoogleTTS(QObject *parent)
     : QObject(parent)
@@ -128,8 +127,6 @@ void GoogleTTS::speak(const QString &text)
     if (m_isSpeaking || m_audioSink || m_audioBuffer || m_currentReply) {
         qDebug() << "GoogleTTS: Stopping current speech before starting new one";
         stop();
-        // Process events to ensure cleanup completes
-        QCoreApplication::processEvents();
     }
 
     qDebug() << "GoogleTTS: Speaking:" << text;
@@ -215,6 +212,7 @@ void GoogleTTS::sendToGoogle(const QString &text)
     QUrl url(urlWithKey);
     QNetworkRequest networkRequest(url);
     networkRequest.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    networkRequest.setTransferTimeout(15000);
 
     // Send request
     QByteArray requestData = QJsonDocument(request).toJson(QJsonDocument::Compact);
@@ -312,6 +310,9 @@ void GoogleTTS::onNetworkError(QNetworkReply::NetworkError error)
 
     QString errorMsg = m_currentReply->errorString();
     qWarning() << "GoogleTTS: Network error:" << errorMsg;
+
+    // Null out so the finished handler (onNetworkReply) skips re-processing
+    m_currentReply = nullptr;
 
     m_isProcessing = false;
     emit processingChanged();

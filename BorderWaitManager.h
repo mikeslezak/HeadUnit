@@ -67,7 +67,6 @@ private:
     void buildSummary();
     void sampleRoutePoints(const QJsonArray &coordinates);
     bool isNearBorder() const;
-    double haversineKm(double lat1, double lon1, double lat2, double lon2) const;
 
     static QList<KnownCrossing> knownCrossings();
 
@@ -85,6 +84,7 @@ private:
     QList<RoutePoint> m_routePoints;
     QJsonArray m_routeCoordinates;
     int m_pendingRequests = 0;
+    int m_generation = 0;
 };
 
 #endif // BORDERWAITMANAGER_H

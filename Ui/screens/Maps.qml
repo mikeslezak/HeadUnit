@@ -14,6 +14,7 @@ Item {
     property bool followMode: true
     property string activeStyleName: "Dark"
     property bool searchResultsVisible: false
+    property bool searchBarVisible: false
     property var searchResults: []
 
     // Persist map viewport and style (no 'category' — not supported in Qt 6.5)
@@ -483,6 +484,37 @@ Item {
         }
     }
 
+    // ── Tap anywhere on map to show/dismiss search bar ──
+    MouseArea {
+        anchors.fill: parent
+        z: 5
+        onClicked: {
+            if (!searchBarVisible) {
+                searchBarVisible = true
+                searchBarHideTimer.restart()
+            } else if (searchInput.activeFocus) {
+                // Tap on map while search is focused — defocus and hide
+                searchInput.focus = false
+                searchResultsVisible = false
+                if (!searchInput.text) searchBarVisible = false
+                else searchBarHideTimer.restart()
+            } else {
+                searchBarVisible = false
+            }
+        }
+    }
+
+    // Auto-hide search bar after inactivity
+    Timer {
+        id: searchBarHideTimer
+        interval: 3000
+        onTriggered: {
+            if (!searchInput.activeFocus && !searchResultsVisible) {
+                searchBarVisible = false
+            }
+        }
+    }
+
     // ── Search Bar ──
     Rectangle {
         id: searchBar
@@ -500,7 +532,10 @@ Item {
             : Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.15)
         border.width: 1
         z: 20
+        visible: searchBarVisible
+        opacity: searchBarVisible ? 1.0 : 0.0
 
+        Behavior on opacity { NumberAnimation { duration: 200 } }
         Behavior on border.color { ColorAnimation { duration: 200 } }
 
         Row {
@@ -538,7 +573,13 @@ Item {
                     visible: !searchInput.text && !searchInput.activeFocus
                 }
 
+                onActiveFocusChanged: {
+                    if (activeFocus) searchBarHideTimer.stop()
+                    else searchBarHideTimer.restart()
+                }
+
                 onTextChanged: {
+                    searchBarHideTimer.stop()
                     if (text.length >= 3) {
                         searchDebounce.restart()
                     } else {
@@ -551,6 +592,7 @@ Item {
                         geocode(text, false)
                         searchResultsVisible = false
                         searchInput.focus = false
+                        searchBarVisible = false
                     }
                 }
             }
@@ -571,6 +613,7 @@ Item {
                         searchInput.text = ""
                         searchInput.focus = false
                         searchResultsVisible = false
+                        searchBarVisible = false
                         searchOverlay.visible = false
                         clearRoute()
                     }
@@ -685,7 +728,7 @@ Item {
         id: controlColumn
         anchors.left: parent.left
         anchors.leftMargin: 12
-        anchors.bottom: bottomBar.top
+        anchors.bottom: parent.bottom
         anchors.bottomMargin: 12
         spacing: 8
         z: 15

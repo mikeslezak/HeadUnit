@@ -40,6 +40,9 @@ public:
     void setEnabled(bool on);
     Q_INVOKABLE void setQuietMode(bool quiet);
 
+    // Call when a route is cleared to discard stale route alerts
+    Q_INVOKABLE void clearPendingAlerts();
+
 signals:
     void enabledChanged();
     void quietModeChanged();
@@ -47,12 +50,8 @@ signals:
 
 private slots:
     void checkConditions();
-    void onRouteWeatherAlert(const QString &message);
-    void onRoadConditionAlert(const QString &message);
+    void onRouteAlert(const QString &message);
     void onSpeedLimitAlert(const QString &message);
-    void onRoadSurfaceAlert(const QString &message);
-    void onAvalancheAlert(const QString &message);
-    void onBorderWaitAlert(const QString &message);
 
 private:
     bool shouldThrottle(const QString &alertType);

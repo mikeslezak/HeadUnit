@@ -210,6 +210,9 @@ void PicovoiceManager::resume()
 
     m_isPaused = false;
 
+    // Discard any microphone audio captured during the pause (contains TTS echo)
+    m_audioBuffer.clear();
+
     if (m_state == WaitingForFollowUp) {
         // Resuming into follow-up mode — start the timeout now (TTS just finished)
         m_followUpTimer->start();
@@ -380,6 +383,9 @@ void PicovoiceManager::processAudioFrame(const int16_t *frame, int32_t length)
         case Listening:
             processWakeWord(frame);
             break;
+
+        case WaitingForReadyPrompt:
+            break; // Ignore audio during TTS prompt
 
         case WaitingForCommand:
             processRhinoIntent(frame);
@@ -607,38 +613,49 @@ void PicovoiceManager::finalizeLeopardTranscription()
 
     qDebug() << "PicovoiceManager: Transcribing with Leopard (fallback)..." << m_speechBuffer.size() << "samples";
 
+    QString transcription = transcribeWithLeopard(m_speechBuffer);
+    if (!transcription.isEmpty()) {
+        qDebug() << "PicovoiceManager: Leopard transcription:" << transcription;
+        if (!transcription.trimmed().isEmpty()) {
+            emit transcriptionReady(transcription);
+        } else {
+            qDebug() << "PicovoiceManager: Empty transcription, ignoring";
+        }
+    }
+
+    // Reset state
+    resetToListening();
+}
+
+QString PicovoiceManager::transcribeWithLeopard(const QVector<int16_t> &audioBuffer)
+{
+    if (!m_leopard || audioBuffer.isEmpty()) {
+        return QString();
+    }
+
     char *transcript = nullptr;
     int32_t numWords = 0;
     pv_word_t *words = nullptr;
 
     pv_status_t status = pv_leopard_process(
         m_leopard,
-        m_speechBuffer.data(),
-        m_speechBuffer.size(),
+        audioBuffer.data(),
+        audioBuffer.size(),
         &transcript,
         &numWords,
         &words
     );
 
+    QString result;
     if (status == PV_STATUS_SUCCESS && transcript) {
-        QString transcription = QString::fromUtf8(transcript);
-        qDebug() << "PicovoiceManager: Leopard transcription:" << transcription;
-
-        if (!transcription.trimmed().isEmpty()) {
-            emit transcriptionReady(transcription);
-        } else {
-            qDebug() << "PicovoiceManager: Empty transcription, ignoring";
-        }
-
-        // Free Leopard resources
+        result = QString::fromUtf8(transcript);
         pv_leopard_transcript_delete(transcript);
         pv_leopard_words_delete(words);
     } else {
         qWarning() << "PicovoiceManager: Leopard transcription error:" << pv_status_to_string(status);
     }
 
-    // Reset state
-    resetToListening();
+    return result;
 }
 
 void PicovoiceManager::onGoogleTranscriptionReady(const QString &text, float confidence)
@@ -664,29 +681,12 @@ void PicovoiceManager::onGoogleError(const QString &message)
     if (m_leopard && !m_speechBuffer.isEmpty()) {
         qDebug() << "PicovoiceManager: Falling back to Leopard STT...";
 
-        char *transcript = nullptr;
-        int32_t numWords = 0;
-        pv_word_t *words = nullptr;
-
-        pv_status_t status = pv_leopard_process(
-            m_leopard,
-            m_speechBuffer.data(),
-            m_speechBuffer.size(),
-            &transcript,
-            &numWords,
-            &words
-        );
-
-        if (status == PV_STATUS_SUCCESS && transcript) {
-            QString transcription = QString::fromUtf8(transcript);
+        QString transcription = transcribeWithLeopard(m_speechBuffer);
+        if (!transcription.isEmpty()) {
             qDebug() << "PicovoiceManager: Leopard fallback transcription:" << transcription;
-
             if (!transcription.trimmed().isEmpty()) {
                 emit transcriptionReady(transcription);
             }
-
-            pv_leopard_transcript_delete(transcript);
-            pv_leopard_words_delete(words);
         }
     }
 

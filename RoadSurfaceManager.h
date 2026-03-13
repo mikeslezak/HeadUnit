@@ -54,9 +54,10 @@ private:
     void processResults();
     void buildSummary();
     void sampleRoutePoints(const QJsonArray &coordinates);
-    bool isNearRoute(double lat, double lon, double radiusKm) const;
-    double haversineKm(double lat1, double lon1, double lat2, double lon2) const;
-
+    bool isNearRoute(double lat, double lon) const;
+    double pointToSegmentDistanceKm(double pLat, double pLon,
+                                     double aLat, double aLon,
+                                     double bLat, double bLon) const;
     // Decode Google Encoded Polyline to get first coordinate
     static QPair<double, double> decodePolylineFirstPoint(const QString &encoded);
 
@@ -73,6 +74,7 @@ private:
     QList<RoutePoint> m_routePoints;
     QJsonArray m_routeCoordinates;
     int m_pendingRequests = 0;
+    int m_generation = 0;
 };
 
 #endif // ROADSURFACEMANAGER_H

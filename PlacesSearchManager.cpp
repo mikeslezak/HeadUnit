@@ -1,5 +1,6 @@
 #include "PlacesSearchManager.h"
 #include "ContextAggregator.h"
+#include "GeoUtils.h"
 #include <QDebug>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -95,7 +96,7 @@ void PlacesSearchManager::onMapboxReply(QNetworkReply *reply)
         if (center.size() >= 2) {
             r.lon = center[0].toDouble();
             r.lat = center[1].toDouble();
-            r.distanceKm = haversineDistance(myLat, myLon, r.lat, r.lon);
+            r.distanceKm = GeoUtils::haversineKm(myLat, myLon, r.lat, r.lon);
         }
         // Extract category from context array
         QJsonArray context = feat["context"].toArray();
@@ -219,7 +220,7 @@ void PlacesSearchManager::geocodePlace(const QString &query)
     params.addQueryItem("q", cleanQuery);
     params.addQueryItem("format", "json");
     params.addQueryItem("limit", "10");
-    params.addQueryItem("countrycodes", "ca");
+    params.addQueryItem("countrycodes", "ca,us");
     params.addQueryItem("addressdetails", "1");
     url.setQuery(params);
 
@@ -388,14 +389,3 @@ void PlacesSearchManager::parseGoogleResults(const QJsonArray &places)
     emit geocodeCompleted(lat, lon, name);
 }
 
-double PlacesSearchManager::haversineDistance(double lat1, double lon1, double lat2, double lon2) const
-{
-    const double R = 6371.0; // Earth radius km
-    double dLat = qDegreesToRadians(lat2 - lat1);
-    double dLon = qDegreesToRadians(lon2 - lon1);
-    double a = qSin(dLat / 2) * qSin(dLat / 2)
-             + qCos(qDegreesToRadians(lat1)) * qCos(qDegreesToRadians(lat2))
-             * qSin(dLon / 2) * qSin(dLon / 2);
-    double c = 2 * qAtan2(qSqrt(a), qSqrt(1 - a));
-    return R * c;
-}
