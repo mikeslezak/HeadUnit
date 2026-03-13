@@ -5,6 +5,7 @@
 #include <QJsonObject>
 #include <QUrlQuery>
 #include <QtMath>
+#include <QDateTime>
 
 RouteWeatherManager::RouteWeatherManager(QObject *parent)
     : QObject(parent)
@@ -14,11 +15,10 @@ RouteWeatherManager::RouteWeatherManager(QObject *parent)
     connect(m_network, &QNetworkAccessManager::finished,
             this, &RouteWeatherManager::onWeatherReply);
 
-    // Refresh route weather every 15 minutes
-    m_refreshTimer->setInterval(15 * 60 * 1000);
+    m_refreshTimer->setInterval(REFRESH_INTERVAL_MS);
     connect(m_refreshTimer, &QTimer::timeout, this, &RouteWeatherManager::refreshForecasts);
 
-    qDebug() << "RouteWeatherManager: Initialized";
+    qDebug() << "RouteWeatherManager: Initialized (30min refresh, 2hr lookahead, 15km sampling)";
 }
 
 void RouteWeatherManager::setContextAggregator(ContextAggregator *ctx) { m_context = ctx; }
@@ -30,25 +30,24 @@ void RouteWeatherManager::setRouteCoordinates(const QJsonArray &coordinates, dou
         return;
     }
 
+    m_routeCoordinates = coordinates;
     m_totalDurationSec = durationSec;
     sampleRoutePoints(coordinates, durationSec);
 
     m_active = true;
     emit activeChanged();
 
-    // Fetch weather for each sampled point
-    m_pendingRequests = m_points.size();
-    for (int i = 0; i < m_points.size(); ++i) {
-        fetchPointWeather(i);
-    }
-
+    fetchWeather();
     m_refreshTimer->start();
-    qDebug() << "RouteWeatherManager: Tracking" << m_points.size() << "points along route";
+
+    qDebug() << "RouteWeatherManager: Tracking" << m_points.size()
+             << "points along route (2hr lookahead)";
 }
 
 void RouteWeatherManager::clearRoute()
 {
     m_active = false;
+    m_routeCoordinates = QJsonArray();
     m_points.clear();
     m_summary.clear();
     m_refreshTimer->stop();
@@ -66,163 +65,195 @@ void RouteWeatherManager::sampleRoutePoints(const QJsonArray &coordinates, doubl
     m_points.clear();
 
     int numCoords = coordinates.size();
-    // Sample 6 evenly-spaced points along the route (including start and end)
-    int numSamples = qMin(6, numCoords);
-    if (numSamples < 2) numSamples = 2;
+    if (numCoords < 2) return;
 
-    for (int i = 0; i < numSamples; ++i) {
-        double fraction = (numSamples == 1) ? 0.0 : static_cast<double>(i) / (numSamples - 1);
-        int idx = qMin(static_cast<int>(fraction * (numCoords - 1)), numCoords - 1);
+    // Walk the route, accumulating distance, and drop a sample point every SAMPLE_INTERVAL_KM.
+    // Stop at the 2-hour lookahead mark.
+    double totalDistKm = 0.0;
+    double lastSampleDist = -SAMPLE_INTERVAL_KM; // force first point
 
-        QJsonArray coord = coordinates[idx].toArray();
-        if (coord.size() < 2) continue;
-
-        RoutePoint pt;
-        pt.lon = coord[0].toDouble();
-        pt.lat = coord[1].toDouble();
-        pt.etaHours = (durationSec * fraction) / 3600.0;
-
-        if (i == 0) pt.locationLabel = "Start";
-        else if (i == numSamples - 1) pt.locationLabel = "Destination";
-        else pt.locationLabel = QString("%1h away").arg(pt.etaHours, 0, 'f', 1);
-
-        m_points.append(pt);
+    // First pass: compute total route distance for speed estimation
+    double routeTotalKm = 0.0;
+    double prevLat = 0, prevLon = 0;
+    for (int i = 0; i < numCoords; ++i) {
+        QJsonArray c = coordinates[i].toArray();
+        if (c.size() < 2) continue;
+        double lat = c[1].toDouble();
+        double lon = c[0].toDouble();
+        if (i > 0) {
+            routeTotalKm += haversineKm(prevLat, prevLon, lat, lon);
+        }
+        prevLat = lat;
+        prevLon = lon;
     }
+
+    double avgSpeedKmh = (durationSec > 0) ? (routeTotalKm / (durationSec / 3600.0)) : 80.0;
+    double lookaheadKm = avgSpeedKmh * LOOKAHEAD_HOURS;
+
+    qDebug() << "RouteWeatherManager: Route" << routeTotalKm << "km, avg speed"
+             << avgSpeedKmh << "km/h, lookahead" << lookaheadKm << "km";
+
+    // Second pass: sample points
+    prevLat = 0; prevLon = 0;
+    totalDistKm = 0.0;
+    for (int i = 0; i < numCoords; ++i) {
+        QJsonArray c = coordinates[i].toArray();
+        if (c.size() < 2) continue;
+        double lat = c[1].toDouble();
+        double lon = c[0].toDouble();
+
+        if (i > 0) {
+            totalDistKm += haversineKm(prevLat, prevLon, lat, lon);
+        }
+        prevLat = lat;
+        prevLon = lon;
+
+        // Stop if beyond 2-hour lookahead
+        if (totalDistKm > lookaheadKm) break;
+
+        // Sample at every SAMPLE_INTERVAL_KM
+        if (totalDistKm - lastSampleDist >= SAMPLE_INTERVAL_KM || i == 0) {
+            RoutePoint pt;
+            pt.lat = lat;
+            pt.lon = lon;
+            pt.etaMinutes = (avgSpeedKmh > 0) ? (totalDistKm / avgSpeedKmh) * 60.0 : 0.0;
+
+            if (i == 0) {
+                pt.locationLabel = "Current location";
+            } else {
+                int mins = qRound(pt.etaMinutes);
+                if (mins < 60) {
+                    pt.locationLabel = QString("%1 min ahead").arg(mins);
+                } else {
+                    pt.locationLabel = QString("%1h %2m ahead")
+                        .arg(mins / 60).arg(mins % 60);
+                }
+            }
+
+            m_points.append(pt);
+            lastSampleDist = totalDistKm;
+        }
+    }
+
+    qDebug() << "RouteWeatherManager: Sampled" << m_points.size()
+             << "points over" << qMin(totalDistKm, lookaheadKm) << "km";
 }
 
-void RouteWeatherManager::fetchPointWeather(int index)
+void RouteWeatherManager::fetchWeather()
 {
-    if (index < 0 || index >= m_points.size()) return;
+    if (m_points.isEmpty()) return;
 
-    const auto &pt = m_points[index];
+    // Build comma-separated lat/lon lists for multi-coordinate Open-Meteo request
+    QStringList lats, lons;
+    for (const auto &pt : m_points) {
+        lats.append(QString::number(pt.lat, 'f', 4));
+        lons.append(QString::number(pt.lon, 'f', 4));
+    }
 
-    // Open-Meteo forecast (free, no key) — get current + hourly for the next 24h
+    // Open-Meteo with minutely_15 for high-res precipitation (HRRR model for North America)
     QString url = "https://api.open-meteo.com/v1/forecast";
     QUrlQuery params;
-    params.addQueryItem("latitude", QString::number(pt.lat, 'f', 4));
-    params.addQueryItem("longitude", QString::number(pt.lon, 'f', 4));
-    params.addQueryItem("current", "temperature_2m,weather_code,wind_speed_10m,precipitation");
-    params.addQueryItem("hourly", "temperature_2m,weather_code,precipitation_probability,precipitation,wind_speed_10m");
-    params.addQueryItem("forecast_hours", "24");
+    params.addQueryItem("latitude", lats.join(","));
+    params.addQueryItem("longitude", lons.join(","));
+    params.addQueryItem("minutely_15", "precipitation,weather_code,temperature_2m,wind_speed_10m");
+    params.addQueryItem("forecast_minutely_15", "24"); // 24 steps = 6 hours of 15-min data
     params.addQueryItem("timezone", "auto");
 
     QUrl requestUrl(url);
     requestUrl.setQuery(params);
 
-    QNetworkRequest req(requestUrl);
-    req.setAttribute(QNetworkRequest::User, index);
-    m_network->get(req);
+    qDebug() << "RouteWeatherManager: Fetching weather for" << m_points.size() << "points";
+    m_network->get(QNetworkRequest(requestUrl));
 }
 
 void RouteWeatherManager::onWeatherReply(QNetworkReply *reply)
 {
     reply->deleteLater();
 
-    int idx = reply->request().attribute(QNetworkRequest::User).toInt();
-    if (idx < 0 || idx >= m_points.size()) return;
-
     if (reply->error() != QNetworkReply::NoError) {
-        qWarning() << "RouteWeatherManager: Weather fetch failed for point" << idx << reply->errorString();
-        m_pendingRequests--;
-        if (m_pendingRequests <= 0) buildSummary();
+        qWarning() << "RouteWeatherManager: Fetch failed:" << reply->errorString();
         return;
     }
 
     QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
-    QJsonObject root = doc.object();
 
-    // Use current weather for start point, or hourly forecast at ETA for later points
-    auto &pt = m_points[idx];
+    // Multi-coordinate response is an array; single coordinate is an object
+    QJsonArray results;
+    if (doc.isArray()) {
+        results = doc.array();
+    } else if (doc.isObject()) {
+        results.append(doc.object());
+    }
 
-    if (idx == 0 || pt.etaHours < 0.5) {
-        // Use current weather
-        QJsonObject current = root["current"].toObject();
-        pt.tempC = current["temperature_2m"].toDouble();
-        pt.weatherCode = current["weather_code"].toInt();
-        pt.precipMm = current["precipitation"].toDouble();
-        pt.windSpeed = current["wind_speed_10m"].toDouble();
-    } else {
-        // Use hourly forecast at the ETA hour
-        QJsonObject hourly = root["hourly"].toObject();
-        QJsonArray temps = hourly["temperature_2m"].toArray();
-        QJsonArray codes = hourly["weather_code"].toArray();
-        QJsonArray precip = hourly["precipitation"].toArray();
-        QJsonArray precipProb = hourly["precipitation_probability"].toArray();
-        QJsonArray wind = hourly["wind_speed_10m"].toArray();
-        int hourIdx = qMin(static_cast<int>(qRound(pt.etaHours)), temps.size() - 1);
-        if (hourIdx >= 0 && hourIdx < temps.size()) {
-            pt.tempC = temps[hourIdx].toDouble();
-            pt.weatherCode = codes[hourIdx].toInt();
-            if (hourIdx < precip.size()) pt.precipMm = precip[hourIdx].toDouble();
-            if (hourIdx < precipProb.size()) pt.precipProbability = precipProb[hourIdx].toInt();
-            if (hourIdx < wind.size()) pt.windSpeed = wind[hourIdx].toDouble();
+    if (results.size() != m_points.size()) {
+        qWarning() << "RouteWeatherManager: Response count mismatch:"
+                   << results.size() << "vs" << m_points.size() << "points";
+        // Use whatever we got
+    }
+
+    QDateTime now = QDateTime::currentDateTimeUtc();
+
+    for (int i = 0; i < qMin(results.size(), static_cast<qsizetype>(m_points.size())); ++i) {
+        QJsonObject pointData = results[i].toObject();
+        QJsonObject minutely = pointData["minutely_15"].toObject();
+
+        QJsonArray times = minutely["time"].toArray();
+        QJsonArray precip = minutely["precipitation"].toArray();
+        QJsonArray codes = minutely["weather_code"].toArray();
+        QJsonArray temps = minutely["temperature_2m"].toArray();
+        QJsonArray winds = minutely["wind_speed_10m"].toArray();
+
+        if (times.isEmpty()) continue;
+
+        // Find the 15-min slot closest to this point's ETA
+        QDateTime targetTime = now.addSecs(qRound(m_points[i].etaMinutes * 60));
+        int bestIdx = 0;
+        qint64 bestDiff = INT64_MAX;
+
+        for (int j = 0; j < times.size(); ++j) {
+            QDateTime slotTime = QDateTime::fromString(times[j].toString(), Qt::ISODate);
+            qint64 diff = qAbs(targetTime.secsTo(slotTime));
+            if (diff < bestDiff) {
+                bestDiff = diff;
+                bestIdx = j;
+            }
         }
+
+        auto &pt = m_points[i];
+        if (bestIdx < precip.size()) pt.precipMm = precip[bestIdx].toDouble();
+        if (bestIdx < codes.size()) pt.weatherCode = codes[bestIdx].toInt();
+        if (bestIdx < temps.size()) pt.tempC = temps[bestIdx].toDouble();
+        if (bestIdx < winds.size()) pt.windSpeed = winds[bestIdx].toDouble();
+        pt.weatherDesc = descriptionForCode(pt.weatherCode);
     }
 
-    pt.weatherDesc = descriptionForCode(pt.weatherCode);
-
-    m_pendingRequests--;
-    if (m_pendingRequests <= 0) {
-        buildSummary();
-    }
+    buildSummary();
 }
 
 void RouteWeatherManager::buildSummary()
 {
     QString summary;
-    bool alertSent = false;
+    QStringList alertParts;
 
     for (const auto &pt : m_points) {
         summary += QString("- %1: %2, %3°C")
             .arg(pt.locationLabel, pt.weatherDesc)
             .arg(pt.tempC, 0, 'f', 0);
         if (pt.precipMm > 0.0) {
-            summary += QString(", %1mm/h precip").arg(pt.precipMm, 0, 'f', 1);
+            summary += QString(", %1mm precip").arg(pt.precipMm, 0, 'f', 1);
         }
         if (pt.windSpeed > 50.0) {
             summary += QString(", wind %1 km/h").arg(pt.windSpeed, 0, 'f', 0);
         }
         summary += "\n";
 
-        // Generate conversational alerts for severe conditions
-        if (!alertSent && isSevereWeather(pt.weatherCode)) {
-            QString alert;
-            QString timeRef = pt.locationLabel;
-            if (pt.etaHours < 0.5) {
-                timeRef = "at your current location";
-            } else if (pt.etaHours < 1.5) {
-                timeRef = "in about an hour ahead";
-            } else {
-                timeRef = QString("in about %1 hours ahead").arg(qRound(pt.etaHours));
-            }
-
-            if (pt.weatherCode >= 95) {
-                alert = QString("Heads up, there's a thunderstorm %1 on your route").arg(timeRef);
-            } else if (pt.weatherCode >= 71 && pt.weatherCode <= 77) {
-                alert = QString("Watch out, there's snow %1 on your route").arg(timeRef);
-            } else if (pt.weatherCode == 66 || pt.weatherCode == 67) {
-                alert = QString("Careful, there's freezing rain %1 on your route. Roads could be icy").arg(timeRef);
-            } else if (pt.weatherCode == 65 || pt.weatherCode == 82) {
-                alert = QString("Heavy rain %1 on your route. Visibility may be reduced").arg(timeRef);
-            } else if (pt.precipMm > 5.0) {
-                alert = QString("Significant precipitation %1, about %2 millimeters per hour")
-                    .arg(timeRef).arg(pt.precipMm, 0, 'f', 1);
-            } else {
-                alert = QString("Weather alert: %1 expected %2 on your route")
-                    .arg(pt.weatherDesc, timeRef);
-            }
-
-            emit alertDetected(alert);
-            alertSent = true;
+        // Collect severe weather for alert
+        if (isSevereWeather(pt.weatherCode)) {
+            alertParts.append(QString("%1 %2").arg(pt.weatherDesc, pt.locationLabel));
         }
-
-        // High wind alert (separate from precipitation)
-        if (!alertSent && pt.windSpeed > 80.0) {
-            QString timeRef = pt.etaHours < 0.5 ? "right now" :
-                QString("in about %1 hours").arg(qRound(pt.etaHours));
-            emit alertDetected(QString("Strong winds of %1 kilometers per hour %2 on your route")
-                .arg(qRound(pt.windSpeed)).arg(timeRef));
-            alertSent = true;
+        if (pt.windSpeed > 80.0) {
+            alertParts.append(QString("Strong winds of %1 km/h %2")
+                .arg(qRound(pt.windSpeed)).arg(pt.locationLabel));
         }
     }
 
@@ -233,22 +264,32 @@ void RouteWeatherManager::buildSummary()
         m_context->setRouteWeatherSummary(summary);
     }
 
-    qDebug() << "RouteWeatherManager: Summary updated," << m_points.size() << "points";
+    // Always emit a weather alert so Jarvis includes weather in the route briefing.
+    // If there are severe conditions, lead with those. Otherwise just summarize.
+    if (!alertParts.isEmpty()) {
+        emit alertDetected("Route weather: " + alertParts.join(". ") + ". Full conditions: " + summary.simplified());
+    } else {
+        // Build a brief all-clear summary from the sampled points
+        emit alertDetected("Route weather along the next 2 hours: " + summary.simplified());
+    }
+
+    qDebug() << "RouteWeatherManager: Summary updated," << m_points.size() << "points,"
+             << alertParts.size() << "severe conditions";
 }
 
 void RouteWeatherManager::refreshForecasts()
 {
-    if (!m_active || m_points.isEmpty()) return;
-    qDebug() << "RouteWeatherManager: Refreshing forecasts";
-    m_pendingRequests = m_points.size();
-    for (int i = 0; i < m_points.size(); ++i) {
-        fetchPointWeather(i);
-    }
+    if (!m_active || m_routeCoordinates.isEmpty()) return;
+
+    // Re-sample points (driver has moved, ETAs have shifted)
+    sampleRoutePoints(m_routeCoordinates, m_totalDurationSec);
+    fetchWeather();
+
+    qDebug() << "RouteWeatherManager: Refreshing forecasts (" << m_points.size() << "points)";
 }
 
 QString RouteWeatherManager::descriptionForCode(int code) const
 {
-    // WMO weather interpretation codes
     switch (code) {
         case 0: return "Clear sky";
         case 1: return "Mainly clear";
@@ -280,8 +321,18 @@ QString RouteWeatherManager::descriptionForCode(int code) const
 
 bool RouteWeatherManager::isSevereWeather(int code) const
 {
-    // Heavy rain, freezing rain/drizzle, moderate+ snow, thunderstorms
     return code == 65 || code == 66 || code == 67
         || code == 56 || code == 57
         || code >= 73;
+}
+
+double RouteWeatherManager::haversineKm(double lat1, double lon1, double lat2, double lon2) const
+{
+    const double R = 6371.0;
+    double dLat = qDegreesToRadians(lat2 - lat1);
+    double dLon = qDegreesToRadians(lon2 - lon1);
+    double a = qSin(dLat / 2) * qSin(dLat / 2)
+             + qCos(qDegreesToRadians(lat1)) * qCos(qDegreesToRadians(lat2))
+             * qSin(dLon / 2) * qSin(dLon / 2);
+    return R * 2 * qAtan2(qSqrt(a), qSqrt(1 - a));
 }

@@ -41,21 +41,21 @@ private:
     struct RoutePoint {
         double lat;
         double lon;
-        double etaHours;     // hours from start to reach this point
+        double etaMinutes;       // minutes from now to reach this point
         QString weatherDesc;
         double tempC = 0.0;
         int weatherCode = 0;
-        double precipMm = 0.0;       // precipitation mm/h
-        int precipProbability = 0;   // 0-100%
-        double windSpeed = 0.0;      // km/h
+        double precipMm = 0.0;   // precipitation mm
+        double windSpeed = 0.0;  // km/h
         QString locationLabel;
     };
 
     void sampleRoutePoints(const QJsonArray &coordinates, double durationSec);
-    void fetchPointWeather(int index);
+    void fetchWeather();
     void buildSummary();
     QString descriptionForCode(int code) const;
     bool isSevereWeather(int code) const;
+    double haversineKm(double lat1, double lon1, double lat2, double lon2) const;
 
     QNetworkAccessManager *m_network;
     QTimer *m_refreshTimer;
@@ -64,8 +64,12 @@ private:
     bool m_active = false;
     QString m_summary;
     QList<RoutePoint> m_points;
-    int m_pendingRequests = 0;
+    QJsonArray m_routeCoordinates;
     double m_totalDurationSec = 0.0;
+
+    static constexpr double SAMPLE_INTERVAL_KM = 15.0;   // sample every 15km
+    static constexpr double LOOKAHEAD_HOURS = 2.0;        // only look 2 hours ahead
+    static constexpr int REFRESH_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
 };
 
 #endif // ROUTEWEATHERMANAGER_H
