@@ -2,396 +2,455 @@ import QtQuick 2.15
 import HeadUnit
 
 /**
- * VoicePipeline - Encapsulates all voice assistant signal wiring.
+ * VoicePipeline — Voice assistant orchestration layer.
  *
- * Manages connections between PicovoiceManager, GoogleTTS, ClaudeClient,
- * and VoiceCommandHandler, plus the Claude indicator UI state and
- * voice confirmation dialog.
+ * Wires PicovoiceManager, GoogleTTS, ClaudeClient, ToolExecutor, and CopilotMonitor.
+ * ClaudeClient handles the tool loop internally; this layer manages:
+ *   - TTS playback sequencing (ready prompt → response → follow-up / nav briefing)
+ *   - Music pause/resume around voice interactions
+ *   - Proactive alert queuing and delivery
+ *   - Navigation briefing coordination (short ack → wait for route data → full briefing)
  */
 Item {
     id: root
     anchors.fill: parent
 
-    // Loader references from Main.qml
+    // --- External references ---
     property var claudeIndicatorLoader: null
-
-    // Track which TTS speech is playing to handle onSpeechFinished correctly
-    // "ready" = ready prompt after wake word, "response" = Claude's response, "nav_ack" = navigation acknowledgment
-    property string pendingSpeechType: ""
-
-    // Whether Claude's last response expects a follow-up reply
-    property bool pendingFollowUp: false
-
-    // ScreenContainer reference for reading GPS/route data
     property var screenContainer: null
 
-    // Queue for proactive alerts that arrive while TTS is speaking
-    property var pendingAlerts: []
+    // --- Interaction state ---
+    // What the current/last TTS utterance represents:
+    //   "" = idle, "ready" = wake word prompt, "response" = Claude response
+    property string speechType: ""
 
-    // Navigation briefing: after the short nav ack, wait for route data to arrive
-    // then deliver one cohesive briefing instead of two separate messages
-    property string pendingNavDestination: ""
+    // Should the mic stay open after the current response? (set by ToolExecutor)
+    property bool wantsFollowUp: false
 
-    // Track which music source was playing when Jarvis activated, so we can resume after
-    property string pausedAudioSource: ""
+    // Which music source was playing before Jarvis activated (for resume)
+    property string musicSource: ""
 
-    // Signals to Main.qml
+    // --- Navigation briefing state ---
+    // Destination waiting for route data (set when navigate tool fires, cleared when briefing sends)
+    property string navDest: ""
+    // True from navigate tool until the briefing TTS finishes (prevents premature cleanup)
+    property bool navActive: false
+
+    // --- Alert queue ---
+    property var alertQueue: []
+
+    // --- Signals to Main.qml ---
     signal notificationRequested(string message, string type)
     signal navigateToDestination(string destination)
+    signal addRouteStop(string destination)
 
-    // PicovoiceManager Connections - Unified Voice Pipeline
+    // =====================================================================
+    // INDICATOR HELPERS
+    // =====================================================================
+    function showIndicator(state) {
+        if (!claudeIndicatorLoader) return
+        claudeIndicatorLoader.active = true
+        if (claudeIndicatorLoader.item) {
+            claudeIndicatorLoader.item.show()
+            claudeIndicatorLoader.item.setState(state)
+        }
+    }
+    function setIndicator(state) {
+        if (claudeIndicatorLoader && claudeIndicatorLoader.item)
+            claudeIndicatorLoader.item.setState(state)
+    }
+    function hideIndicator() {
+        if (claudeIndicatorLoader && claudeIndicatorLoader.item)
+            claudeIndicatorLoader.item.hide()
+    }
+
+    // =====================================================================
+    // MUSIC PAUSE / RESUME
+    // =====================================================================
+    function pauseMusic() {
+        root.musicSource = ""
+        if (tidalClient && tidalClient.isPlaying) {
+            tidalClient.pause()
+            root.musicSource = "tidal"
+        } else if (spotifyClient && spotifyClient.isPlaying) {
+            spotifyClient.pause()
+            root.musicSource = "spotify"
+        } else if (mediaController && mediaController.isPlaying) {
+            mediaController.pause()
+            root.musicSource = "bluetooth"
+        }
+    }
+
+    function resumeMusic() {
+        if (root.musicSource === "tidal" && tidalClient) tidalClient.play()
+        else if (root.musicSource === "spotify" && spotifyClient) spotifyClient.play()
+        else if (root.musicSource === "bluetooth" && mediaController) mediaController.play()
+        root.musicSource = ""
+    }
+
+    // =====================================================================
+    // TEARDOWN — end an interaction cleanly
+    // =====================================================================
+    function finishInteraction() {
+        console.log("VoicePipeline: Finishing interaction")
+        hideIndicator()
+        resumeMusic()
+        resumeAfterTTSTimer.start()
+    }
+
+    // =====================================================================
+    // PICOVOICE CONNECTIONS
+    // =====================================================================
     Connections {
         target: picovoiceManager
 
         function onWakeWordDetected(keyword) {
-            // Cancel any pending nav briefing — new wake word takes priority
-            navBriefingTimer.stop()
-            root.pendingNavDestination = ""
-            root.pendingAlerts = []
+            console.log("Wake word detected:", keyword)
 
-            console.log("Wake word detected via PicovoiceManager:", keyword, "- Activating Claude AI")
-
-            // CRITICAL: Stop any ongoing TTS playback immediately to prevent audio conflicts
-            if (googleTTS.isSpeaking) {
-                console.log("Stopping TTS playback before processing new wake word")
-                googleTTS.stop()
+            // Dismiss any pending confirmation dialog
+            if (voiceConfirmationDialog.visible) {
+                toolExecutor.cancelAction()
+                voiceConfirmationDialog.visible = false
             }
 
-            // Cancel any pending hide timer
+            // Cancel any in-progress nav briefing or alerts
+            navBriefingTimer.stop()
+            root.navDest = ""
+            root.navActive = false
+            root.alertQueue = []
+            root.wantsFollowUp = false
             hideClaudeTimer.stop()
 
-            // Pause any playing music so Jarvis can be heard
+            // Stop any ongoing TTS
+            if (googleTTS.isSpeaking) googleTTS.stop()
+
             pauseMusic()
+            showIndicator("listening")
 
-            // Activate Claude indicator (same as long-press home button)
-            if (claudeIndicatorLoader) {
-                claudeIndicatorLoader.active = true
-
-                if (claudeIndicatorLoader.item) {
-                    claudeIndicatorLoader.item.show()
-                    claudeIndicatorLoader.item.setState("listening")
-                } else {
-                    console.warn("ClaudeIndicator not loaded yet after setting active=true")
-                }
-            }
-
-            // Play a short "ready" voice prompt to indicate we're listening
-            root.pendingSpeechType = "ready"
-            var readyPhrases = ["Yes?", "What's up?", "I'm here", "Go ahead", "Listening"]
-            var randomIndex = Math.floor(Math.random() * readyPhrases.length)
-            googleTTS.speak(readyPhrases[randomIndex])
-        }
-
-        function onIntentDetected(intent, slots) {
-            console.log("Intent detected:", intent, "Slots:", JSON.stringify(slots))
-
-            if (claudeIndicatorLoader && claudeIndicatorLoader.item) {
-                claudeIndicatorLoader.item.setState("processing")
-            }
-
-            // Auto-hide after timeout for quick commands
-            hideClaudeTimer.start()
+            // Play random ready prompt
+            root.speechType = "ready"
+            var phrases = ["Yes?", "What's up?", "I'm here", "Go ahead", "Listening"]
+            googleTTS.speak(phrases[Math.floor(Math.random() * phrases.length)])
         }
 
         function onTranscriptionReady(text) {
-            console.log("Speech transcription from Leopard:", text)
+            console.log("Transcription:", text)
+            setIndicator("processing")
+        }
 
-            if (claudeIndicatorLoader && claudeIndicatorLoader.item) {
-                claudeIndicatorLoader.item.setState("processing")
-            }
+        function onIntentDetected(intent, slots) {
+            console.log("Intent:", intent, JSON.stringify(slots))
+            setIndicator("processing")
+            hideClaudeTimer.start()
+        }
+
+        function onInteractionReset() {
+            // PicovoiceManager silently returned to Listening (follow-up timeout, speech start timeout, etc.)
+            console.log("VoicePipeline: PicovoiceManager interaction reset")
+            root.speechType = ""
+            root.wantsFollowUp = false
+            hideClaudeTimer.stop()
+            hideIndicator()
+            resumeMusic()
         }
 
         function onError(message) {
             console.log("PicovoiceManager error:", message)
-            if (claudeIndicatorLoader && claudeIndicatorLoader.item) {
-                claudeIndicatorLoader.item.hide()
-            }
+            root.speechType = ""
+            root.wantsFollowUp = false
+            root.navDest = ""
+            root.navActive = false
+            root.alertQueue = []
+            navBriefingTimer.stop()
+            hideClaudeTimer.stop()
+            hideIndicator()
+            resumeMusic()
             root.notificationRequested("Voice Error: " + message, "error")
         }
     }
 
-    // Google TTS Connections - for ready prompt and response completion
+    // =====================================================================
+    // GOOGLE TTS CONNECTIONS
+    // =====================================================================
     Connections {
         target: googleTTS
 
         function onSpeechStarted() {
-            // Pause wake word detection while TTS is playing to prevent
-            // the speaker output from triggering false "jarvis" detections
             picovoiceManager.pause()
-
-            // TTS is actively playing — cancel the silent-failure fallback timer.
-            // onSpeechFinished will handle cleanup when playback completes.
             hideClaudeTimer.stop()
         }
 
-        function onSpeechFinished() {
-            if (root.pendingSpeechType === "ready") {
-                // Ready prompt finished — tell PicovoiceManager to start listening
-                console.log("TTS ready prompt finished, starting command listening")
+        function onError(message) {
+            console.log("GoogleTTS error:", message)
+            // TTS failed — speechFinished will never fire, so clean up manually
+            var type = root.speechType
+            root.speechType = ""
+            root.wantsFollowUp = false
+            hideClaudeTimer.stop()
+
+            if (type === "ready") {
+                // Ready prompt failed — cancel the whole interaction
+                root.navDest = ""
+                root.navActive = false
+                root.alertQueue = []
+                navBriefingTimer.stop()
+                picovoiceManager.cancelAndReset()
+                hideIndicator()
+                resumeMusic()
+            } else if (type === "response") {
+                // Response TTS failed — same cleanup as finishInteraction
+                root.navActive = false
+                root.alertQueue = []
+                navBriefingTimer.stop()
                 picovoiceManager.resume()
-                picovoiceManager.onReadyPromptFinished()
-
-                // Update indicator to show we're listening
-                if (claudeIndicatorLoader && claudeIndicatorLoader.item) {
-                    claudeIndicatorLoader.item.setState("listening")
-                }
-            } else if (root.pendingSpeechType === "nav_ack") {
-                // Short nav acknowledgment finished — show thinking state
-                // while we wait for route data to arrive for the full briefing
-                console.log("TTS nav ack finished, waiting for route data")
-                picovoiceManager.resume()
-                if (claudeIndicatorLoader && claudeIndicatorLoader.item) {
-                    claudeIndicatorLoader.item.setState("thinking")
-                }
-                root.pendingSpeechType = ""
-                return
-            } else if (root.pendingSpeechType === "response") {
-                // Claude response finished speaking
-                hideClaudeTimer.stop()
-
-                // Check for queued alerts — send to Claude for natural delivery
-                if (root.pendingAlerts.length > 0) {
-                    var alerts = root.pendingAlerts
-                    root.pendingAlerts = []
-                    var alertContext = "New conditions just came in. Mention these naturally and concisely in one flowing thought: " + alerts.join(". ")
-                    console.log("VoicePipeline: Sending queued alerts to Claude:", alertContext)
-                    if (claudeIndicatorLoader && claudeIndicatorLoader.item) {
-                        claudeIndicatorLoader.item.setState("thinking")
-                    }
-                    claudeClient.sendMessage(alertContext, contextAggregator.buildContext(), true)
-                    return
-                }
-
-                if (root.pendingFollowUp) {
-                    // Follow-up expected — keep indicator visible, enter follow-up mode
-                    console.log("TTS response finished, entering follow-up mode")
-                    root.pendingFollowUp = false
-                    if (claudeIndicatorLoader && claudeIndicatorLoader.item) {
-                        claudeIndicatorLoader.item.setState("listening")
-                    }
-                    // Enter follow-up mode so PicovoiceManager listens without wake word
-                    picovoiceManager.enterFollowUpMode()
-                    // Resume audio processing after echo delay
-                    resumeAfterTTSTimer.start()
-                } else {
-                    // No follow-up — hide indicator, resume wake word and music
-                    console.log("TTS response finished, hiding Claude indicator")
-                    if (claudeIndicatorLoader && claudeIndicatorLoader.item) {
-                        claudeIndicatorLoader.item.hide()
-                    }
-                    resumeMusic()
-                    resumeAfterTTSTimer.start()
-                }
+                finishInteraction()
             } else {
-                // Unknown speech finished — just resume listening
                 picovoiceManager.resume()
             }
-            root.pendingSpeechType = ""
+        }
+
+        function onSpeechFinished() {
+            var type = root.speechType
+            root.speechType = ""
+
+            if (type === "ready") {
+                // Ready prompt done — start listening for user's command
+                console.log("Ready prompt done, listening for command")
+                picovoiceManager.resume()
+                picovoiceManager.onReadyPromptFinished()
+                setIndicator("listening")
+
+            } else if (type === "response") {
+                hideClaudeTimer.stop()
+
+                if (root.navDest !== "") {
+                    // This was the short nav ack ("On it") — wait for briefing timer
+                    console.log("Nav ack done, waiting for route briefing...")
+                    setIndicator("thinking")
+                    picovoiceManager.resume()
+
+                } else if (root.navActive) {
+                    // This was the full nav briefing — wrap up the whole nav flow
+                    console.log("Nav briefing done, finishing")
+                    root.navActive = false
+                    root.alertQueue = []
+                    finishInteraction()
+
+                } else if (root.alertQueue.length > 0) {
+                    // Queued proactive alerts — dispatch them
+                    var alerts = root.alertQueue
+                    root.alertQueue = []
+                    setIndicator("thinking")
+                    var prompt = "New conditions just came in. Mention these naturally and concisely: " + alerts.join(". ")
+                    claudeClient.sendMessage(prompt, contextAggregator.buildContext(), true)
+
+                } else if (root.wantsFollowUp) {
+                    // Claude asked a question — keep mic open
+                    console.log("Entering follow-up mode")
+                    root.wantsFollowUp = false
+                    setIndicator("listening")
+                    picovoiceManager.enterFollowUpMode()
+                    resumeAfterTTSTimer.start()
+
+                } else {
+                    // Normal response — done
+                    console.log("Response done, finishing")
+                    finishInteraction()
+                }
+
+            } else {
+                // Unknown speech type — resume mic and check for queued alerts
+                picovoiceManager.resume()
+                if (root.alertQueue.length > 0) {
+                    var pendingAlerts = root.alertQueue
+                    root.alertQueue = []
+                    speakAlert(pendingAlerts.join(". "))
+                }
+            }
         }
     }
 
-    // Brief delay before resuming wake word detection after TTS response
-    // to avoid picking up tail-end speaker echo
     Timer {
         id: resumeAfterTTSTimer
-        interval: 500
+        interval: 400
         repeat: false
-        onTriggered: {
-            picovoiceManager.resume()
-        }
+        onTriggered: picovoiceManager.resume()
     }
 
-    // Claude Client Connections
+    // =====================================================================
+    // CLAUDE CLIENT CONNECTIONS
+    // =====================================================================
     Connections {
         target: claudeClient
 
         function onProcessingChanged() {
-            if (claudeIndicatorLoader && claudeIndicatorLoader.item) {
-                if (claudeClient.isProcessing) {
-                    claudeIndicatorLoader.item.setState("processing")
-                }
-                // Don't start hide timer here — onSpeechFinished handles it after TTS completes
-            }
+            if (claudeClient.isProcessing) setIndicator("processing")
         }
 
         function onResponseReceived(response, toolCalls) {
-            console.log("Claude response:", response)
+            console.log("Claude response:", response.substring(0, 200))
+            setIndicator("speaking")
 
-            voiceCommandHandler.processClaudeResponse(response)
-
-            // Check for expects_reply and navigate action in JSON command block
-            root.pendingFollowUp = false
-            var isNavAction = false
-            var navDestination = ""
-            var jsonMatch = response.match(/```json\s*(\{[\s\S]*?\})\s*```/)
-            if (jsonMatch) {
-                try {
-                    var cmd = JSON.parse(jsonMatch[1])
-                    if (cmd.expects_reply === true) {
-                        root.pendingFollowUp = true
-                    }
-                    if (cmd.action === "navigate" && cmd.destination) {
-                        isNavAction = true
-                        navDestination = cmd.destination
-                    }
-                } catch(e) {}
-            }
-
-            // If this is a navigate action, speak the short acknowledgment immediately
-            // ("On it", "Firing up the route", etc.) then wait for route data to arrive
-            // before delivering the full briefing as one cohesive message.
-            if (isNavAction) {
-                var navAckText = response.replace(/```json[\s\S]*?```/g, "").trim()
-                root.pendingNavDestination = navDestination
-                console.log("VoicePipeline: Nav action — speaking ack, waiting for route data")
-                if (claudeIndicatorLoader && claudeIndicatorLoader.item) {
-                    claudeIndicatorLoader.item.setState("speaking")
-                }
-                // Speak the short ack so the user isn't left in silence
-                root.pendingSpeechType = "nav_ack"
-                googleTTS.speak(navAckText.length > 0 ? navAckText : "On it.")
-                // Start the timer — route data typically arrives within 3-8 seconds
-                navBriefingTimer.start()
-                return
-            }
-
-            if (claudeIndicatorLoader && claudeIndicatorLoader.item) {
-                claudeIndicatorLoader.item.setState("speaking")
-            }
-
-            // Strip JSON command blocks before speaking — TTS should only read natural language
-            var spokenText = response.replace(/```json[\s\S]*?```/g, "").trim()
+            var spokenText = stripMarkdown(response.trim())
             if (spokenText.length === 0) spokenText = "Done."
 
-            root.pendingSpeechType = "response"
+            root.speechType = "response"
             googleTTS.speak(spokenText)
-
-            // Fallback: hide after 30s in case TTS fails silently
             hideClaudeTimer.start()
         }
 
         function onError(message) {
             console.log("Claude error:", message)
+            root.speechType = ""
             navBriefingTimer.stop()
-            root.pendingNavDestination = ""
-            root.pendingAlerts = []
-            if (claudeIndicatorLoader && claudeIndicatorLoader.item) {
-                claudeIndicatorLoader.item.hide()
+            hideClaudeTimer.stop()
+            root.navDest = ""
+            root.navActive = false
+            root.alertQueue = []
+            root.wantsFollowUp = false
+            if (voiceConfirmationDialog.visible) {
+                voiceConfirmationDialog.visible = false
             }
+            hideIndicator()
+            picovoiceManager.resume()
+            resumeMusic()
             root.notificationRequested("Claude Error: " + message, "error")
         }
     }
 
-    // Voice Command Handler Connections
+    // =====================================================================
+    // TOOL EXECUTOR CONNECTIONS
+    // =====================================================================
     Connections {
-        target: voiceCommandHandler
+        target: toolExecutor
+
+        function onNavigationStarted(destination) {
+            console.log("Navigation started to:", destination)
+            root.navDest = destination
+            root.navActive = true
+            navBriefingTimer.start()
+            root.navigateToDestination(destination)
+        }
+
+        function onRouteStopRequested(destination) {
+            console.log("Route stop requested:", destination)
+            root.addRouteStop(destination)
+        }
+
+        function onFollowUpExpected() {
+            console.log("Follow-up expected")
+            root.wantsFollowUp = true
+        }
 
         function onConfirmationRequested(action, details) {
-            console.log("Voice command confirmation requested:", action, details)
+            console.log("Confirmation requested:", action, details)
             voiceConfirmationDialog.action = action
             voiceConfirmationDialog.details = details
             voiceConfirmationDialog.visible = true
         }
-
-        function onCommandExecuted(action, details) {
-            console.log("Voice command executed:", action, details)
-        }
-
-        function onNavigationRequested(destination) {
-            console.log("Voice navigation requested:", destination)
-            root.navigateToDestination(destination)
-        }
-
-        function onCommandFailed(action, error) {
-            console.log("Voice command failed:", action, error)
-            root.notificationRequested("Command failed: " + error, "error")
-        }
     }
 
-    // CopilotMonitor proactive alerts — queue if TTS is busy, otherwise speak
+    // =====================================================================
+    // COPILOT MONITOR — proactive alerts
+    // =====================================================================
     Connections {
         target: copilotMonitor
 
         function onProactiveAlert(message) {
-            console.log("Copilot proactive alert:", message)
+            console.log("Proactive alert:", message)
 
-            // If a nav briefing is pending, collect alerts for the unified briefing
-            if (root.pendingNavDestination !== "") {
-                console.log("VoicePipeline: Collecting alert for nav briefing")
-                var alerts = root.pendingAlerts
-                alerts.push(message)
-                root.pendingAlerts = alerts
-                // Restart the briefing timer — more data may still be arriving
+            // If nav briefing is pending, collect alerts for the unified briefing
+            if (root.navDest !== "") {
+                var q = root.alertQueue
+                q.push(message)
+                root.alertQueue = q
                 navBriefingTimer.restart()
                 return
             }
 
-            // If TTS is currently speaking, queue the alert for after it finishes
-            if (googleTTS.isSpeaking || root.pendingSpeechType !== "") {
-                console.log("VoicePipeline: TTS busy, queuing alert")
-                var alerts = root.pendingAlerts
-                alerts.push(message)
-                root.pendingAlerts = alerts
+            // If TTS is busy, queue for later
+            if (googleTTS.isSpeaking || root.speechType !== "") {
+                var q2 = root.alertQueue
+                q2.push(message)
+                root.alertQueue = q2
                 return
             }
 
+            // Speak it now
             speakAlert(message)
         }
     }
 
-    // Deliver a unified navigation briefing — combines the initial nav response
-    // with all route data (weather, road conditions, surface, etc.) into one prompt
+    // =====================================================================
+    // NAV BRIEFING — unified route briefing after route data arrives
+    // =====================================================================
     function deliverNavBriefing() {
-        var destination = root.pendingNavDestination
-        var routeAlerts = root.pendingAlerts
+        var destination = root.navDest
+        var alerts = root.alertQueue
 
-        // Clear state
-        root.pendingNavDestination = ""
-        root.pendingAlerts = []
+        root.navDest = ""        // Clear so onSpeechFinished knows this is the briefing
+        root.alertQueue = []
+        // root.navActive stays true until the briefing TTS finishes
 
         var prompt = "You just started navigation to " + destination + ". "
-        if (routeAlerts.length > 0) {
-            prompt += "Here is the route data that just came in: " + routeAlerts.join(" ") + " "
+        if (alerts.length > 0) {
+            prompt += "Here is the route data that just came in: " + alerts.join(" ") + " "
         }
-        prompt += "Give the driver a single, cohesive route briefing. Acknowledge the destination, mention the drive time if you know it, then cover weather and any road conditions in one natural flow. Keep it concise — this all needs to sound like one thought, not a list."
+        prompt += "Give the driver a single, cohesive route briefing. Acknowledge the destination, mention the drive time if you know it, then cover weather and road conditions in one natural flow. Keep it concise."
 
-        console.log("VoicePipeline: Delivering unified nav briefing for", destination,
-                     "with", routeAlerts.length, "route alerts")
+        console.log("Delivering nav briefing for", destination, "with", alerts.length, "alerts")
 
-        if (claudeIndicatorLoader && claudeIndicatorLoader.item) {
-            claudeIndicatorLoader.item.setState("processing")
-        }
-        root.pendingFollowUp = false
+        showIndicator("processing")
+        root.wantsFollowUp = false
+        root.speechType = ""
         claudeClient.sendMessage(prompt, contextAggregator.buildContext(), true)
         hideClaudeTimer.start()
     }
 
-    // Send a proactive alert through Claude for natural conversational delivery
     function speakAlert(message) {
-        // Pause music for alert
-        pauseMusic()
+        if (root.musicSource === "") pauseMusic()
 
-        // Show Claude indicator
-        if (claudeIndicatorLoader) {
-            claudeIndicatorLoader.active = true
-            if (claudeIndicatorLoader.item) {
-                claudeIndicatorLoader.item.show()
-                claudeIndicatorLoader.item.setState("thinking")
-            }
-        }
-
-        // Send to Claude so Jarvis delivers it conversationally
-        var prompt = "New route conditions detected. Mention these naturally and concisely in one flowing thought: " + message
-        root.pendingSpeechType = "response"
-        root.pendingFollowUp = false
+        showIndicator("thinking")
+        root.wantsFollowUp = false
+        var prompt = "New route conditions detected. Mention these naturally and concisely: " + message
         claudeClient.sendMessage(prompt, contextAggregator.buildContext(), true)
         hideClaudeTimer.start()
     }
 
-    // Forward route state from ScreenContainer to ContextAggregator.
-    // Polls every 5s because ScreenContainer's nav properties are populated by
-    // a Loader'd Maps.qml — there's no direct signal path from the map item to
-    // this pipeline without adding cross-component wiring through Main.qml.
+    // =====================================================================
+    // TIMERS
+    // =====================================================================
+
+    // Wait for route data before sending nav briefing to Claude
+    Timer {
+        id: navBriefingTimer
+        interval: 8000
+        repeat: false
+        onTriggered: deliverNavBriefing()
+    }
+
+    // Fallback: hide indicator if TTS speechFinished never fires
+    Timer {
+        id: hideClaudeTimer
+        interval: 30000
+        repeat: false
+        onTriggered: {
+            console.log("hideClaudeTimer fallback fired")
+            // Reset ALL interaction state to prevent stale state corrupting next interaction
+            root.speechType = ""
+            root.wantsFollowUp = false
+            root.navDest = ""
+            root.navActive = false
+            root.alertQueue = []
+            navBriefingTimer.stop()
+            googleTTS.stop()
+            picovoiceManager.resume()
+            hideIndicator()
+            resumeMusic()
+        }
+    }
+
+    // Forward route state to ContextAggregator
     Timer {
         id: routeForwardTimer
         interval: 5000
@@ -401,186 +460,131 @@ Item {
             if (root.screenContainer && root.screenContainer.navActive !== undefined) {
                 contextAggregator.routeActive = root.screenContainer.navActive
                 contextAggregator.routeDuration = root.screenContainer.navRouteDuration || ""
+                contextAggregator.routeDistance = root.screenContainer.navRouteDistance || ""
+                contextAggregator.routeDestination = root.screenContainer.navRouteDestinationName || ""
             }
         }
     }
 
-    // Navigation briefing timer — waits for route data managers to report back
-    // before sending everything to Claude for one cohesive briefing.
-    // Fires 8s after the navigate action (or restarts when new alerts arrive).
-    Timer {
-        id: navBriefingTimer
-        interval: 8000
-        repeat: false
-        onTriggered: {
-            deliverNavBriefing()
-        }
+    // =====================================================================
+    // UTILITY
+    // =====================================================================
+
+    function stripMarkdown(text) {
+        text = text.replace(/\*\*([^*]+)\*\*/g, "$1")
+        text = text.replace(/\*([^*]+)\*/g, "$1")
+        text = text.replace(/__([^_]+)__/g, "$1")
+        text = text.replace(/_([^_]+)_/g, "$1")
+        text = text.replace(/^#{1,6}\s+/gm, "")
+        text = text.replace(/^[\s]*[-*+]\s+/gm, "")
+        text = text.replace(/^[\s]*\d+\.\s+/gm, "")
+        text = text.replace(/`([^`]+)`/g, "$1")
+        text = text.replace(/```[\s\S]*?```/g, "")
+        text = text.replace(/\n{3,}/g, "\n\n")
+        return text.trim()
     }
 
-    // Fallback timer to hide Claude indicator if TTS speechFinished doesn't fire
+    // Manual activation (NavBar long-press)
+    // NOTE: manualActivate() emits wakeWordDetected which triggers onWakeWordDetected.
+    // Do NOT call pauseMusic() here — onWakeWordDetected already does it.
+    // Calling it twice clobbers musicSource to "" so music never resumes.
+    function activate() {
+        console.log("Manual voice activation")
+        picovoiceManager.manualActivate()
+    }
+
+    // Cancel current interaction
+    function cancelInteraction() {
+        console.log("Canceling interaction")
+        root.speechType = ""
+        root.wantsFollowUp = false
+        root.navDest = ""
+        root.navActive = false
+        root.alertQueue = []
+        navBriefingTimer.stop()
+        hideClaudeTimer.stop()
+        googleTTS.stop()
+        picovoiceManager.cancelAndReset()
+        hideIndicator()
+        resumeMusic()
+    }
+
+    // =====================================================================
+    // CONFIRMATION DIALOG (SMS)
+    // =====================================================================
     Timer {
-        id: hideClaudeTimer
+        id: confirmationDismissTimer
         interval: 30000
         repeat: false
         onTriggered: {
-            console.log("VoicePipeline: hideClaudeTimer fired (TTS silent failure fallback)")
-            if (claudeIndicatorLoader && claudeIndicatorLoader.item) {
-                claudeIndicatorLoader.item.hide()
+            if (voiceConfirmationDialog.visible) {
+                console.log("VoicePipeline: Confirmation dialog auto-dismissed after 30s")
+                toolExecutor.cancelAction()
+                voiceConfirmationDialog.visible = false
             }
-            googleTTS.stop()
-            picovoiceManager.resume()
-            resumeMusic()
         }
     }
 
-    // Voice Command Confirmation Dialog
     Rectangle {
         id: voiceConfirmationDialog
         anchors.centerIn: parent
-        width: 500
-        height: 200
-        radius: 12
+        width: 500; height: 200; radius: 12
         color: Qt.rgba(ThemeValues.bgCol.r, ThemeValues.bgCol.g, ThemeValues.bgCol.b, 0.95)
-        border.color: ThemeValues.primaryCol
-        border.width: 2
-        visible: false
-        z: 1002
+        border.color: ThemeValues.primaryCol; border.width: 2
+        visible: false; z: 1002
+        onVisibleChanged: {
+            if (visible) confirmationDismissTimer.start()
+            else confirmationDismissTimer.stop()
+        }
 
         property string action: ""
         property string details: ""
 
         Column {
-            anchors.centerIn: parent
-            spacing: 20
+            anchors.centerIn: parent; spacing: 20
 
             Text {
                 anchors.horizontalCenter: parent.horizontalCenter
                 text: voiceConfirmationDialog.details
                 color: ThemeValues.textCol
-                font.pixelSize: 18
-                font.family: ThemeValues.fontFamily
-                width: 450
-                wrapMode: Text.WordWrap
+                font.pixelSize: 18; font.family: ThemeValues.fontFamily
+                width: 450; wrapMode: Text.WordWrap
                 horizontalAlignment: Text.AlignHCenter
             }
 
             Row {
-                anchors.horizontalCenter: parent.horizontalCenter
-                spacing: 20
+                anchors.horizontalCenter: parent.horizontalCenter; spacing: 20
 
                 Rectangle {
-                    width: 120
-                    height: 50
-                    radius: 8
+                    width: 120; height: 50; radius: 8
                     color: "transparent"
-                    border.color: ThemeValues.primaryCol
-                    border.width: 2
-
+                    border.color: ThemeValues.primaryCol; border.width: 2
                     Text {
-                        anchors.centerIn: parent
-                        text: "Yes, Send"
+                        anchors.centerIn: parent; text: "Yes, Send"
                         color: ThemeValues.primaryCol
-                        font.pixelSize: 16
-                        font.family: ThemeValues.fontFamily
+                        font.pixelSize: 16; font.family: ThemeValues.fontFamily
                     }
-
                     MouseArea {
                         anchors.fill: parent
-                        onClicked: {
-                            voiceCommandHandler.confirmAction()
-                            voiceConfirmationDialog.visible = false
-                        }
+                        onClicked: { toolExecutor.confirmAction(); voiceConfirmationDialog.visible = false }
                     }
                 }
 
                 Rectangle {
-                    width: 120
-                    height: 50
-                    radius: 8
+                    width: 120; height: 50; radius: 8
                     color: "transparent"
-                    border.color: ThemeValues.accentCol
-                    border.width: 2
-
+                    border.color: ThemeValues.accentCol; border.width: 2
                     Text {
-                        anchors.centerIn: parent
-                        text: "Cancel"
+                        anchors.centerIn: parent; text: "Cancel"
                         color: ThemeValues.accentCol
-                        font.pixelSize: 16
-                        font.family: ThemeValues.fontFamily
+                        font.pixelSize: 16; font.family: ThemeValues.fontFamily
                     }
-
                     MouseArea {
                         anchors.fill: parent
-                        onClicked: {
-                            voiceCommandHandler.cancelAction()
-                            voiceConfirmationDialog.visible = false
-                        }
+                        onClicked: { toolExecutor.cancelAction(); voiceConfirmationDialog.visible = false }
                     }
                 }
             }
         }
-    }
-
-    // Pause any playing music so Jarvis can be heard
-    function pauseMusic() {
-        root.pausedAudioSource = ""
-        if (tidalClient && tidalClient.isPlaying) {
-            console.log("VoicePipeline: Pausing Tidal")
-            tidalClient.pause()
-            root.pausedAudioSource = "tidal"
-        } else if (spotifyClient && spotifyClient.isPlaying) {
-            console.log("VoicePipeline: Pausing Spotify")
-            spotifyClient.pause()
-            root.pausedAudioSource = "spotify"
-        } else if (mediaController && mediaController.isPlaying) {
-            console.log("VoicePipeline: Pausing MediaController")
-            mediaController.pause()
-            root.pausedAudioSource = "music"
-        }
-    }
-
-    // Resume music that was paused when Jarvis activated
-    function resumeMusic() {
-        if (root.pausedAudioSource === "tidal" && tidalClient) {
-            tidalClient.play()
-        } else if (root.pausedAudioSource === "spotify" && spotifyClient) {
-            spotifyClient.play()
-        } else if (root.pausedAudioSource === "music" && mediaController) {
-            mediaController.play()
-        }
-        root.pausedAudioSource = ""
-    }
-
-    // Manual activation support (called from NavBar long-press)
-    function activate() {
-        console.log("Claude AI activated via manual trigger")
-
-        // Pause music
-        pauseMusic()
-
-        if (claudeIndicatorLoader) {
-            claudeIndicatorLoader.active = true
-
-            if (claudeIndicatorLoader.item) {
-                claudeIndicatorLoader.item.show()
-                claudeIndicatorLoader.item.setState("listening")
-            }
-        }
-
-        picovoiceManager.manualActivate()
-    }
-
-    // Cancel current voice interaction (called when user taps to dismiss)
-    function cancelInteraction() {
-        console.log("VoicePipeline: Canceling interaction, stopping TTS, resetting voice pipeline")
-        root.pendingSpeechType = ""
-        root.pendingFollowUp = false
-        navBriefingTimer.stop()
-        root.pendingNavDestination = ""
-        root.pendingAlerts = []
-        hideClaudeTimer.stop()
-        googleTTS.stop()
-        picovoiceManager.cancelAndReset()
-        resumeMusic()
     }
 }

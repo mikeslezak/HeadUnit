@@ -3,9 +3,15 @@
 
 #include <QObject>
 #include <QString>
+#include <QJsonArray>
+#include <QPair>
+#include <QList>
 
 class WeatherManager;
 class VehicleBusManager;
+class TidalClient;
+class SpotifyClient;
+class MediaController;
 
 class ContextAggregator : public QObject
 {
@@ -24,9 +30,16 @@ public:
 
     void setWeatherManager(WeatherManager *mgr);
     void setVehicleBusManager(VehicleBusManager *mgr);
+    void setTidalClient(TidalClient *client);
+    void setSpotifyClient(SpotifyClient *client);
+    void setMediaController(MediaController *mgr);
 
     double gpsLatitude() const { return m_gpsLat; }
     double gpsLongitude() const { return m_gpsLon; }
+
+    // Best available location (real GPS, or WeatherManager ip-api fallback)
+    double bestLatitude() const;
+    double bestLongitude() const;
     double gpsSpeed() const { return m_gpsSpeed; }
     double gpsHeading() const { return m_gpsHeading; }
     bool routeActive() const { return m_routeActive; }
@@ -63,6 +76,12 @@ public:
     // Border wait times (set by BorderWaitManager)
     void setBorderWaitSummary(const QString &summary);
 
+    // Route sample points for along-route searches (lat/lon pairs evenly spaced)
+    Q_INVOKABLE void setRouteCoordinates(const QJsonArray &coordinates, double durationSec);
+    Q_INVOKABLE void clearRouteCoordinates();
+    QList<QPair<double,double>> routeSamplePoints(int count = 3) const;
+    const QJsonArray &routeCoordinates() const { return m_routeCoords; }
+
 signals:
     void gpsChanged();
     void routeChanged();
@@ -70,6 +89,9 @@ signals:
 private:
     WeatherManager *m_weather = nullptr;
     VehicleBusManager *m_vehicle = nullptr;
+    TidalClient *m_tidal = nullptr;
+    SpotifyClient *m_spotify = nullptr;
+    MediaController *m_media = nullptr;
 
     double m_gpsLat = 0.0;
     double m_gpsLon = 0.0;
@@ -86,6 +108,7 @@ private:
     QString m_roadSurfaceSummary;
     QString m_avalancheSummary;
     QString m_borderWaitSummary;
+    QJsonArray m_routeCoords;
 };
 
 #endif // CONTEXTAGGREGATOR_H

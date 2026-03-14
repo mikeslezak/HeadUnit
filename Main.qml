@@ -117,6 +117,8 @@ Window {
         function onPlayStateChanged() {
             if (tidalClient.isPlaying) {
                 setAudioSource("tidal")
+            } else if (activeAudioSource === "tidal") {
+                activeAudioSource = "none"
             }
         }
     }
@@ -127,6 +129,8 @@ Window {
         function onPlayStateChanged() {
             if (spotifyClient.isPlaying) {
                 setAudioSource("spotify")
+            } else if (activeAudioSource === "spotify") {
+                activeAudioSource = "none"
             }
         }
     }
@@ -137,6 +141,8 @@ Window {
         function onPlayStateChanged() {
             if (mediaController.isPlaying) {
                 setAudioSource("music")
+            } else if (activeAudioSource === "music") {
+                activeAudioSource = "none"
             }
         }
     }
@@ -308,11 +314,12 @@ Window {
 
                 onLoaded: {
                     item.theme = theme
-                    item.closeRequested.connect(function() {
-                        notificationPanelLoader.active = false
-                    })
                     console.log("NotificationPanel loaded")
                 }
+            }
+            Connections {
+                target: notificationPanelLoader.item
+                function onCloseRequested() { notificationPanelLoader.active = false }
             }
 
             // Voice Control Overlay (for phone-based assistant)
@@ -326,11 +333,14 @@ Window {
 
                 onLoaded: {
                     item.theme = theme
-                    item.closeRequested.connect(function() {
-                        voiceControlLoader.active = false
-                        voiceAssistant.stopListening()
-                    })
                     console.log("VoiceControl loaded")
+                }
+            }
+            Connections {
+                target: voiceControlLoader.item
+                function onCloseRequested() {
+                    voiceControlLoader.active = false
+                    voiceAssistant.stopListening()
                 }
             }
 
@@ -345,15 +355,18 @@ Window {
 
                 onLoaded: {
                     item.theme = theme
-                    item.closeRequested.connect(function() {
-                        console.log("ClaudeIndicator: closeRequested fired — canceling voice pipeline")
-                        claudeIndicatorLoader.active = false
-                        claudeClient.cancelRequest()
-                        googleTTS.stop()
-                        picovoiceManager.cancelAndReset()
-                        voicePipeline.cancelInteraction()
-                    })
                     console.log("ClaudeIndicator loaded with theme:", theme.name)
+                }
+            }
+            Connections {
+                target: claudeIndicatorLoader.item
+                function onCloseRequested() {
+                    console.log("ClaudeIndicator: closeRequested fired — canceling voice pipeline")
+                    claudeIndicatorLoader.active = false
+                    claudeClient.cancelRequest()
+                    googleTTS.stop()
+                    picovoiceManager.cancelAndReset()
+                    voicePipeline.cancelInteraction()
                 }
             }
 
@@ -406,6 +419,10 @@ Window {
                 onNavigateToDestination: function(destination) {
                     showScreen("home")
                     screenContainer.navigateTo(destination)
+                }
+                onAddRouteStop: function(destination) {
+                    showScreen("home")
+                    screenContainer.addStopOnRoute(destination)
                 }
             }
 

@@ -30,7 +30,9 @@ Item {
     property bool routeActive: false
     property string routeDistance: ""
     property string routeDuration: ""
-    property var routeDestination: null   // {lat, lon, name}
+    property var routeDestination: null   // {lat, lon, name} — final destination
+    property var routeWaypoints: []       // Array of {lat, lon, name} intermediate stops
+    property var routeOrigin: null        // {lat, lon} — origin used when route was first calculated
     property var routeGeoJson: ({"type": "Feature", "geometry": {"type": "LineString", "coordinates": []}})  // GeoJSON for the route line
 
     // Weather overlay
@@ -177,6 +179,10 @@ Item {
                     var radar = data.radar
                     if (radar && radar.past && radar.past.length > 0) {
                         var latest = radar.past[radar.past.length - 1]
+                        if (!latest || !latest.path) {
+                            console.warn("Weather: RainViewer response missing path field")
+                            return
+                        }
                         var tileUrl = "https://tilecache.rainviewer.com" + latest.path + "/256/{z}/{x}/{y}/2/1_1.png"
 
                         var srcParam = Qt.createQmlObject(
@@ -202,7 +208,10 @@ Item {
     }
 
     Component.onDestruction: {
-        if (mapLoader.item) {
+        // Clean up dynamically created weather layer objects to prevent QML object leak
+        removeWeatherLayers()
+
+        if (mapLoader.status === Loader.Ready && mapLoader.item && mapLoader.item.map) {
             var c = mapLoader.item.map.center
             mapPrefs.mapSavedLat = c.latitude
             mapPrefs.mapSavedLon = c.longitude
@@ -361,7 +370,7 @@ Item {
                 center: gps.position.coordinateValid
                     ? gps.position.coordinate
                     : QtPositioning.coordinate(0, 0)
-                visible: gps.position.coordinateValid
+                visible: gps.position.coordinateValid || false
                 radius: 24
                 color: "transparent"
                 border.color: ThemeValues.primaryCol
@@ -375,7 +384,7 @@ Item {
                 center: gps.position.coordinateValid
                     ? gps.position.coordinate
                     : QtPositioning.coordinate(0, 0)
-                visible: gps.position.coordinateValid
+                visible: gps.position.coordinateValid || false
                 radius: 10
                 color: ThemeValues.primaryCol
                 border.color: ThemeValues.textCol
@@ -389,6 +398,7 @@ Item {
     // Helper: reposition overlay markers when map moves or zooms
     property var _searchCoord: null
     property var _destCoord: null
+    property var _waypointCoords: []  // Array of QtPositioning.coordinate for stop markers
 
     Timer {
         id: markerUpdateTimer
@@ -417,6 +427,16 @@ Item {
             var dp = map.fromCoordinate(_destCoord, false)
             destOverlay.x = mapLoader.x + dp.x - 2
             destOverlay.y = mapLoader.y + dp.y - destOverlay.height
+        }
+
+        // Reposition waypoint markers
+        for (var i = 0; i < waypointMarkerRepeater.count; i++) {
+            var item = waypointMarkerRepeater.itemAt(i)
+            if (item && i < _waypointCoords.length) {
+                var wp = map.fromCoordinate(_waypointCoords[i], false)
+                item.x = mapLoader.x + wp.x - 2
+                item.y = mapLoader.y + wp.y - item.height
+            }
         }
     }
 
@@ -493,6 +513,50 @@ Item {
             anchors.horizontalCenterOffset: 2
             width: 8; height: 8; radius: 4
             color: ThemeValues.primaryCol
+        }
+    }
+
+    // Waypoint stop markers (numbered 1, 2, 3...)
+    Repeater {
+        id: waypointMarkerRepeater
+        model: root._waypointCoords.length
+
+        Item {
+            width: 32; height: 56
+            visible: root.routeActive
+            z: 15
+
+            onVisibleChanged: if (visible) markerUpdateTimer.restart()
+
+            Rectangle {
+                x: 1; y: 0
+                width: 2; height: 56
+                color: ThemeValues.accentCol
+            }
+
+            Rectangle {
+                x: 3; y: 0
+                width: 28; height: 20
+                radius: 3
+                color: ThemeValues.accentCol
+
+                Text {
+                    anchors.centerIn: parent
+                    text: String(index + 1)
+                    color: ThemeValues.bgCol
+                    font.pixelSize: 12
+                    font.family: ThemeValues.fontFamily
+                    font.bold: true
+                }
+            }
+
+            Rectangle {
+                anchors.bottom: parent.bottom
+                anchors.horizontalCenter: parent.left
+                anchors.horizontalCenterOffset: 2
+                width: 8; height: 8; radius: 4
+                color: ThemeValues.accentCol
+            }
         }
     }
 
@@ -856,6 +920,8 @@ Item {
                 }
             } else if (xhr.readyState === XMLHttpRequest.DONE && xhr.status !== 200) {
                 console.warn("Geocode request failed with status:", xhr.status, xhr.statusText)
+                searchResults = [{ name: "Search failed", context: "Check connection and try again", lat: 0, lon: 0 }]
+                searchResultsVisible = true
             }
         }
         xhr.open("GET", url)
@@ -887,6 +953,8 @@ Item {
         xhr.onreadystatechange = function() {
             if (xhr.readyState === XMLHttpRequest.DONE && xhr.status !== 200) {
                 console.warn("Directions request failed with status:", xhr.status, xhr.statusText)
+                routeDistance = "Route failed"
+                routeDuration = "Tap to retry"
                 return
             }
             if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
@@ -905,7 +973,7 @@ Item {
                     var route = result.routes[0]
 
                     // Format distance
-                    var distM = route.distance
+                    var distM = route.distance || 0
                     if (distM >= 1000) {
                         routeDistance = (distM / 1000).toFixed(1) + " km"
                     } else {
@@ -913,7 +981,7 @@ Item {
                     }
 
                     // Format duration
-                    var durSec = route.duration
+                    var durSec = route.duration || 0
                     if (durSec >= 3600) {
                         var hrs = Math.floor(durSec / 3600)
                         var mins = Math.round((durSec % 3600) / 60)
@@ -923,6 +991,9 @@ Item {
                     }
 
                     routeDestination = { lat: destLat, lon: destLon, name: destName }
+                    routeWaypoints = []  // Fresh navigate clears any previous stops
+                    _waypointCoords = []
+                    routeOrigin = { lat: origin.latitude, lon: origin.longitude }
                     root._destCoord = QtPositioning.coordinate(destLat, destLon)
                     markerUpdateTimer.restart()
 
@@ -936,27 +1007,33 @@ Item {
 
                     // Feed route metadata to ContextAggregator for voice assistant awareness
                     if (typeof contextAggregator !== 'undefined') {
+                        contextAggregator.routeActive = true
                         contextAggregator.routeDestination = destName || searchInput.text
                         contextAggregator.routeDistance = routeDistance
+                        contextAggregator.routeDuration = routeDuration
                     }
 
-                    // Parse turn-by-turn steps
+                    // Parse turn-by-turn steps from ALL legs
                     var legs = route.legs
                     var steps = []
-                    if (legs && legs.length > 0) {
-                        for (var s = 0; s < legs[0].steps.length; s++) {
-                            var step = legs[0].steps[s]
-                            var maneuver = step.maneuver || {}
-                            steps.push({
-                                instruction: maneuver.instruction || "",
-                                type: maneuver.type || "",
-                                modifier: maneuver.modifier || "",
-                                distance: step.distance || 0,
-                                duration: step.duration || 0,
-                                name: step.name || "",
-                                lat: maneuver.location ? maneuver.location[1] : 0,
-                                lon: maneuver.location ? maneuver.location[0] : 0
-                            })
+                    if (legs) {
+                        for (var l = 0; l < legs.length; l++) {
+                            if (legs[l].steps) {
+                                for (var s = 0; s < legs[l].steps.length; s++) {
+                                    var step = legs[l].steps[s]
+                                    var maneuver = step.maneuver || {}
+                                    steps.push({
+                                        instruction: maneuver.instruction || "",
+                                        type: maneuver.type || "",
+                                        modifier: maneuver.modifier || "",
+                                        distance: step.distance || 0,
+                                        duration: step.duration || 0,
+                                        name: step.name || "",
+                                        lat: maneuver.location ? maneuver.location[1] : 0,
+                                        lon: maneuver.location ? maneuver.location[0] : 0
+                                    })
+                                }
+                            }
                         }
                     }
                     routeSteps = steps
@@ -1008,8 +1085,199 @@ Item {
                         borderWaitManager.setRouteCoordinates(route.geometry.coordinates, durSec)
                     }
 
+                    // Feed route coords to ContextAggregator for along-route places search
+                    if (typeof contextAggregator !== 'undefined' && route.geometry && route.geometry.coordinates) {
+                        contextAggregator.setRouteCoordinates(route.geometry.coordinates, durSec)
+                    }
+
                 } catch (e) {
                     console.error("Directions error:", e)
+                }
+            }
+        }
+        xhr.open("GET", url)
+        xhr.send()
+    }
+
+    function addStopAlongRoute(stopLat, stopLon, stopName) {
+        if (!routeActive || !routeDestination) {
+            console.warn("Maps: No active route — cannot add stop, using getDirections instead")
+            getDirections(stopLat, stopLon, stopName)
+            return
+        }
+
+        console.log("Maps: Adding stop along route:", stopName, "at", stopLat, stopLon)
+
+        // Add this stop to waypoints list
+        var wps = routeWaypoints.slice() // copy
+        wps.push({ lat: stopLat, lon: stopLon, name: stopName })
+        routeWaypoints = wps
+
+        // Update waypoint marker coordinates
+        var coords = []
+        for (var i = 0; i < wps.length; i++) {
+            coords.push(QtPositioning.coordinate(wps[i].lat, wps[i].lon))
+        }
+        _waypointCoords = coords
+
+        // Rebuild the route: origin → waypoints → final destination
+        recalculateRouteWithWaypoints()
+    }
+
+    function recalculateRouteWithWaypoints() {
+        directionsGeneration++
+        var myGeneration = directionsGeneration
+
+        var origin
+        if (gps.position.coordinateValid) {
+            origin = gps.position.coordinate
+        } else if (routeOrigin) {
+            // No GPS — use the origin from when route was first calculated
+            origin = QtPositioning.coordinate(routeOrigin.lat, routeOrigin.lon)
+            console.log("Maps: No GPS fix — using stored route origin for recalculation")
+        } else if (mapLoader.item) {
+            origin = mapLoader.item.map.center
+        } else {
+            console.warn("Maps: No GPS fix and no map — cannot recalculate route")
+            return
+        }
+
+        // Build coordinate string: origin;wp1;wp2;...;destination
+        var coords = origin.longitude + "," + origin.latitude
+        for (var i = 0; i < routeWaypoints.length; i++) {
+            coords += ";" + routeWaypoints[i].lon + "," + routeWaypoints[i].lat
+        }
+        coords += ";" + routeDestination.lon + "," + routeDestination.lat
+
+        var url = "https://api.mapbox.com/directions/v5/mapbox/driving/"
+            + coords
+            + "?geometries=geojson&overview=full&steps=true&banner_instructions=true&annotations=maxspeed&access_token=" + root.mapboxToken
+
+        console.log("Maps: Recalculating route with", routeWaypoints.length, "waypoint(s)")
+
+        var xhr = new XMLHttpRequest()
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === XMLHttpRequest.DONE && xhr.status !== 200) {
+                console.warn("Directions request failed:", xhr.status, xhr.statusText)
+                return
+            }
+            if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
+                if (myGeneration !== root.directionsGeneration) return
+
+                try {
+                    var result = JSON.parse(xhr.responseText)
+                    if (!result.routes || result.routes.length === 0) {
+                        console.warn("No routes found with waypoints")
+                        return
+                    }
+
+                    var route = result.routes[0]
+
+                    // Format total distance (sum all legs)
+                    var distM = route.distance || 0
+                    if (distM >= 1000)
+                        routeDistance = (distM / 1000).toFixed(1) + " km"
+                    else
+                        routeDistance = Math.round(distM) + " m"
+
+                    // Format total duration
+                    var durSec = route.duration || 0
+                    if (durSec >= 3600) {
+                        var hrs = Math.floor(durSec / 3600)
+                        var mins = Math.round((durSec % 3600) / 60)
+                        routeDuration = hrs + " hr " + mins + " min"
+                    } else {
+                        routeDuration = Math.round(durSec / 60) + " min"
+                    }
+
+                    // Update route line
+                    routeGeoJson = { "type": "Feature", "geometry": route.geometry }
+
+                    // Update context aggregator
+                    if (typeof contextAggregator !== 'undefined') {
+                        contextAggregator.routeDistance = routeDistance
+                        contextAggregator.routeDuration = routeDuration
+                        // Build destination string with stops
+                        var destStr = ""
+                        for (var w = 0; w < routeWaypoints.length; w++) {
+                            destStr += routeWaypoints[w].name + " → "
+                        }
+                        destStr += routeDestination.name
+                        contextAggregator.routeDestination = destStr
+                    }
+
+                    // Parse turn-by-turn steps from ALL legs
+                    var legs = route.legs
+                    var steps = []
+                    if (legs) {
+                        for (var l = 0; l < legs.length; l++) {
+                            if (legs[l].steps) {
+                                for (var s = 0; s < legs[l].steps.length; s++) {
+                                    var step = legs[l].steps[s]
+                                    var maneuver = step.maneuver || {}
+                                    steps.push({
+                                        instruction: maneuver.instruction || "",
+                                        type: maneuver.type || "",
+                                        modifier: maneuver.modifier || "",
+                                        distance: step.distance || 0,
+                                        duration: step.duration || 0,
+                                        name: step.name || "",
+                                        lat: maneuver.location ? maneuver.location[1] : 0,
+                                        lon: maneuver.location ? maneuver.location[0] : 0
+                                    })
+                                }
+                            }
+                        }
+                    }
+                    routeSteps = steps
+                    currentStep = 0
+                    updateCurrentStepDisplay()
+
+                    // Fit map to show entire route
+                    fitRouteBounds(origin.latitude, origin.longitude,
+                                   routeDestination.lat, routeDestination.lon)
+
+                    // Feed updated route to downstream managers
+                    if (route.geometry && route.geometry.coordinates) {
+                        var routeCoords = route.geometry.coordinates
+                        if (typeof routeWeatherManager !== 'undefined')
+                            routeWeatherManager.setRouteCoordinates(routeCoords, durSec)
+                        if (typeof roadConditionManager !== 'undefined')
+                            roadConditionManager.setRouteCoordinates(routeCoords, durSec)
+                        if (typeof roadSurfaceManager !== 'undefined')
+                            roadSurfaceManager.setRouteCoordinates(routeCoords, durSec)
+                        if (typeof highwayCameraManager !== 'undefined')
+                            highwayCameraManager.setRouteCoordinates(routeCoords, durSec)
+                        if (typeof avalancheManager !== 'undefined')
+                            avalancheManager.setRouteCoordinates(routeCoords, durSec)
+                        if (typeof borderWaitManager !== 'undefined')
+                            borderWaitManager.setRouteCoordinates(routeCoords, durSec)
+                        if (typeof contextAggregator !== 'undefined')
+                            contextAggregator.setRouteCoordinates(routeCoords, durSec)
+                    }
+
+                    if (typeof speedLimitManager !== 'undefined' && route.legs) {
+                        // Combine maxspeed annotations from all legs
+                        var allMaxspeed = []
+                        var allCoords = []
+                        for (var sl = 0; sl < route.legs.length; sl++) {
+                            var ann = route.legs[sl].annotation
+                            if (ann && ann.maxspeed) {
+                                allMaxspeed = allMaxspeed.concat(ann.maxspeed)
+                            }
+                        }
+                        if (allMaxspeed.length > 0 && route.geometry && route.geometry.coordinates) {
+                            speedLimitManager.setSpeedLimitData(allMaxspeed, route.geometry.coordinates, durSec)
+                        }
+                    }
+
+                    console.log("Maps: Route recalculated with", routeWaypoints.length, "stop(s),",
+                                steps.length, "steps,", routeDistance, routeDuration)
+
+                    markerUpdateTimer.restart()
+
+                } catch (e) {
+                    console.error("Directions recalculate error:", e)
                 }
             }
         }
@@ -1024,7 +1292,10 @@ Item {
         routeDistance = ""
         routeDuration = ""
         routeDestination = null
+        routeWaypoints = []
+        routeOrigin = null
         root._destCoord = null
+        root._waypointCoords = []
         root._searchCoord = null
         routeGeoJson = { "type": "Feature", "geometry": { "type": "LineString", "coordinates": [] } }
         routeSteps = []
@@ -1036,8 +1307,11 @@ Item {
 
         // Clear route metadata from ContextAggregator
         if (typeof contextAggregator !== 'undefined') {
+            contextAggregator.routeActive = false
             contextAggregator.routeDestination = ""
             contextAggregator.routeDistance = ""
+            contextAggregator.routeDuration = ""
+            contextAggregator.clearRouteCoordinates()
         }
 
         // Clear route weather tracking

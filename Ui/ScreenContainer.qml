@@ -45,12 +45,13 @@ Item {
         onLoaded: {
             item.theme = root.theme
             item.bluetoothManager = Qt.binding(function() { return bluetoothManager })
-            if (item.messageFromJs) {
-                item.messageFromJs.connect(function(msg) {
-                    console.log("Music screen message:", msg)
-                })
-            }
         }
+    }
+    // Use Connections block to avoid accumulation on Loader reload
+    Connections {
+        target: musicLoader.item
+        function onMessageFromJs(msg) { console.log("Music screen message:", msg) }
+        ignoreUnknownSignals: true
     }
 
     Loader {
@@ -167,18 +168,41 @@ Item {
         source: "screens/AppGrid.qml"
         onLoaded: {
             item.theme = root.theme
-            item.appSelected.connect(function(key) { root.screenSelected(key) })
         }
+    }
+    // Use Connections block to avoid accumulation on Loader reload
+    Connections {
+        target: appGridLoader.item
+        function onAppSelected(key) { root.screenSelected(key) }
     }
 
     // Use Google Places for voice navigation (much better at resolving business names)
+    // _pendingNav guards against stray geocodeCompleted signals from search `near` parameter
+    property bool _pendingNav: false
+    property bool _pendingAddStop: false
+
     Connections {
         target: placesSearchManager
         function onGeocodeCompleted(lat, lon, name) {
+            if (!_pendingNav && !_pendingAddStop) {
+                // Not a navigation geocode — ignore (likely from search `near` parameter)
+                return
+            }
             console.log("ScreenContainer: Google geocode result:", name, "at", lat, lon)
             if (mapsLoader.item) {
-                mapsLoader.item.getDirections(lat, lon, name)
+                if (_pendingAddStop && mapsLoader.item.routeActive) {
+                    console.log("ScreenContainer: Adding stop along route:", name)
+                    mapsLoader.item.addStopAlongRoute(lat, lon, name)
+                } else {
+                    mapsLoader.item.getDirections(lat, lon, name)
+                }
             }
+            _pendingNav = false
+            _pendingAddStop = false
+        }
+        function onGeocodeFailed(error) {
+            _pendingNav = false
+            _pendingAddStop = false
         }
     }
 
@@ -187,7 +211,25 @@ Item {
             console.warn("ScreenContainer: Maps not loaded, cannot navigate")
             return
         }
-        // Use Google Places Text Search for accurate business/POI resolution
+        _pendingNav = true
+        _pendingAddStop = false
+        placesSearchManager.geocodePlace(destination)
+    }
+
+    function addStopOnRoute(destination) {
+        if (!mapsLoader.item) {
+            console.warn("ScreenContainer: Maps not loaded, cannot add stop")
+            return
+        }
+        if (!mapsLoader.item.routeActive) {
+            console.log("ScreenContainer: No active route, falling back to regular navigate")
+            _pendingNav = true
+            _pendingAddStop = false
+            placesSearchManager.geocodePlace(destination)
+            return
+        }
+        _pendingNav = false
+        _pendingAddStop = true
         placesSearchManager.geocodePlace(destination)
     }
 
