@@ -3,6 +3,7 @@
 
 #include <QObject>
 #include <QString>
+#include <QSet>
 #include <QJsonArray>
 #include <QTimer>
 #include <QNetworkAccessManager>
@@ -25,7 +26,7 @@ public:
     QString summary() const { return m_summary; }
 
 public slots:
-    void setRouteCoordinates(const QJsonArray &coordinates, double durationSec);
+    void setRouteCoordinates(const QJsonArray &coordinates, double durationSec, bool silent = false);
     void clearRoute();
 
 signals:
@@ -73,6 +74,10 @@ private:
     struct RoutePoint { double lat; double lon; };
     QList<RoutePoint> m_routePoints;
     void sampleRoutePoints(const QJsonArray &coordinates);
+
+    // Change detection — only emit alertDetected when event set differs
+    QSet<QString> m_lastEventIds;
+    bool m_suppressNextAlert = false;
 };
 
 #endif // ROADCONDITIONMANAGER_H

@@ -29,7 +29,7 @@ public:
     int waitMinutes() const { return m_waitMinutes; }
 
 public slots:
-    void setRouteCoordinates(const QJsonArray &coordinates, double durationSec);
+    void setRouteCoordinates(const QJsonArray &coordinates, double durationSec, bool silent = false);
     void clearRoute();
 
 signals:
@@ -84,6 +84,10 @@ private:
     QList<RoutePoint> m_routePoints;
     int m_pendingRequests = 0;
     int m_generation = 0;
+
+    // Change detection — only emit alertDetected when max wait changes
+    int m_lastMaxWaitMinutes = -1;
+    bool m_suppressNextAlert = false;
 };
 
 #endif // BORDERWAITMANAGER_H

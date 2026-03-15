@@ -84,6 +84,7 @@ public:
     void sortMessagesByTime();
 
     Message* findMessage(const QString &id);
+    const QList<Message>& messages() const { return m_messages; }
 
 private:
     QList<Message> m_messages;
@@ -122,6 +123,7 @@ public:
     void sortConversations();
 
     Conversation* findConversation(const QString &threadId);
+    const QList<Conversation>& conversations() const { return m_conversations; }
 
 private:
     QList<Conversation> m_conversations;
@@ -217,8 +219,17 @@ private:
     QString m_deviceAddress;
 
 #ifndef Q_OS_WIN
-    QDBusInterface *m_mapInterface;
+    QDBusInterface *m_obexClient;
+    QDBusInterface *m_mapSession;    // org.bluez.obex.MessageAccess1 on session path
     QString m_sessionPath;
+
+    void setupOBEXClient();
+    void cleanupSession();
+    void parseBMessageList(const QDBusMessage &reply);
+    void parseBMessage(const QString &filePath, const QString &handle);
+    void onTransferPropertiesChanged(const QString &interface, const QVariantMap &changed, const QStringList &invalidated);
+    QString m_currentTransferPath;
+    QString m_pendingMessageHandle;
 #endif
 
     QTimer *m_syncTimer;

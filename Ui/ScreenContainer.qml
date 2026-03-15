@@ -87,11 +87,14 @@ Item {
         visible: root.currentScreen === "messages"
         active: false
         asynchronous: true
-        source: "screens/Messages.qml"
-        onLoaded: {
-            item.theme = root.theme
-            item.bluetoothManager = Qt.binding(function() { return bluetoothManager })
-            item.messageManager = Qt.binding(function() { return messageManager })
+        onActiveChanged: {
+            if (active) {
+                setSource("screens/Messages.qml", {
+                    "theme": Qt.binding(function() { return root.theme }),
+                    "bluetoothManager": Qt.binding(function() { return bluetoothManager }),
+                    "messageManager": Qt.binding(function() { return messageManager })
+                })
+            }
         }
     }
 
@@ -214,6 +217,15 @@ Item {
         _pendingNav = true
         _pendingAddStop = false
         placesSearchManager.geocodePlace(destination)
+    }
+
+    function cancelNavigation() {
+        if (!mapsLoader.item) {
+            console.warn("ScreenContainer: Maps not loaded, cannot cancel navigation")
+            return
+        }
+        mapsLoader.item.clearRoute()
+        console.log("ScreenContainer: Navigation cancelled")
     }
 
     function addStopOnRoute(destination) {

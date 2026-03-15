@@ -22,6 +22,8 @@ TelephonyManager::TelephonyManager(QObject *parent)
     , m_activeCallDuration(0)
     , m_isCallMuted(false)
     , m_cellularSignal(0)
+    , m_phoneBatteryLevel(-1)
+    , m_roamingStatus("")
     , m_ofonoUpdateTimer(new QTimer(this))
     , m_callDurationTimer(new QTimer(this))
     , m_contactManager(nullptr)
@@ -106,6 +108,26 @@ void TelephonyManager::setupOfonoMonitoring()
                     this,
                     SLOT(onCallRemoved(QDBusObjectPath))
                 );
+
+                // Real-time battery updates from Handsfree
+                QDBusConnection::systemBus().connect(
+                    "org.ofono",
+                    modemPath,
+                    "org.ofono.Handsfree",
+                    "PropertyChanged",
+                    this,
+                    SLOT(onHandsfreePropertyChanged(QString,QDBusVariant))
+                );
+
+                // Real-time signal/carrier/roaming updates
+                QDBusConnection::systemBus().connect(
+                    "org.ofono",
+                    modemPath,
+                    "org.ofono.NetworkRegistration",
+                    "PropertyChanged",
+                    this,
+                    SLOT(onNetworkPropertyChanged(QString,QDBusVariant))
+                );
             } else {
                 arg.endArray();
             }
@@ -141,6 +163,14 @@ void TelephonyManager::updateOfonoSignal()
             m_carrierName = "";
             emit cellularSignalChanged();
             emit carrierNameChanged();
+        }
+        if (m_phoneBatteryLevel != -1) {
+            m_phoneBatteryLevel = -1;
+            emit phoneBatteryLevelChanged();
+        }
+        if (!m_roamingStatus.isEmpty()) {
+            m_roamingStatus.clear();
+            emit roamingStatusChanged();
         }
         return;
     }
@@ -192,6 +222,7 @@ void TelephonyManager::updateOfonoSignal()
     else if (strengthPercent >= 20) signalBars = 1;
 
     QString carrier = properties.value("Name", "").toString();
+    QString regStatus = properties.value("Status", "").toString();
 
     bool changed = false;
     if (m_cellularSignal != signalBars) {
@@ -204,12 +235,65 @@ void TelephonyManager::updateOfonoSignal()
         emit carrierNameChanged();
         changed = true;
     }
+    if (m_roamingStatus != regStatus) {
+        m_roamingStatus = regStatus;
+        emit roamingStatusChanged();
+        changed = true;
+    }
 
     if (changed) {
         qDebug() << "TelephonyManager: Cellular signal -"
                  << "Bars:" << m_cellularSignal
                  << "(" << strengthPercent << "%)"
-                 << "Carrier:" << m_carrierName;
+                 << "Carrier:" << m_carrierName
+                 << "Status:" << m_roamingStatus;
+    }
+
+    // Query phone battery — prefer BlueZ Battery1 (exact 0-100%) over HFP (coarse 0-5)
+    int batteryPercent = -1;
+
+    // Try BlueZ Battery1 interface first (precise BLE battery reading)
+    QString devicePath = m_adapterPath + "/dev_" + connectedAddress.replace(":", "_");
+    QDBusMessage batMsg = QDBusMessage::createMethodCall(
+        "org.bluez", devicePath,
+        "org.freedesktop.DBus.Properties", "Get"
+    );
+    batMsg << "org.bluez.Battery1" << "Percentage";
+    QDBusMessage batReply = QDBusConnection::systemBus().call(batMsg);
+    if (batReply.type() == QDBusMessage::ReplyMessage) {
+        batteryPercent = batReply.arguments().at(0).value<QDBusVariant>().variant().toInt();
+    }
+
+    // Fallback to oFono HFP battery (0-5 scale)
+    if (batteryPercent < 0) {
+        QDBusMessage hfMsg = QDBusMessage::createMethodCall(
+            "org.ofono", modemPath,
+            "org.ofono.Handsfree", "GetProperties"
+        );
+        QDBusMessage hfReply = QDBusConnection::systemBus().call(hfMsg);
+        if (hfReply.type() == QDBusMessage::ReplyMessage) {
+            const QDBusArgument hfArg = hfReply.arguments().at(0).value<QDBusArgument>();
+            QVariantMap hfProps;
+            hfArg.beginMap();
+            while (!hfArg.atEnd()) {
+                QString key;
+                QDBusVariant dbusVariant;
+                hfArg.beginMapEntry();
+                hfArg >> key >> dbusVariant;
+                hfArg.endMapEntry();
+                hfProps[key] = dbusVariant.variant();
+            }
+            hfArg.endMap();
+            if (hfProps.contains("BatteryChargeLevel")) {
+                batteryPercent = hfProps.value("BatteryChargeLevel").toInt() * 20;
+            }
+        }
+    }
+
+    if (batteryPercent >= 0 && m_phoneBatteryLevel != batteryPercent) {
+        m_phoneBatteryLevel = batteryPercent;
+        emit phoneBatteryLevelChanged();
+        qDebug() << "TelephonyManager: Phone battery:" << batteryPercent << "%";
     }
 #endif
 }
@@ -318,10 +402,9 @@ void TelephonyManager::dialNumber(const QString &phoneNumber)
             QString callPath = reply.value().path();
             qDebug() << "TelephonyManager: Call initiated, path:" << callPath;
             m_activeCallPath = callPath;
-
-            QDBusConnection::systemBus().connect(
-                "org.ofono", callPath, "org.ofono.VoiceCall", "PropertyChanged",
-                this, SLOT(onCallPropertyChanged(QString,QDBusVariant)));
+            // Note: PropertyChanged subscription is handled by onCallAdded()
+            // which always fires for both incoming and outgoing calls.
+            // Connecting here too would cause duplicate signal delivery.
         }
         w->deleteLater();
     });
@@ -475,6 +558,56 @@ void TelephonyManager::toggleMute()
         qWarning() << "TelephonyManager: Failed to toggle mute:" << setReply.error().message();
         m_isCallMuted = !m_isCallMuted;
         emit callMutedChanged();
+    }
+#endif
+}
+
+void TelephonyManager::triggerSiri()
+{
+#ifndef Q_OS_WIN
+    if (!m_deviceModel) return;
+
+    // Find connected device to build modem path
+    QString connectedAddress;
+    for (int i = 0; i < m_deviceModel->rowCount(); ++i) {
+        QModelIndex index = m_deviceModel->index(i, 0);
+        if (m_deviceModel->data(index, BluetoothDeviceModel::ConnectedRole).toBool()) {
+            connectedAddress = m_deviceModel->data(index, BluetoothDeviceModel::AddressRole).toString();
+            break;
+        }
+    }
+    if (connectedAddress.isEmpty()) {
+        qWarning() << "TelephonyManager: No connected device for Siri";
+        return;
+    }
+
+    QString modemPath = "/hfp" + m_adapterPath + "/dev_" + connectedAddress.replace(":", "_");
+
+    // Try oFono Siri interface first (Apple-specific, eyes-free mode)
+    QDBusMessage siriMsg = QDBusMessage::createMethodCall(
+        "org.ofono", modemPath,
+        "org.ofono.Siri", "SetProperty"
+    );
+    siriMsg << "EyesFreeMode" << QVariant::fromValue(QDBusVariant(QString("enabled")));
+
+    QDBusMessage siriReply = QDBusConnection::systemBus().call(siriMsg);
+    if (siriReply.type() != QDBusMessage::ErrorMessage) {
+        qDebug() << "TelephonyManager: Siri activated via EyesFreeMode";
+        return;
+    }
+
+    // Fallback: use standard HFP VoiceRecognition (AT+BVRA=1)
+    QDBusMessage hfMsg = QDBusMessage::createMethodCall(
+        "org.ofono", modemPath,
+        "org.ofono.Handsfree", "SetProperty"
+    );
+    hfMsg << "VoiceRecognition" << QVariant::fromValue(QDBusVariant(true));
+
+    QDBusMessage hfReply = QDBusConnection::systemBus().call(hfMsg);
+    if (hfReply.type() == QDBusMessage::ErrorMessage) {
+        qWarning() << "TelephonyManager: Failed to activate Siri:" << hfReply.errorMessage();
+    } else {
+        qDebug() << "TelephonyManager: Siri activated via VoiceRecognition";
     }
 #endif
 }
@@ -640,6 +773,17 @@ void TelephonyManager::onCallRemoved(const QDBusObjectPath &path)
 
     if (m_activeCallPath == callPath) {
         qDebug() << "TelephonyManager: Active call ended";
+
+        // Disconnect PropertyChanged signal for this call to prevent leak
+        QDBusConnection::systemBus().disconnect(
+            "org.ofono",
+            callPath,
+            "org.ofono.VoiceCall",
+            "PropertyChanged",
+            this,
+            SLOT(onCallPropertyChanged(QString,QDBusVariant))
+        );
+
         m_hasActiveCall = false;
         m_activeCallPath.clear();
         m_activeCallNumber.clear();
@@ -652,7 +796,93 @@ void TelephonyManager::onCallRemoved(const QDBusObjectPath &path)
     }
 }
 
+void TelephonyManager::onHandsfreePropertyChanged(const QString &propertyName, const QDBusVariant &value)
+{
+    if (propertyName == "BatteryChargeLevel") {
+        int level = value.variant().toInt();
+        int batteryPercent = level * 20;
+        if (m_phoneBatteryLevel != batteryPercent) {
+            m_phoneBatteryLevel = batteryPercent;
+            emit phoneBatteryLevelChanged();
+            qDebug() << "TelephonyManager: Phone battery updated:" << batteryPercent << "% (HFP level" << level << "/5)";
+        }
+    }
+}
+
+void TelephonyManager::onNetworkPropertyChanged(const QString &propertyName, const QDBusVariant &value)
+{
+    if (propertyName == "Strength") {
+        int strengthPercent = value.variant().toInt();
+        int signalBars = 0;
+        if (strengthPercent >= 80) signalBars = 4;
+        else if (strengthPercent >= 60) signalBars = 3;
+        else if (strengthPercent >= 40) signalBars = 2;
+        else if (strengthPercent >= 20) signalBars = 1;
+        if (m_cellularSignal != signalBars) {
+            m_cellularSignal = signalBars;
+            emit cellularSignalChanged();
+        }
+    } else if (propertyName == "Name") {
+        QString carrier = value.variant().toString();
+        if (m_carrierName != carrier) {
+            m_carrierName = carrier;
+            emit carrierNameChanged();
+        }
+    } else if (propertyName == "Status") {
+        QString status = value.variant().toString();
+        if (m_roamingStatus != status) {
+            m_roamingStatus = status;
+            emit roamingStatusChanged();
+        }
+    }
+}
+
 #endif // Q_OS_WIN
+
+void TelephonyManager::handleBluetoothDisconnect()
+{
+    qDebug() << "TelephonyManager: Bluetooth disconnected, cleaning up";
+
+    if (m_hasActiveCall) {
+#ifndef Q_OS_WIN
+        // Disconnect call property signal for the dead path
+        if (!m_activeCallPath.isEmpty()) {
+            QDBusConnection::systemBus().disconnect(
+                "org.ofono",
+                m_activeCallPath,
+                "org.ofono.VoiceCall",
+                "PropertyChanged",
+                this,
+                SLOT(onCallPropertyChanged(QString,QDBusVariant))
+            );
+        }
+#endif
+        m_hasActiveCall = false;
+        m_activeCallPath.clear();
+        m_activeCallNumber.clear();
+        m_activeCallName.clear();
+        m_activeCallState.clear();
+        m_activeCallDuration = 0;
+        m_callDurationTimer->stop();
+        emit activeCallChanged();
+    }
+
+    // Clear cellular info
+    if (m_cellularSignal != 0 || !m_carrierName.isEmpty()) {
+        m_cellularSignal = 0;
+        m_carrierName.clear();
+        emit cellularSignalChanged();
+        emit carrierNameChanged();
+    }
+    if (m_phoneBatteryLevel != -1) {
+        m_phoneBatteryLevel = -1;
+        emit phoneBatteryLevelChanged();
+    }
+    if (!m_roamingStatus.isEmpty()) {
+        m_roamingStatus.clear();
+        emit roamingStatusChanged();
+    }
+}
 
 void TelephonyManager::updateCallDuration()
 {

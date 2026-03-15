@@ -48,6 +48,10 @@ BluetoothManager::BluetoothManager(QObject *parent)
             this, &BluetoothManager::cellularSignalChanged);
     connect(m_telephonyManager, &TelephonyManager::carrierNameChanged,
             this, &BluetoothManager::carrierNameChanged);
+    connect(m_telephonyManager, &TelephonyManager::phoneBatteryLevelChanged,
+            this, &BluetoothManager::phoneBatteryLevelChanged);
+    connect(m_telephonyManager, &TelephonyManager::roamingStatusChanged,
+            this, &BluetoothManager::roamingStatusChanged);
 
 #ifdef Q_OS_WIN
     m_mockMode = true;
@@ -175,7 +179,7 @@ void BluetoothManager::setupDBusMonitoring()
         "org.freedesktop.DBus.Properties",
         "PropertiesChanged",
         this,
-        SLOT(onPropertiesChanged(QString,QVariantMap,QStringList))
+        SLOT(onPropertiesChanged(QString,QVariantMap,QStringList,QDBusMessage))
     );
 
     qDebug() << "BluetoothManager: DBus monitoring setup complete";
@@ -256,7 +260,7 @@ void BluetoothManager::loadExistingDevices()
                 "org.freedesktop.DBus.Properties",
                 "PropertiesChanged",
                 this,
-                SLOT(onPropertiesChanged(QString,QVariantMap,QStringList))
+                SLOT(onPropertiesChanged(QString,QVariantMap,QStringList,QDBusMessage))
             );
         }
     }
@@ -584,11 +588,11 @@ void BluetoothManager::connectToDevice(const QString &address)
             emit error(errorMsg);
             setStatusMessage("Connection failed");
         } else {
-            qDebug() << "BluetoothManager: Connection initiated";
+            qDebug() << "BluetoothManager: Connection initiated — waiting for PropertiesChanged";
             setStatusMessage("Connecting...");
-            QTimer::singleShot(1000, this, [this]() {
-                refreshDeviceList();
-            });
+            // Do NOT call refreshDeviceList() here — it disconnects DBus signal
+            // handlers during the critical connection window. The onPropertiesChanged
+            // handler will pick up Connected=true when BlueZ sends it.
         }
         w->deleteLater();
     });
@@ -806,6 +810,24 @@ void BluetoothManager::refreshDeviceList()
     }
 
     qDebug() << "BluetoothManager: Refreshing device list...";
+
+    // Disconnect per-device PropertiesChanged signals before clearing
+    // to prevent accumulation on each refresh cycle
+    for (int i = 0; i < m_deviceModel->rowCount(); ++i) {
+        QModelIndex index = m_deviceModel->index(i, 0);
+        QString path = m_deviceModel->data(index, BluetoothDeviceModel::PathRole).toString();
+        if (!path.isEmpty()) {
+            QDBusConnection::systemBus().disconnect(
+                "org.bluez",
+                path,
+                "org.freedesktop.DBus.Properties",
+                "PropertiesChanged",
+                this,
+                SLOT(onPropertiesChanged(QString,QVariantMap,QStringList,QDBusMessage))
+            );
+        }
+    }
+
     m_deviceModel->clear();
     loadExistingDevices();
     setStatusMessage("Device list refreshed");
@@ -935,7 +957,7 @@ void BluetoothManager::onInterfacesAdded(const QDBusObjectPath &path, const QVar
         "org.freedesktop.DBus.Properties",
         "PropertiesChanged",
         this,
-        SLOT(onPropertiesChanged(QString,QVariantMap,QStringList))
+        SLOT(onPropertiesChanged(QString,QVariantMap,QStringList,QDBusMessage))
     );
 }
 
@@ -951,6 +973,15 @@ void BluetoothManager::onInterfacesRemoved(const QDBusObjectPath &path, const QS
         return;
     }
 
+    // Disconnect PropertiesChanged signal for this removed device
+    QDBusConnection::systemBus().disconnect(
+        "org.bluez",
+        pathStr,
+        "org.freedesktop.DBus.Properties",
+        "PropertiesChanged",
+        this,
+        SLOT(onPropertiesChanged(QString,QVariantMap,QStringList,QDBusMessage)));
+
     QString address = pathToAddress(pathStr);
     qDebug() << "BluetoothManager: Device removed:" << address;
 
@@ -960,7 +991,8 @@ void BluetoothManager::onInterfacesRemoved(const QDBusObjectPath &path, const QS
 
 void BluetoothManager::onPropertiesChanged(const QString &interface,
                                           const QVariantMap &changedProperties,
-                                          const QStringList &invalidatedProperties)
+                                          const QStringList &invalidatedProperties,
+                                          const QDBusMessage &message)
 {
     Q_UNUSED(invalidatedProperties);
 
@@ -974,36 +1006,62 @@ void BluetoothManager::onPropertiesChanged(const QString &interface,
             }
         }
     } else if (interface == "org.bluez.Device1") {
-        for (int i = 0; i < m_deviceModel->rowCount(); ++i) {
-            QModelIndex index = m_deviceModel->index(i, 0);
-            QString devicePath = m_deviceModel->data(index, BluetoothDeviceModel::PathRole).toString();
+        // Only key properties trigger a meaningful UI update — skip noisy ones like RSSI
+        bool hasRelevant = changedProperties.contains("Connected")
+                        || changedProperties.contains("Paired")
+                        || changedProperties.contains("Trusted")
+                        || changedProperties.contains("Name")
+                        || changedProperties.contains("Alias")
+                        || changedProperties.contains("ServicesResolved");
+        if (!hasRelevant) return;
 
-            QVariantMap props = getDeviceProperties(devicePath);
-            if (!props.isEmpty()) {
-                BluetoothDevice device = parseDeviceProperties(devicePath, props);
-                QString address = device.address;
+        // Use the DBus message path to identify exactly which device changed —
+        // avoids iterating all devices and making blocking DBus calls
+        QString devicePath = message.path();
+        QString address = pathToAddress(devicePath);
 
-                BluetoothDevice *existingDevice = m_deviceModel->findDevice(address);
-                if (existingDevice) {
-                    bool wasConnected = existingDevice->connected;
-                    bool wasPaired = existingDevice->paired;
+        BluetoothDevice *existingDevice = m_deviceModel->findDevice(address);
+        if (!existingDevice) {
+            qDebug() << "BluetoothManager: PropertiesChanged for unknown device" << address;
+            return;
+        }
 
-                    m_deviceModel->updateDevice(address, device);
+        bool wasConnected = existingDevice->connected;
+        bool wasPaired = existingDevice->paired;
 
-                    if (!wasConnected && device.connected) {
-                        emit deviceConnected(address);
-                        setStatusMessage("Connected to " + device.name);
-                    } else if (wasConnected && !device.connected) {
-                        emit deviceDisconnected(address);
-                        setStatusMessage("Disconnected from " + device.name);
-                    }
+        // Apply changed properties directly instead of re-querying all properties
+        if (changedProperties.contains("Connected"))
+            existingDevice->connected = changedProperties.value("Connected").toBool();
+        if (changedProperties.contains("Paired"))
+            existingDevice->paired = changedProperties.value("Paired").toBool();
+        if (changedProperties.contains("Trusted"))
+            existingDevice->trusted = changedProperties.value("Trusted").toBool();
+        if (changedProperties.contains("Name"))
+            existingDevice->name = changedProperties.value("Name").toString();
+        if (changedProperties.contains("Alias"))
+            existingDevice->name = changedProperties.value("Alias").toString();
 
-                    if (!wasPaired && device.paired) {
-                        emit devicePaired(address);
-                        setStatusMessage("Paired with " + device.name);
-                    }
-                }
-            }
+        m_deviceModel->updateDevice(address, *existingDevice);
+
+        if (!wasConnected && existingDevice->connected) {
+            qDebug() << "BluetoothManager: Device connected:" << existingDevice->name << address;
+            emit deviceConnected(address);
+            setStatusMessage("Connected to " + existingDevice->name);
+        } else if (wasConnected && !existingDevice->connected) {
+            qDebug() << "BluetoothManager: Device disconnected:" << existingDevice->name << address;
+            emit deviceDisconnected(address);
+            setStatusMessage("Disconnected from " + existingDevice->name);
+        }
+
+        if (!wasPaired && existingDevice->paired) {
+            emit devicePaired(address);
+            setStatusMessage("Paired with " + existingDevice->name);
+        }
+
+        // Log ServicesResolved for debugging connection issues
+        if (changedProperties.contains("ServicesResolved")) {
+            bool resolved = changedProperties.value("ServicesResolved").toBool();
+            qDebug() << "BluetoothManager: ServicesResolved=" << resolved << "for" << existingDevice->name;
         }
     }
 }

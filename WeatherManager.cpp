@@ -1,4 +1,5 @@
 #include "WeatherManager.h"
+#include <algorithm>
 #include <QNetworkReply>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -39,6 +40,10 @@ void WeatherManager::refresh()
 
 void WeatherManager::setLocation(double lat, double lon)
 {
+    if (lat == 0.0 && lon == 0.0) {
+        qDebug() << "WeatherManager: Ignoring (0,0) coordinates";
+        return;
+    }
     m_latitude = lat;
     m_longitude = lon;
     m_hasLocation = true;
@@ -53,6 +58,7 @@ void WeatherManager::fetchLocation()
     // Use ip-api.com for geolocation (free, no key needed)
     QNetworkRequest request(QUrl("http://ip-api.com/json/?fields=lat,lon,city,regionName"));
     request.setHeader(QNetworkRequest::UserAgentHeader, "HeadUnit/1.0");
+    request.setTransferTimeout(15000);
     m_locationNetwork->get(request);
 }
 
@@ -113,6 +119,7 @@ void WeatherManager::fetchWeather()
 
     QNetworkRequest request(url);
     request.setHeader(QNetworkRequest::UserAgentHeader, "HeadUnit/1.0");
+    request.setTransferTimeout(15000);
     m_weatherNetwork->get(request);
 }
 
@@ -166,7 +173,8 @@ void WeatherManager::onWeatherReply(QNetworkReply *reply)
     }
 
     if (startIdx >= 0) {
-        for (int i = startIdx; i < qMin(startIdx + 24, hourlyTimes.size()); ++i) {
+        int hourlyLimit = std::min({hourlyTimes.size(), hourlyTemps.size(), hourlyCodes.size(), hourlyIsDay.size()});
+        for (int i = startIdx; i < qMin(startIdx + 24, hourlyLimit); ++i) {
             QJsonObject h;
             QDateTime t = QDateTime::fromString(hourlyTimes[i].toString(), Qt::ISODate);
             h["time"] = t.toString("ha");
@@ -186,7 +194,8 @@ void WeatherManager::onWeatherReply(QNetworkReply *reply)
 
     QJsonArray dailyArr;
     QStringList dayNames = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
-    for (int i = 0; i < dailyTimes.size(); ++i) {
+    int dailyLimit = std::min({dailyTimes.size(), dailyMaxTemps.size(), dailyMinTemps.size(), dailyCodes.size()});
+    for (int i = 0; i < dailyLimit; ++i) {
         QJsonObject d;
         QDate date = QDate::fromString(dailyTimes[i].toString(), "yyyy-MM-dd");
         d["day"] = (i == 0) ? QString("Today") : dayNames[date.dayOfWeek() % 7];

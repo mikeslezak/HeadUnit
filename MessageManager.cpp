@@ -12,6 +12,7 @@
 #ifndef Q_OS_WIN
 #include <QDBusMessage>
 #include <QDBusArgument>
+#include <QDBusVariant>
 #include <QDBusMetaType>
 #endif
 
@@ -305,7 +306,8 @@ MessageManager::MessageManager(QObject *parent)
     , m_isSyncing(false)
     , m_totalUnreadCount(0)
 #ifndef Q_OS_WIN
-    , m_mapInterface(nullptr)
+    , m_obexClient(nullptr)
+    , m_mapSession(nullptr)
 #endif
     , m_syncTimer(new QTimer(this))
 {
@@ -326,8 +328,9 @@ MessageManager::~MessageManager()
     saveMessagesCache();
 
 #ifndef Q_OS_WIN
-    if (m_mapInterface) {
-        delete m_mapInterface;
+    cleanupSession();
+    if (m_obexClient) {
+        delete m_obexClient;
     }
 #endif
 }
@@ -382,10 +385,7 @@ void MessageManager::disconnect()
     m_deviceAddress.clear();
 
 #ifndef Q_OS_WIN
-    if (m_mapInterface) {
-        delete m_mapInterface;
-        m_mapInterface = nullptr;
-    }
+    cleanupSession();
 #endif
 
     setStatusMessage("Disconnected");
@@ -544,48 +544,345 @@ void MessageManager::setIsSyncing(bool syncing)
 }
 
 #ifndef Q_OS_WIN
+
+void MessageManager::setupOBEXClient()
+{
+    m_obexClient = new QDBusInterface("org.bluez.obex",
+                                       "/org/bluez/obex",
+                                       "org.bluez.obex.Client1",
+                                       QDBusConnection::sessionBus(),
+                                       this);
+
+    if (!m_obexClient->isValid()) {
+        qWarning() << "MessageManager: OBEX client not available:" << m_obexClient->lastError().message();
+        m_obexClient->deleteLater();
+        m_obexClient = nullptr;
+    } else {
+        qDebug() << "MessageManager: OBEX client connected";
+    }
+}
+
+void MessageManager::cleanupSession()
+{
+    if (m_mapSession) {
+        // Remove the OBEX session
+        if (m_obexClient && !m_sessionPath.isEmpty()) {
+            m_obexClient->call("RemoveSession", QDBusObjectPath(m_sessionPath));
+        }
+        m_mapSession->deleteLater();
+        m_mapSession = nullptr;
+        m_sessionPath.clear();
+    }
+}
+
 bool MessageManager::connectMAP()
 {
     qDebug() << "MessageManager: Connecting to Bluetooth MAP service";
 
-    // Connect to org.bluez.obex.MessageAccess1 interface
-    // This is a placeholder - full MAP implementation would be more complex
-    m_mapInterface = new QDBusInterface(
-        "org.bluez.obex",
-        "/org/bluez/obex",
-        "org.bluez.obex.MessageAccess1",
-        QDBusConnection::sessionBus(),
-        this
-    );
+    if (!m_obexClient) {
+        setupOBEXClient();
+    }
 
-    if (!m_mapInterface->isValid()) {
-        qWarning() << "MessageManager: Failed to connect to MAP service:" << m_mapInterface->lastError().message();
+    if (!m_obexClient) {
+        qWarning() << "MessageManager: OBEX client not available";
         return false;
     }
 
+    // Clean up any previous session
+    cleanupSession();
+
+    // Create OBEX session with MAP target
+    QVariantMap args;
+    args["Target"] = "MAP";
+
+    qDebug() << "MessageManager: Creating MAP session to" << m_deviceAddress;
+    QDBusMessage msg = m_obexClient->call("CreateSession", m_deviceAddress, args);
+
+    if (msg.type() == QDBusMessage::ErrorMessage) {
+        qWarning() << "MessageManager: MAP CreateSession failed:" << msg.errorMessage();
+        return false;
+    }
+
+    if (msg.arguments().isEmpty()) {
+        qWarning() << "MessageManager: CreateSession returned no arguments";
+        return false;
+    }
+
+    m_sessionPath = msg.arguments().at(0).value<QDBusObjectPath>().path();
+    qDebug() << "MessageManager: MAP session created:" << m_sessionPath;
+
+    // Create MessageAccess1 interface on the session
+    m_mapSession = new QDBusInterface("org.bluez.obex",
+                                       m_sessionPath,
+                                       "org.bluez.obex.MessageAccess1",
+                                       QDBusConnection::sessionBus(),
+                                       this);
+
+    if (!m_mapSession->isValid()) {
+        qWarning() << "MessageManager: MAP session interface invalid:" << m_mapSession->lastError().message();
+        m_mapSession->deleteLater();
+        m_mapSession = nullptr;
+        m_sessionPath.clear();
+        return false;
+    }
+
+    qDebug() << "MessageManager: MAP connected successfully";
     return true;
 }
 
 void MessageManager::pullMessageList()
 {
-    // Bluetooth MAP message list pull would go here
-    // This is a simplified stub
+    if (!m_mapSession || !m_mapSession->isValid()) {
+        qWarning() << "MessageManager: No MAP session for pullMessageList";
+        setIsSyncing(false);
+        return;
+    }
+
+    qDebug() << "MessageManager: Pulling message list from inbox";
+
+    // Navigate to inbox: SetFolder("telecom/msg/inbox")
+    QDBusMessage setFolderReply = m_mapSession->call("SetFolder", "telecom");
+    if (setFolderReply.type() == QDBusMessage::ErrorMessage) {
+        qWarning() << "MessageManager: SetFolder(telecom) failed:" << setFolderReply.errorMessage();
+        // Try root-relative path
+    }
+    m_mapSession->call("SetFolder", "msg");
+    m_mapSession->call("SetFolder", "inbox");
+
+    // ListMessages returns array of {object_path, properties_dict}
+    QVariantMap filters;
+    filters["Offset"] = QVariant::fromValue(quint16(0));
+    filters["MaxCount"] = QVariant::fromValue(quint16(50));
+
+    QDBusMessage reply = m_mapSession->call("ListMessages", "", filters);
+
+    if (reply.type() == QDBusMessage::ErrorMessage) {
+        qWarning() << "MessageManager: ListMessages failed:" << reply.errorMessage();
+        setIsSyncing(false);
+        setStatusMessage("Sync failed: " + reply.errorMessage());
+        return;
+    }
+
+    parseBMessageList(reply);
+
     setIsSyncing(false);
     setStatusMessage("Messages synced");
 }
 
+void MessageManager::parseBMessageList(const QDBusMessage &reply)
+{
+    if (reply.arguments().isEmpty()) return;
+
+    // ListMessages returns a(oa{sv}) — array of structs {object_path, properties_dict}
+    // We'll use qdbus_cast to convert the reply to a usable format
+    const QDBusArgument arg = reply.arguments().at(0).value<QDBusArgument>();
+    int count = 0;
+
+    arg.beginArray();
+    while (!arg.atEnd()) {
+        arg.beginStructure();
+
+        QDBusObjectPath msgPath;
+        arg >> msgPath;
+
+        // Read properties dict using beginMap/endMap
+        QVariantMap props;
+        arg.beginMap();
+        while (!arg.atEnd()) {
+            arg.beginMapEntry();
+            QString key;
+            QDBusVariant val;
+            arg >> key >> val;
+            props[key] = val.variant();
+            arg.endMapEntry();
+        }
+        arg.endMap();
+
+        arg.endStructure();
+
+        // Create Message from MAP properties
+        Message msg;
+        msg.id = msgPath.path().section('/', -1); // Use last path component as ID
+        msg.sender = props.value("Sender", "").toString();
+        msg.senderAddress = props.value("SenderAddress", props.value("Sender", "")).toString();
+        msg.body = props.value("Subject", "").toString(); // Subject is the preview text
+        msg.isRead = props.value("Read", false).toBool();
+        msg.isIncoming = props.value("Type", "").toString() != "SENT";
+        msg.type = props.value("Type", "SMS").toString();
+
+        // Parse timestamp
+        QString timeStr = props.value("Timestamp", "").toString();
+        if (!timeStr.isEmpty()) {
+            // MAP timestamp format: YYYYMMDDTHHMMSS±HHMM
+            msg.timestamp = QDateTime::fromString(timeStr.left(15), "yyyyMMdd'T'HHmmss");
+            if (!msg.timestamp.isValid()) {
+                msg.timestamp = QDateTime::currentDateTime();
+            }
+        } else {
+            msg.timestamp = QDateTime::currentDateTime();
+        }
+
+        // Build thread ID from sender address
+        msg.threadId = createThreadId(msg.senderAddress);
+
+        // Add to models
+        if (!m_messageModel->findMessage(msg.id)) {
+            m_messageModel->addMessage(msg);
+            updateConversationFromMessage(msg);
+            count++;
+        }
+
+        qDebug() << "MessageManager: Message from" << msg.sender
+                 << "at" << msg.timestamp.toString("hh:mm")
+                 << ":" << msg.body.left(50);
+    }
+    arg.endArray();
+
+    if (count > 0) {
+        m_messageModel->sortMessagesByTime();
+        qDebug() << "MessageManager: Loaded" << count << "new messages";
+    }
+}
+
 void MessageManager::pullMessage(const QString &messageId)
 {
-    Q_UNUSED(messageId);
-    // Pull individual message implementation
+    if (!m_mapSession || !m_mapSession->isValid()) return;
+
+    // Get full message content
+    QString targetFile = "/tmp/message_" + messageId + ".bmsg";
+    QVariantMap filters;
+    filters["Attachment"] = true;
+
+    QDBusMessage reply = m_mapSession->call("GetMessage", messageId, targetFile, filters);
+    if (reply.type() == QDBusMessage::ErrorMessage) {
+        qWarning() << "MessageManager: GetMessage failed:" << reply.errorMessage();
+        return;
+    }
+
+    // Get transfer path and monitor
+    if (!reply.arguments().isEmpty()) {
+        QDBusObjectPath transferPath = reply.arguments().at(0).value<QDBusObjectPath>();
+        m_currentTransferPath = transferPath.path();
+        m_pendingMessageHandle = messageId;
+
+        QDBusConnection::sessionBus().connect("org.bluez.obex",
+                                               m_currentTransferPath,
+                                               "org.freedesktop.DBus.Properties",
+                                               "PropertiesChanged",
+                                               this,
+                                               SLOT(onTransferPropertiesChanged(QString,QVariantMap,QStringList)));
+    }
+}
+
+void MessageManager::onTransferPropertiesChanged(const QString &interface,
+                                                   const QVariantMap &changed,
+                                                   const QStringList &invalidated)
+{
+    Q_UNUSED(interface);
+    Q_UNUSED(invalidated);
+
+    if (!changed.contains("Status")) return;
+    QString status = changed.value("Status").toString();
+
+    if (status == "complete") {
+        qDebug() << "MessageManager: Message transfer complete";
+        if (!m_pendingMessageHandle.isEmpty()) {
+            QString filePath = "/tmp/message_" + m_pendingMessageHandle + ".bmsg";
+            parseBMessage(filePath, m_pendingMessageHandle);
+            m_pendingMessageHandle.clear();
+            QFile::remove(filePath);
+        }
+    } else if (status == "error") {
+        qWarning() << "MessageManager: Message transfer failed";
+        m_pendingMessageHandle.clear();
+    }
+}
+
+void MessageManager::parseBMessage(const QString &filePath, const QString &handle)
+{
+    QFile file(filePath);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) return;
+
+    QString content = QString::fromUtf8(file.readAll());
+    file.close();
+
+    // Extract body from bMessage format
+    // Body is between BEGIN:MSG and END:MSG
+    QRegularExpression bodyRe("BEGIN:MSG\\r?\\n(.*)\\r?\\nEND:MSG",
+                              QRegularExpression::DotMatchesEverythingOption);
+    auto match = bodyRe.match(content);
+
+    if (match.hasMatch()) {
+        QString body = match.captured(1).trimmed();
+
+        // Update the message in the model
+        Message *msg = m_messageModel->findMessage(handle);
+        if (msg) {
+            msg->body = body;
+            qDebug() << "MessageManager: Full message body:" << body.left(100);
+        }
+    }
 }
 
 void MessageManager::pushMessage(const QString &recipient, const QString &body)
 {
-    Q_UNUSED(recipient);
-    Q_UNUSED(body);
-    // Push message implementation via MAP
-    emit messageSent(false, "Bluetooth MAP send not yet implemented");
+    if (!m_mapSession || !m_mapSession->isValid()) {
+        emit messageSent(false, "Not connected to MAP");
+        return;
+    }
+
+    qDebug() << "MessageManager: Sending message to" << recipient;
+
+    // Build bMessage format
+    QString bMessage = QString(
+        "BEGIN:BMSG\r\n"
+        "VERSION:1.0\r\n"
+        "STATUS:UNREAD\r\n"
+        "TYPE:SMS_GSM\r\n"
+        "FOLDER:\r\n"
+        "BEGIN:VCARD\r\n"
+        "VERSION:2.1\r\n"
+        "TEL:%1\r\n"
+        "END:VCARD\r\n"
+        "BEGIN:BENV\r\n"
+        "BEGIN:BBODY\r\n"
+        "CHARSET:UTF-8\r\n"
+        "ENCODING:8BIT\r\n"
+        "LENGTH:%2\r\n"
+        "BEGIN:MSG\r\n"
+        "%3\r\n"
+        "END:MSG\r\n"
+        "END:BBODY\r\n"
+        "END:BENV\r\n"
+        "END:BMSG\r\n"
+    ).arg(recipient).arg(body.toUtf8().size()).arg(body);
+
+    // Write to temp file
+    QString tmpFile = "/tmp/outgoing_msg.bmsg";
+    QFile file(tmpFile);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        emit messageSent(false, "Failed to create message file");
+        return;
+    }
+    file.write(bMessage.toUtf8());
+    file.close();
+
+    // Navigate to outbox
+    m_mapSession->call("SetFolder", "/telecom/msg");
+
+    // Push the message
+    QVariantMap args;
+    QDBusMessage reply = m_mapSession->call("PushMessage", tmpFile, "outbox", args);
+
+    QFile::remove(tmpFile);
+
+    if (reply.type() == QDBusMessage::ErrorMessage) {
+        qWarning() << "MessageManager: PushMessage failed:" << reply.errorMessage();
+        emit messageSent(false, reply.errorMessage());
+    } else {
+        qDebug() << "MessageManager: Message sent successfully";
+        emit messageSent(true, "");
+    }
 }
 #else
 bool MessageManager::connectMAP()

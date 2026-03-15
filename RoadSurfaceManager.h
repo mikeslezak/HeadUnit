@@ -26,7 +26,7 @@ public:
     QString summary() const { return m_summary; }
 
 public slots:
-    void setRouteCoordinates(const QJsonArray &coordinates, double durationSec);
+    void setRouteCoordinates(const QJsonArray &coordinates, double durationSec, bool silent = false);
     void clearRoute();
 
 signals:
@@ -68,6 +68,10 @@ private:
     QJsonArray m_routeCoordinates;
     int m_pendingRequests = 0;
     int m_generation = 0;
+
+    // Change detection — only emit alertDetected when alert text differs
+    QString m_lastAlertText;
+    bool m_suppressNextAlert = false;
 };
 
 #endif // ROADSURFACEMANAGER_H

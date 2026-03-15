@@ -24,13 +24,14 @@ AvalancheManager::AvalancheManager(QObject *parent)
 
 void AvalancheManager::setContextAggregator(ContextAggregator *ctx) { m_context = ctx; }
 
-void AvalancheManager::setRouteCoordinates(const QJsonArray &coordinates, double durationSec)
+void AvalancheManager::setRouteCoordinates(const QJsonArray &coordinates, double durationSec, bool silent)
 {
     if (coordinates.size() < 2) {
         clearRoute();
         return;
     }
 
+    m_suppressNextAlert = silent;
     ++m_generation;
     sampleMountainPoints(coordinates, durationSec);
 
@@ -53,6 +54,9 @@ void AvalancheManager::clearRoute()
     m_refreshTimer->stop();
     emit activeChanged();
     emit summaryChanged();
+
+    m_lastHighestDanger = 0;
+    m_suppressNextAlert = false;
 
     if (m_context) {
         m_context->setAvalancheSummary(QString());
@@ -232,6 +236,21 @@ void AvalancheManager::buildSummary()
     if (m_context) {
         m_context->setAvalancheSummary(summary);
     }
+
+    // --- Change detection: only emit alertDetected when danger level changes ---
+    if (m_suppressNextAlert) {
+        m_suppressNextAlert = false;
+        m_lastHighestDanger = highest;
+        qDebug() << "AvalancheManager: Alert suppressed (silent mode)";
+        return;
+    }
+
+    if (highest == m_lastHighestDanger) {
+        qDebug() << "AvalancheManager: No change in danger level, skipping alert";
+        return;
+    }
+
+    m_lastHighestDanger = highest;
 
     // Alert if highest danger >= 4 (High)
     if (highest >= 4 && highestPoint) {

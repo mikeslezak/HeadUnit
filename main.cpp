@@ -31,6 +31,8 @@
 #include "HighwayCameraManager.h"
 #include "AvalancheManager.h"
 #include "BorderWaitManager.h"
+#include "ToolExecutor.h"
+#include "AncsManager.h"
 
 void myMessageHandler(QtMsgType type, const QMessageLogContext &context, const QString &msg) {
     QByteArray localMsg = msg.toLocal8Bit();
@@ -78,11 +80,13 @@ int main(int argc, char *argv[])
     BluetoothManager bluetoothManager;
     ContactManager contactManager;
     MessageManager messageManager;
-    VoiceCommandHandler voiceCommandHandler;
+    VoiceCommandHandler voiceCommandHandler;  // Kept for backward compat (unused by tool-use pipeline)
     WeatherManager weatherManager;
     VehicleBusManager vehicleBusManager;
     TidalClient tidalClient;
+    tidalClient.connectToService();
     SpotifyClient spotifyClient;
+    spotifyClient.connectToService();
     UpdateManager updateManager;
 
     // Wizard Copilot managers
@@ -96,6 +100,24 @@ int main(int argc, char *argv[])
     HighwayCameraManager highwayCameraManager;
     AvalancheManager avalancheManager;
     BorderWaitManager borderWaitManager;
+
+    // ANCS — BLE peripheral advertising for iPhone notifications
+    AncsManager ancsManager;
+
+    // ToolExecutor — dispatches Claude tool calls to the right manager
+    ToolExecutor toolExecutor;
+    toolExecutor.setContactManager(&contactManager);
+    toolExecutor.setMessageManager(&messageManager);
+    toolExecutor.setBluetoothManager(&bluetoothManager);
+    toolExecutor.setPlacesSearchManager(&placesSearchManager);
+    toolExecutor.setTidalClient(&tidalClient);
+    toolExecutor.setSpotifyClient(&spotifyClient);
+    toolExecutor.setMediaController(&mediaController);
+    toolExecutor.setCopilotMonitor(&copilotMonitor);
+
+    // Wire ClaudeClient to use native tool calling via ToolExecutor
+    claudeClient.setAvailableTools(ToolExecutor::toolDefinitions());
+    claudeClient.setToolExecutor(&toolExecutor);
 
     // Set API keys from environment variables (loaded via .env)
     QString googleApiKey = qEnvironmentVariable("GOOGLE_API_KEY");
@@ -111,25 +133,32 @@ int main(int argc, char *argv[])
     }
 
     // Set default TTS preferences (can be changed in Settings)
-    googleTTS.setVoiceName("en-US-Studio-O");  // Studio: highest quality female US English voice
-    googleTTS.setSpeakingRate(1.0);  // Normal speed
-    googleTTS.setPitch(0.0);  // Normal pitch
+    googleTTS.setVoiceName("en-US-Studio-O");
+    googleTTS.setSpeakingRate(1.0);
+    googleTTS.setPitch(0.0);
 
     // Wake word and voice pipeline wiring is handled by VoicePipeline.qml
 
     QQmlApplicationEngine engine;
 
-    // Set up VoiceCommandHandler dependencies
-    voiceCommandHandler.setContactManager(&contactManager);
-    voiceCommandHandler.setMessageManager(&messageManager);
-    voiceCommandHandler.setBluetoothManager(&bluetoothManager);
-
     // Set up BluetoothManager dependencies
     bluetoothManager.setContactManager(&contactManager);
+
+    // Cascade BT disconnect to MediaController and TelephonyManager
+    QObject::connect(&bluetoothManager, &BluetoothManager::deviceDisconnected,
+                     &mediaController, [pMedia = &mediaController](const QString &) {
+                         pMedia->disconnect();
+                     });
+    QObject::connect(&bluetoothManager, &BluetoothManager::deviceDisconnected,
+                     bluetoothManager.telephonyManager(), &TelephonyManager::handleBluetoothDisconnect);
 
     // Wire Wizard Copilot managers
     contextAggregator.setWeatherManager(&weatherManager);
     contextAggregator.setVehicleBusManager(&vehicleBusManager);
+    contextAggregator.setTidalClient(&tidalClient);
+    contextAggregator.setSpotifyClient(&spotifyClient);
+    contextAggregator.setMediaController(&mediaController);
+    contextAggregator.setBluetoothManager(&bluetoothManager);
     placesSearchManager.setContextAggregator(&contextAggregator);
     placesSearchManager.setMapboxToken(qEnvironmentVariable("MAPBOX_TOKEN", ""));
     placesSearchManager.setGoogleApiKey(qEnvironmentVariable("GOOGLE_API_KEY"));
@@ -151,55 +180,29 @@ int main(int argc, char *argv[])
     // Connect PicovoiceManager signals to handlers
     // Transcription ready -> send to Claude with live context from ContextAggregator
     QObject::connect(&picovoiceManager, &PicovoiceManager::transcriptionReady,
-                     [&claudeClient, &contextAggregator](const QString &text) {
-                         claudeClient.sendMessage(text, contextAggregator.buildContext());
+                     &claudeClient, [pClaude = &claudeClient, pCtx = &contextAggregator](const QString &text) {
+                         pClaude->sendMessage(text, pCtx->buildContext());
                      });
 
     // Provide Claude with contact list for intelligent name matching
-    // Also provide to PicovoiceManager for Google STT speech context hints
-    // Update contacts when sync completes
     QObject::connect(&contactManager, &ContactManager::syncCompleted,
-                     [&claudeClient, &contactManager, &picovoiceManager](int /*count*/) {
-                         QStringList names = contactManager.getAllContactNames();
-                         claudeClient.setContactNames(names);
-                         picovoiceManager.setSpeechContextHints(names);
+                     &claudeClient, [pClaude = &claudeClient, pContacts = &contactManager, pPico = &picovoiceManager](int /*count*/) {
+                         QStringList names = pContacts->getAllContactNames();
+                         pClaude->setContactNames(names);
+                         pPico->setSpeechContextHints(names);
                      });
 
-    // Also set initial contacts if already loaded from cache
+    // Set initial contacts if already loaded from cache
     QStringList cachedNames = contactManager.getAllContactNames();
     if (!cachedNames.isEmpty()) {
         claudeClient.setContactNames(cachedNames);
         picovoiceManager.setSpeechContextHints(cachedNames);
     }
 
-    // Places search: VoiceCommandHandler requests search -> PlacesSearchManager performs it ->
-    // results fed back to Claude as follow-up context
-    QObject::connect(&voiceCommandHandler, &VoiceCommandHandler::placesSearchRequested,
-                     &placesSearchManager, &PlacesSearchManager::searchPlaces);
-    QObject::connect(&placesSearchManager, &PlacesSearchManager::searchCompleted,
-                     [&claudeClient, &contextAggregator](const QString &results) {
-                         QString followUp = QString("[SYSTEM: Places search completed. Present these results to the user "
-                             "conversationally with distance and rating. Ask which one they want directions to. "
-                             "Include expects_reply: true in your JSON.]\n\n%1").arg(results);
-                         claudeClient.sendMessage(followUp, contextAggregator.buildContext(), true);
-                     });
-    QObject::connect(&placesSearchManager, &PlacesSearchManager::searchFailed,
-                     [&claudeClient](const QString &error) {
-                         claudeClient.sendMessage(
-                             QString("Places search failed: %1. Let the user know.").arg(error),
-                             QString(), true);
-                     });
-
-    // Follow-up mode: when Claude expects a reply, keep mic open without wake word
-    QObject::connect(&voiceCommandHandler, &VoiceCommandHandler::followUpExpected,
-                     &picovoiceManager, &PicovoiceManager::enterFollowUpMode);
-
-    // Quiet mode: user can silence proactive copilot alerts
-    QObject::connect(&voiceCommandHandler, &VoiceCommandHandler::quietModeRequested,
-                     &copilotMonitor, &CopilotMonitor::setQuietMode);
-
-    // Note: Claude response -> Google TTS is handled in Main.qml onResponseReceived
-    // to coordinate with UI state changes (avoiding duplicate speak() calls)
+    // Note: Places search, follow-up mode, and quiet mode are now handled
+    // internally by the ToolExecutor + ClaudeClient tool-use loop.
+    // VoicePipeline.qml connects to ToolExecutor signals for navigation,
+    // follow-up, and confirmation dialogs.
 
     // Expose all controllers to QML
     engine.rootContext()->setContextProperty("mediaController", &mediaController);
@@ -227,6 +230,8 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("highwayCameraManager", &highwayCameraManager);
     engine.rootContext()->setContextProperty("avalancheManager", &avalancheManager);
     engine.rootContext()->setContextProperty("borderWaitManager", &borderWaitManager);
+    engine.rootContext()->setContextProperty("toolExecutor", &toolExecutor);
+    engine.rootContext()->setContextProperty("ancsManager", &ancsManager);
 
     // Project root directory (for loading large assets like splash videos from filesystem)
     QString projectDir = QCoreApplication::applicationDirPath() + "/..";
@@ -248,7 +253,6 @@ int main(int argc, char *argv[])
 
     // Load QML - version compatible approach
 #if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
-    // Qt 6.5+ (including 6.9) - use loadFromModule
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed,
                      &app, []() {
                          qCritical() << "QML Engine Creation Failed";
@@ -258,7 +262,6 @@ int main(int argc, char *argv[])
 
     engine.loadFromModule("HeadUnit", "Main");
 #else
-    // Qt 6.2-6.4 - use direct load
     engine.load(QUrl(QStringLiteral("qrc:/qt/qml/HeadUnit/Main.qml")));
 #endif
 
@@ -269,21 +272,35 @@ int main(int argc, char *argv[])
 
     qDebug() << "=== HeadUnit Started Successfully ===";
     qDebug() << "Controllers initialized:";
-    qDebug() << "  - Media:         " << &mediaController;
-    qDebug() << "  - Voice:         " << &voiceAssistant;
-    qDebug() << "  - Picovoice:     " << &picovoiceManager;
     qDebug() << "  - Claude AI:     " << &claudeClient;
-    qDebug() << "  - Notifications: " << &notificationManager;
-    qDebug() << "  - Bluetooth:     " << &bluetoothManager;
-    qDebug() << "  - Contacts:      " << &contactManager;
-    qDebug() << "  - Messages:      " << &messageManager;
-    qDebug() << "  - VoiceCommands: " << &voiceCommandHandler;
+    qDebug() << "  - ToolExecutor:  " << &toolExecutor;
+    qDebug() << "  - Picovoice:     " << &picovoiceManager;
     qDebug() << "  - VehicleBus:    " << &vehicleBusManager;
     qDebug() << "  - TidalClient:   " << &tidalClient;
 
-    // Start unified voice pipeline (wake word + STT + noise suppression)
-    qDebug() << "Starting Picovoice unified voice pipeline...";
-    picovoiceManager.start();
+    // Wire ANCS notifications into the notification system
+    QObject::connect(&ancsManager, &AncsManager::notificationReceived,
+                     &notificationManager, [&notificationManager](const QVariantMap &n) {
+                         // Forward ANCS notification to the existing notification system
+                         emit notificationManager.notificationReceived(n);
+                     });
+
+    // When LE bond completes and BR/EDR profiles connect, set up media/voice services
+    QObject::connect(&ancsManager, &AncsManager::deviceBondedOverLE,
+                     &mediaController, [&mediaController](const QString &address) {
+                         qDebug() << "LE bond triggered BR/EDR service setup for" << address;
+                         mediaController.connectToDevice(address);
+                     });
+
+    // Start BLE ANCS advertising immediately (doesn't block)
+    ancsManager.startAdvertising();
+
+    // Start unified voice pipeline after event loop is running
+    // (audio device init can block if PulseAudio is reconfiguring)
+    QTimer::singleShot(3000, &picovoiceManager, [&picovoiceManager]() {
+        qDebug() << "Starting Picovoice unified voice pipeline...";
+        picovoiceManager.start();
+    });
 
     return app.exec();
 }

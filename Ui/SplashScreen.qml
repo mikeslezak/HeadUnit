@@ -113,6 +113,19 @@ Rectangle {
             console.log("Splash: Starting video playback")
             videoPlayer.source = root.videoUrl
             videoPlayer.play()
+            videoWatchdog.start()
+        }
+    }
+
+    // Safety: if video doesn't finish within 12s, skip splash
+    Timer {
+        id: videoWatchdog
+        interval: 12000
+        onTriggered: {
+            if (root.visible) {
+                console.warn("Splash: Video watchdog — forcing finish")
+                root.finished()
+            }
         }
     }
 

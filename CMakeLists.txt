@@ -61,6 +61,8 @@ qt_add_executable(appHeadUnit
     HighwayCameraManager.cpp
     AvalancheManager.cpp
     BorderWaitManager.cpp
+    ToolExecutor.cpp
+    AncsManager.cpp
 )
 
 target_sources(appHeadUnit PRIVATE
@@ -92,6 +94,8 @@ target_sources(appHeadUnit PRIVATE
     HighwayCameraManager.h
     AvalancheManager.h
     BorderWaitManager.h
+    ToolExecutor.h
+    AncsManager.h
 )
 
 set_source_files_properties(ThemeValues.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)

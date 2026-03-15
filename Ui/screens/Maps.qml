@@ -12,6 +12,7 @@ Item {
 
     property bool mapReady: false
     property bool followMode: true
+    property bool navMode: false        // Active driving navigation mode
     property string activeStyleName: "Dark"
     property bool searchResultsVisible: false
     property bool searchBarVisible: false
@@ -33,7 +34,7 @@ Item {
     property var routeDestination: null   // {lat, lon, name} — final destination
     property var routeWaypoints: []       // Array of {lat, lon, name} intermediate stops
     property var routeOrigin: null        // {lat, lon} — origin used when route was first calculated
-    property var routeGeoJson: ({"type": "Feature", "geometry": {"type": "LineString", "coordinates": []}})  // GeoJSON for the route line
+    property var routeGeoJson: ({"type": "FeatureCollection", "features": []})  // GeoJSON for the route line
 
     // Weather overlay
     property bool radarVisible: false
@@ -59,6 +60,50 @@ Item {
         interval: 5000
         repeat: false
         onTriggered: clearRoute()
+    }
+
+    // Auto-enter navigation mode after showing route overview
+    Timer {
+        id: navModeTimer
+        interval: 3000
+        repeat: false
+        onTriggered: enterNavMode()
+    }
+
+    function enterNavMode() {
+        if (!routeActive || !mapLoader.item) return
+        navMode = true
+        followMode = true
+        mapLoader.item.map.zoomLevel = 16
+        mapLoader.item.map.tilt = 45
+
+        if (gps.position.coordinateValid) {
+            mapLoader.item.map.center = gps.position.coordinate
+            if (gps.position.directionValid) {
+                mapLoader.item.map.bearing = gps.position.direction
+            }
+        } else if (routeOrigin) {
+            // No GPS fix — center on route start and compute bearing from first segment
+            mapLoader.item.map.center = QtPositioning.coordinate(routeOrigin.lat, routeOrigin.lon)
+            var coords = routeGeoJson.geometry.coordinates
+            if (coords && coords.length >= 2) {
+                var dx = coords[1][0] - coords[0][0]
+                var dy = coords[1][1] - coords[0][1]
+                mapLoader.item.map.bearing = (Math.atan2(dx, dy) * 180 / Math.PI + 360) % 360
+            }
+        }
+        console.log("Maps: Entered navigation mode")
+    }
+
+    function exitNavMode() {
+        if (!navMode) return
+        navMode = false
+        // Keep followMode as-is, reset tilt and bearing
+        if (mapLoader.item) {
+            mapLoader.item.map.tilt = 0
+            mapLoader.item.map.bearing = 0
+        }
+        console.log("Maps: Exited navigation mode")
     }
 
     // Save map viewport when user stops panning
@@ -228,6 +273,10 @@ Item {
         onPositionChanged: {
             if (position.coordinateValid && followMode && mapLoader.item) {
                 mapLoader.item.map.center = position.coordinate
+                // In nav mode, rotate map to match heading
+                if (navMode && position.directionValid) {
+                    mapLoader.item.map.bearing = position.direction
+                }
             }
             // Forward GPS to ContextAggregator for voice assistant location awareness
             if (position.coordinateValid && typeof contextAggregator !== 'undefined') {
@@ -567,6 +616,11 @@ Item {
         propagateComposedEvents: true
         onPressed: function(mouse) { mouse.accepted = false }
         onClicked: {
+            // Exit nav mode on tap (let user browse the map)
+            if (navMode) {
+                exitNavMode()
+                return
+            }
             if (!searchBarVisible) {
                 searchBarVisible = true
                 searchBarHideTimer.restart()
@@ -833,10 +887,17 @@ Item {
             text: "\u2316"
             highlighted: followMode
             onClicked: {
-                followMode = !followMode
-                if (followMode && gps.position.coordinateValid && mapLoader.item) {
-                    mapLoader.item.map.center = gps.position.coordinate
-                    mapLoader.item.map.zoomLevel = 15
+                if (routeActive && !navMode) {
+                    // Re-enter navigation mode
+                    enterNavMode()
+                } else if (navMode) {
+                    exitNavMode()
+                } else {
+                    followMode = !followMode
+                    if (followMode && gps.position.coordinateValid && mapLoader.item) {
+                        mapLoader.item.map.center = gps.position.coordinate
+                        mapLoader.item.map.zoomLevel = 15
+                    }
                 }
             }
         }
@@ -858,6 +919,34 @@ Item {
             fontSize: 14
             highlighted: root.radarVisible
             onClicked: toggleRadar()
+        }
+
+        // Cancel navigation button — only visible during active navigation
+        Item { width: 1; height: 8; visible: root.routeActive }
+
+        Rectangle {
+            visible: root.routeActive
+            width: 48; height: 48; radius: 12
+            color: cancelMa.pressed
+                ? Qt.rgba(ThemeValues.errorCol.r, ThemeValues.errorCol.g, ThemeValues.errorCol.b, 0.35)
+                : Qt.rgba(ThemeValues.errorCol.r, ThemeValues.errorCol.g, ThemeValues.errorCol.b, 0.15)
+            border.color: ThemeValues.errorCol
+            border.width: 1
+
+            Behavior on color { ColorAnimation { duration: 100 } }
+
+            Text {
+                anchors.centerIn: parent
+                text: "\u2715"
+                color: ThemeValues.errorCol
+                font.pixelSize: 20; font.family: ThemeValues.fontFamily; font.bold: true
+            }
+
+            MouseArea {
+                id: cancelMa
+                anchors.fill: parent
+                onClicked: clearRoute()
+            }
         }
     }
 
@@ -1003,6 +1092,7 @@ Item {
                         "geometry": route.geometry
                     }
 
+
                     routeActive = true
 
                     // Feed route metadata to ContextAggregator for voice assistant awareness
@@ -1040,8 +1130,9 @@ Item {
                     currentStep = 0
                     updateCurrentStepDisplay()
 
-                    // Fit map to show entire route
+                    // Fit map to show entire route, then auto-enter nav mode
                     fitRouteBounds(origin.latitude, origin.longitude, destLat, destLon)
+                    navModeTimer.restart()
 
                     // Feed route coordinates to RouteWeatherManager for weather-along-route tracking
                     if (typeof routeWeatherManager !== 'undefined' && route.geometry && route.geometry.coordinates) {
@@ -1193,6 +1284,7 @@ Item {
                     // Update route line
                     routeGeoJson = { "type": "Feature", "geometry": route.geometry }
 
+
                     // Update context aggregator
                     if (typeof contextAggregator !== 'undefined') {
                         contextAggregator.routeDistance = routeDistance
@@ -1233,25 +1325,26 @@ Item {
                     currentStep = 0
                     updateCurrentStepDisplay()
 
-                    // Fit map to show entire route
+                    // Fit map to show entire route, then auto-enter nav mode
                     fitRouteBounds(origin.latitude, origin.longitude,
                                    routeDestination.lat, routeDestination.lon)
+                    navModeTimer.restart()
 
-                    // Feed updated route to downstream managers
+                    // Feed updated route to downstream managers (silent=true to suppress repeat alerts)
                     if (route.geometry && route.geometry.coordinates) {
                         var routeCoords = route.geometry.coordinates
                         if (typeof routeWeatherManager !== 'undefined')
-                            routeWeatherManager.setRouteCoordinates(routeCoords, durSec)
+                            routeWeatherManager.setRouteCoordinates(routeCoords, durSec, true)
                         if (typeof roadConditionManager !== 'undefined')
-                            roadConditionManager.setRouteCoordinates(routeCoords, durSec)
+                            roadConditionManager.setRouteCoordinates(routeCoords, durSec, true)
                         if (typeof roadSurfaceManager !== 'undefined')
-                            roadSurfaceManager.setRouteCoordinates(routeCoords, durSec)
+                            roadSurfaceManager.setRouteCoordinates(routeCoords, durSec, true)
                         if (typeof highwayCameraManager !== 'undefined')
                             highwayCameraManager.setRouteCoordinates(routeCoords, durSec)
                         if (typeof avalancheManager !== 'undefined')
-                            avalancheManager.setRouteCoordinates(routeCoords, durSec)
+                            avalancheManager.setRouteCoordinates(routeCoords, durSec, true)
                         if (typeof borderWaitManager !== 'undefined')
-                            borderWaitManager.setRouteCoordinates(routeCoords, durSec)
+                            borderWaitManager.setRouteCoordinates(routeCoords, durSec, true)
                         if (typeof contextAggregator !== 'undefined')
                             contextAggregator.setRouteCoordinates(routeCoords, durSec)
                     }
@@ -1288,6 +1381,8 @@ Item {
     function clearRoute() {
         directionsGeneration++
         arrivalClearTimer.stop()
+        navModeTimer.stop()
+        exitNavMode()
         routeActive = false
         routeDistance = ""
         routeDuration = ""
@@ -1297,7 +1392,7 @@ Item {
         root._destCoord = null
         root._waypointCoords = []
         root._searchCoord = null
-        routeGeoJson = { "type": "Feature", "geometry": { "type": "LineString", "coordinates": [] } }
+        routeGeoJson = { "type": "FeatureCollection", "features": [] }
         routeSteps = []
         currentStep = 0
         nextManeuver = ""

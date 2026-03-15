@@ -14,7 +14,7 @@ Item {
 
     // Use direct property bindings for reactive updates
     readonly property int phoneSignal: bluetoothManager?.cellularSignal ?? 0
-    readonly property int phoneBattery: notificationManager?.phoneBatteryLevel ?? -1
+    readonly property int phoneBattery: bluetoothManager?.phoneBatteryLevel ?? -1
     readonly property bool isCharging: bluetoothManager?.isConnectedDeviceCharging() ?? false
     readonly property string carrier: bluetoothManager?.carrierName ?? ""
 
@@ -130,11 +130,34 @@ Item {
             }
         }
 
+        // Carrier name
+        Text {
+            text: carrier
+            color: ThemeValues.textCol
+            font.pixelSize: ThemeValues.fontSize - 4
+            font.family: ThemeValues.fontFamily
+            opacity: 0.6
+            anchors.verticalCenter: parent.verticalCenter
+            visible: carrier.length > 0
+        }
+
+        // Roaming indicator
+        Text {
+            text: "R"
+            color: ThemeValues.warningCol
+            font.pixelSize: ThemeValues.fontSize - 4
+            font.family: ThemeValues.fontFamily
+            font.weight: Font.Bold
+            anchors.verticalCenter: parent.verticalCenter
+            visible: (bluetoothManager?.roamingStatus ?? "") === "roaming"
+        }
+
         Rectangle {
             width: 1
             height: 16
             color: Qt.rgba(ThemeValues.primaryCol.r, ThemeValues.primaryCol.g, ThemeValues.primaryCol.b, 0.3)
             anchors.verticalCenter: parent.verticalCenter
+            visible: carrier.length > 0 || phoneBattery >= 0
         }
 
         // Phone Battery
@@ -192,9 +215,9 @@ Item {
             }
         }
 
-        // Show message when battery not available
+        // Show message when no device connected at all
         Text {
-            visible: phoneBattery < 0
+            visible: phoneBattery < 0 && phoneSignal === 0 && carrier.length === 0
             text: "No Device"
             color: ThemeValues.textCol
             font.pixelSize: ThemeValues.fontSize - 5

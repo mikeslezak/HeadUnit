@@ -32,6 +32,11 @@ void CopilotMonitor::setContextAggregator(ContextAggregator *ctx) { m_context = 
 void CopilotMonitor::setVehicleBusManager(VehicleBusManager *vehicle) { m_vehicle = vehicle; }
 void CopilotMonitor::setRouteWeatherManager(RouteWeatherManager *routeWeather)
 {
+    if (m_routeWeather == routeWeather) return;
+    if (m_routeWeather) {
+        disconnect(m_routeWeather, &RouteWeatherManager::alertDetected,
+                   this, &CopilotMonitor::onRouteAlert);
+    }
     m_routeWeather = routeWeather;
     if (m_routeWeather) {
         connect(m_routeWeather, &RouteWeatherManager::alertDetected,
@@ -109,6 +114,11 @@ void CopilotMonitor::checkConditions()
 
 void CopilotMonitor::setRoadConditionManager(RoadConditionManager *roadConditions)
 {
+    if (m_roadConditions == roadConditions) return;
+    if (m_roadConditions) {
+        disconnect(m_roadConditions, &RoadConditionManager::alertDetected,
+                   this, &CopilotMonitor::onRouteAlert);
+    }
     m_roadConditions = roadConditions;
     if (m_roadConditions) {
         connect(m_roadConditions, &RoadConditionManager::alertDetected,
@@ -124,6 +134,11 @@ void CopilotMonitor::onRouteAlert(const QString &message)
 
 void CopilotMonitor::setSpeedLimitManager(SpeedLimitManager *speedLimit)
 {
+    if (m_speedLimit == speedLimit) return;
+    if (m_speedLimit) {
+        disconnect(m_speedLimit, &SpeedLimitManager::alertDetected,
+                   this, &CopilotMonitor::onSpeedLimitAlert);
+    }
     m_speedLimit = speedLimit;
     if (m_speedLimit) {
         connect(m_speedLimit, &SpeedLimitManager::alertDetected,
@@ -133,6 +148,11 @@ void CopilotMonitor::setSpeedLimitManager(SpeedLimitManager *speedLimit)
 
 void CopilotMonitor::setRoadSurfaceManager(RoadSurfaceManager *roadSurface)
 {
+    if (m_roadSurface == roadSurface) return;
+    if (m_roadSurface) {
+        disconnect(m_roadSurface, &RoadSurfaceManager::alertDetected,
+                   this, &CopilotMonitor::onRouteAlert);
+    }
     m_roadSurface = roadSurface;
     if (m_roadSurface) {
         connect(m_roadSurface, &RoadSurfaceManager::alertDetected,
@@ -142,6 +162,11 @@ void CopilotMonitor::setRoadSurfaceManager(RoadSurfaceManager *roadSurface)
 
 void CopilotMonitor::setAvalancheManager(AvalancheManager *avalanche)
 {
+    if (m_avalanche == avalanche) return;
+    if (m_avalanche) {
+        disconnect(m_avalanche, &AvalancheManager::alertDetected,
+                   this, &CopilotMonitor::onRouteAlert);
+    }
     m_avalanche = avalanche;
     if (m_avalanche) {
         connect(m_avalanche, &AvalancheManager::alertDetected,
@@ -151,6 +176,11 @@ void CopilotMonitor::setAvalancheManager(AvalancheManager *avalanche)
 
 void CopilotMonitor::setBorderWaitManager(BorderWaitManager *borderWait)
 {
+    if (m_borderWait == borderWait) return;
+    if (m_borderWait) {
+        disconnect(m_borderWait, &BorderWaitManager::alertDetected,
+                   this, &CopilotMonitor::onRouteAlert);
+    }
     m_borderWait = borderWait;
     if (m_borderWait) {
         connect(m_borderWait, &BorderWaitManager::alertDetected,
@@ -226,7 +256,7 @@ void CopilotMonitor::flushRouteAlerts()
 {
     if (m_pendingRouteAlerts.isEmpty()) return;
 
-    // Route briefings are never throttled — the user explicitly asked for navigation.
+    // Route alerts only arrive when conditions actually changed (change detection in each manager).
     // Flush immediately every time.
 
     // Combine all pending alerts into one message

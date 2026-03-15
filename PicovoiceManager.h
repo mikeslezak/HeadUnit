@@ -64,6 +64,7 @@ signals:
     void intentDetected(const QString &intent, const QVariantMap &slots);
     void transcriptionReady(const QString &text);
     void error(const QString &message);
+    void interactionReset();  // Emitted when PicovoiceManager silently returns to Listening (timeouts)
     void statusMessageChanged();
     void runningChanged();
     void initializedChanged();
@@ -82,7 +83,9 @@ private:
         Listening,            // Listening for wake word
         WaitingForReadyPrompt,// Wake word detected, waiting for TTS ready prompt to finish
         WaitingForCommand,    // Ready prompt finished, processing with Rhino
-        ProcessingSpeech,     // Rhino didn't understand, accumulating for Leopard
+        WaitingForSpeechStart,// No Rhino: waiting for user to start speaking (energy-based)
+        ProcessingSpeech,     // Accumulating audio for Leopard/Google STT
+        WaitingForTranscription, // Audio sent to STT, waiting for result (no further processing)
         WaitingForFollowUp    // After response, listening without wake word (12s timeout)
     };
     State m_state;
@@ -122,6 +125,10 @@ private:
     bool m_wakeWordAvailable;
     QString m_statusMessage;
 
+    // Audio recovery
+    int m_audioRecoveryAttempts = 0;
+    static const int MAX_AUDIO_RECOVERY_ATTEMPTS = 5;
+
     // Reusable frame buffer (avoids per-frame allocation)
     QVector<int16_t> m_processedFrame;
 
@@ -133,7 +140,10 @@ private:
     // Voice Activity Detection (VAD) for faster response
     qint64 m_lastVoiceActivityTime;
     static const int SILENCE_THRESHOLD_MS = 1500;     // 1.5 seconds of silence triggers finalization
-    static const int16_t SILENCE_ENERGY_THRESHOLD = 500;  // RMS energy below this = silence
+    static const int16_t SILENCE_ENERGY_THRESHOLD = 150;  // Minimum RMS floor (USB mic with PulseAudio boost)
+    float m_noiseFloor = 500.0f;                          // Adaptive noise floor (updated in Listening state)
+    static constexpr float NOISE_FLOOR_ALPHA = 0.02f;     // Slow adaptation rate
+    static constexpr float SPEECH_THRESHOLD_RATIO = 3.0f; // Speech must be 3x noise floor
     static const int MIN_SPEECH_DURATION_MS = 500;    // Minimum speech before allowing silence detection
 
     // Debouncing
@@ -144,8 +154,21 @@ private:
     QTimer *m_followUpTimer;
     static const int FOLLOW_UP_TIMEOUT_MS = 12000;  // 12 seconds
 
+    // Post-resume deaf period to avoid TTS echo pickup
+    qint64 m_resumeTime = 0;
+    static const int POST_RESUME_DEAF_MS = 400;  // Ignore audio for 400ms after resume
+
     // Ready prompt safety timeout
     QTimer *m_readyPromptTimer;
+
+    // Speech start timeout (no Rhino: how long to wait for user to start speaking)
+    QTimer *m_speechStartTimer;
+
+    // Transcription timeout (Google STT didn't respond)
+    QTimer *m_transcriptionTimer;
+
+    // Rhino command timeout (Rhino never finalized)
+    QTimer *m_commandTimer;
 
     // Initialization methods
     bool initializePorcupine();

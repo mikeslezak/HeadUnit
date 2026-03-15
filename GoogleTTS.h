@@ -10,6 +10,7 @@
 #include <QAudioFormat>
 #include <QBuffer>
 #include <QMediaDevices>
+#include <QHash>
 
 /**
  * GoogleTTS - Google Cloud Text-to-Speech Integration
@@ -201,6 +202,12 @@ private:
     bool m_isSpeaking;
     bool m_isProcessing;
     QString m_statusMessage;
+
+    // Audio cache for short phrases (ready prompts, acknowledgments)
+    QHash<QString, QByteArray> m_audioCache;
+    QString m_pendingSpeakText;  // Text being synthesized (for caching)
+    static constexpr int MAX_CACHE_TEXT_LENGTH = 50;  // Only cache short phrases
+    static constexpr int MAX_CACHE_ENTRIES = 20;       // Cap cache size
 
     // Constants
     static constexpr const char* API_ENDPOINT = "https://texttospeech.googleapis.com/v1/text:synthesize";

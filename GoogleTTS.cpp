@@ -1,5 +1,6 @@
 #include "GoogleTTS.h"
 #include <QDebug>
+#include <QPointer>
 #include <QNetworkRequest>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -51,18 +52,19 @@ GoogleTTS::~GoogleTTS()
         stop();
     }
 
+    // In the destructor, the event loop won't run again so we must
+    // delete the reply directly (deleteLater won't execute).
     if (m_currentReply) {
         m_currentReply->abort();
-        m_currentReply->deleteLater();
+        delete m_currentReply;
+        m_currentReply = nullptr;
     }
 
-    if (m_audioSink) {
-        delete m_audioSink;
-    }
+    delete m_audioSink;
+    m_audioSink = nullptr;
 
-    if (m_audioBuffer) {
-        delete m_audioBuffer;
-    }
+    delete m_audioBuffer;
+    m_audioBuffer = nullptr;
 }
 
 // ========================================================================
@@ -131,6 +133,21 @@ void GoogleTTS::speak(const QString &text)
 
     qDebug() << "GoogleTTS: Speaking:" << text;
 
+    // Check cache for short phrases (ready prompts, acknowledgments)
+    if (text.length() <= MAX_CACHE_TEXT_LENGTH && m_audioCache.contains(text)) {
+        qDebug() << "GoogleTTS: Cache hit for:" << text;
+        m_isSpeaking = true;
+        m_isProcessing = false;
+        emit speakingChanged();
+        emit speechStarted();
+        setStatusMessage("Speaking...");
+        playAudio(m_audioCache[text]);
+        return;
+    }
+
+    // Store text for caching after synthesis
+    m_pendingSpeakText = text;
+
     // Send to Google for synthesis
     sendToGoogle(text);
 }
@@ -140,11 +157,12 @@ void GoogleTTS::stop()
     qDebug() << "GoogleTTS: Stopping speech...";
 
     // Abort any pending network request first
+    // Don't deleteLater here — the QNetworkAccessManager::finished signal will
+    // still fire for the aborted reply, and onNetworkReply handles deletion.
     if (m_currentReply) {
         disconnect(m_currentReply, &QNetworkReply::errorOccurred,
                    this, &GoogleTTS::onNetworkError);
         m_currentReply->abort();
-        m_currentReply->deleteLater();
         m_currentReply = nullptr;
     }
 
@@ -264,6 +282,7 @@ void GoogleTTS::onNetworkReply(QNetworkReply *reply)
         reply->deleteLater();
         m_currentReply = nullptr;
         reset();
+        emit speechFinished();
         return;
     }
 
@@ -279,6 +298,7 @@ void GoogleTTS::onNetworkReply(QNetworkReply *reply)
         reply->deleteLater();
         m_currentReply = nullptr;
         reset();
+        emit speechFinished();
         return;
     }
 
@@ -287,7 +307,30 @@ void GoogleTTS::onNetworkReply(QNetworkReply *reply)
         QString audioContentBase64 = response["audioContent"].toString();
         QByteArray audioData = QByteArray::fromBase64(audioContentBase64.toLatin1());
 
+        if (audioData.isEmpty()) {
+            qWarning() << "GoogleTTS: Base64 decode produced empty audio data";
+            emit error("Invalid audio data received");
+            setStatusMessage("Error: Invalid audio data");
+            m_pendingSpeakText.clear();
+            emit speechFinished();
+            reply->deleteLater();
+            m_currentReply = nullptr;
+            return;
+        }
+
         qDebug() << "GoogleTTS: Received audio data:" << audioData.size() << "bytes";
+
+        // Cache short phrases for instant playback next time (cap at 20 entries)
+        if (m_pendingSpeakText.length() <= MAX_CACHE_TEXT_LENGTH && !m_pendingSpeakText.isEmpty()) {
+            if (m_audioCache.size() >= MAX_CACHE_ENTRIES && !m_audioCache.contains(m_pendingSpeakText)) {
+                // Evict oldest entry (arbitrary — QHash has no order, just remove one)
+                m_audioCache.erase(m_audioCache.begin());
+            }
+            m_audioCache[m_pendingSpeakText] = audioData;
+            qDebug() << "GoogleTTS: Cached audio for:" << m_pendingSpeakText
+                     << "(" << m_audioCache.size() << "entries)";
+        }
+        m_pendingSpeakText.clear();
 
         // Play the audio
         playAudio(audioData);
@@ -310,18 +353,10 @@ void GoogleTTS::onNetworkError(QNetworkReply::NetworkError error)
         return;
     }
 
-    QString errorMsg = m_currentReply->errorString();
-    qWarning() << "GoogleTTS: Network error:" << errorMsg;
-
-    // Null out so the finished handler (onNetworkReply) skips re-processing
-    m_currentReply = nullptr;
-
-    m_isProcessing = false;
-    emit processingChanged();
-    emit this->error("Connection error: " + errorMsg);
-    setStatusMessage("Error: " + errorMsg);
-
-    reset();
+    // Log the error here but do NOT delete/null m_currentReply.
+    // The QNetworkAccessManager::finished signal always fires after errorOccurred,
+    // and onNetworkReply handles cleanup. Deleting here causes double-deletion.
+    qWarning() << "GoogleTTS: Network error:" << m_currentReply->errorString();
 }
 
 // ========================================================================
@@ -461,22 +496,26 @@ void GoogleTTS::reset()
 {
     // Schedule cleanup to happen after we exit the current callback
     // This is important when reset() is called from onAudioStateChanged
-    QMetaObject::invokeMethod(this, [this]() {
+    // Use QPointer guard: if GoogleTTS is destroyed before the lambda
+    // runs, the QPointer goes null and we skip the cleanup safely.
+    QPointer<GoogleTTS> guard(this);
+    QMetaObject::invokeMethod(this, [guard]() {
+        if (!guard) return;
         // Disconnect first to prevent any further callbacks
-        if (m_audioSink) {
-            disconnect(m_audioSink, &QAudioSink::stateChanged,
-                       this, &GoogleTTS::onAudioStateChanged);
-            delete m_audioSink;
-            m_audioSink = nullptr;
+        if (guard->m_audioSink) {
+            guard->disconnect(guard->m_audioSink, &QAudioSink::stateChanged,
+                       guard, &GoogleTTS::onAudioStateChanged);
+            delete guard->m_audioSink;
+            guard->m_audioSink = nullptr;
         }
 
-        if (m_audioBuffer) {
-            m_audioBuffer->close();
-            delete m_audioBuffer;
-            m_audioBuffer = nullptr;
+        if (guard->m_audioBuffer) {
+            guard->m_audioBuffer->close();
+            delete guard->m_audioBuffer;
+            guard->m_audioBuffer = nullptr;
         }
 
-        m_audioData.clear();
+        guard->m_audioData.clear();
     }, Qt::QueuedConnection);
 
     // Update state immediately

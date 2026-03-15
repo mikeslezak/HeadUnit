@@ -16,6 +16,8 @@ Item {
     property var appSettings: null
     property string activeAudioSource: "none"
 
+    property string _pendingServiceAddress: ""
+
     // Emitted when a notification should be shown
     signal notificationRequested(var notification)
 
@@ -53,7 +55,10 @@ Item {
             console.log("Device connected successfully:", address)
             var deviceName = bluetoothManager.getDeviceName(address)
             root.showNotification("Connected to " + deviceName, "success")
-            root.setupDeviceServices(address)
+            // Delay service setup to let BlueZ resolve profiles (ServicesResolved)
+            // before we try to use A2DP, HFP, AVRCP, ANCS, etc.
+            root._pendingServiceAddress = address
+            serviceSetupTimer.restart()
         }
 
         function onDeviceDisconnected(address) {
@@ -89,8 +94,10 @@ Item {
     function setupDeviceServices(address) {
         console.log("Setting up device services for:", address)
         mediaController.connectToDevice(address)
-        notificationManager.connectToDevice(address, "ios")
+        // ANCS notifications handled by AncsManager (BLE peripheral advertising + D-Bus GATT)
+        // Do NOT call notificationManager.connectToDevice() — it conflicts with AncsManager
         voiceAssistant.connectToPhone(address)
+        messageManager.connectToDevice(address)
     }
 
     // Show system notification
@@ -102,6 +109,21 @@ Item {
             priority: type === "error" ? 3 : 1
         }
         root.notificationRequested(notification)
+    }
+
+    // Delay service setup to let BlueZ finish profile resolution
+    Timer {
+        id: serviceSetupTimer
+        interval: 3000
+        running: false
+        repeat: false
+        onTriggered: {
+            if (root._pendingServiceAddress !== "") {
+                console.log("Setting up services after delay for:", root._pendingServiceAddress)
+                root.setupDeviceServices(root._pendingServiceAddress)
+                root._pendingServiceAddress = ""
+            }
+        }
     }
 
     // Timer to wait for voice connection

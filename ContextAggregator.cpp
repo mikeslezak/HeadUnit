@@ -1,8 +1,13 @@
 #include "ContextAggregator.h"
 #include "WeatherManager.h"
 #include "VehicleBusManager.h"
+#include "TidalClient.h"
+#include "SpotifyClient.h"
+#include "MediaController.h"
+#include "BluetoothManager.h"
 #include <QDateTime>
 #include <QDebug>
+#include <QJsonArray>
 
 ContextAggregator::ContextAggregator(QObject *parent)
     : QObject(parent)
@@ -12,6 +17,10 @@ ContextAggregator::ContextAggregator(QObject *parent)
 
 void ContextAggregator::setWeatherManager(WeatherManager *mgr) { m_weather = mgr; }
 void ContextAggregator::setVehicleBusManager(VehicleBusManager *mgr) { m_vehicle = mgr; }
+void ContextAggregator::setTidalClient(TidalClient *client) { m_tidal = client; }
+void ContextAggregator::setSpotifyClient(SpotifyClient *client) { m_spotify = client; }
+void ContextAggregator::setMediaController(MediaController *mgr) { m_media = mgr; }
+void ContextAggregator::setBluetoothManager(BluetoothManager *mgr) { m_bluetooth = mgr; }
 
 void ContextAggregator::setGpsLatitude(double lat)
 {
@@ -94,6 +103,50 @@ void ContextAggregator::setBorderWaitSummary(const QString &summary)
     m_borderWaitSummary = summary;
 }
 
+void ContextAggregator::setRouteCoordinates(const QJsonArray &coordinates, double /*durationSec*/)
+{
+    m_routeCoords = coordinates;
+    qDebug() << "ContextAggregator: Stored" << coordinates.size() << "route coordinates for along-route search";
+}
+
+void ContextAggregator::clearRouteCoordinates()
+{
+    m_routeCoords = QJsonArray();
+}
+
+QList<QPair<double,double>> ContextAggregator::routeSamplePoints(int count) const
+{
+    QList<QPair<double,double>> points;
+    if (m_routeCoords.isEmpty() || count <= 0) return points;
+
+    int total = m_routeCoords.size();
+    // Sample evenly spaced points along the route (skip start, include midpoints)
+    for (int i = 1; i <= count; ++i) {
+        int idx = (total * i) / (count + 1);
+        if (idx >= total) idx = total - 1;
+        QJsonArray coord = m_routeCoords[idx].toArray();
+        if (coord.size() >= 2) {
+            // GeoJSON is [lon, lat]
+            points.append({coord[1].toDouble(), coord[0].toDouble()});
+        }
+    }
+    return points;
+}
+
+double ContextAggregator::bestLatitude() const
+{
+    if (m_gpsLat != 0.0) return m_gpsLat;
+    if (m_weather) return m_weather->latitude();
+    return 0.0;
+}
+
+double ContextAggregator::bestLongitude() const
+{
+    if (m_gpsLon != 0.0) return m_gpsLon;
+    if (m_weather) return m_weather->longitude();
+    return 0.0;
+}
+
 QString ContextAggregator::buildContext() const
 {
     QString ctx;
@@ -102,15 +155,25 @@ QString ContextAggregator::buildContext() const
     QDateTime now = QDateTime::currentDateTime();
     ctx += QString("Current time: %1\n").arg(now.toString("dddd, MMMM d yyyy, h:mm AP"));
 
-    // GPS location
-    if (m_gpsLat != 0.0 || m_gpsLon != 0.0) {
-        ctx += QString("GPS coordinates: %1, %2\n").arg(m_gpsLat, 0, 'f', 5).arg(m_gpsLon, 0, 'f', 5);
-        if (m_gpsSpeed > 0.0) {
+    // GPS location (prefer real GPS, fall back to WeatherManager's ip-api geolocation)
+    double lat = m_gpsLat;
+    double lon = m_gpsLon;
+    bool fromGps = true;
+    if (lat == 0.0 && lon == 0.0 && m_weather) {
+        lat = m_weather->latitude();
+        lon = m_weather->longitude();
+        fromGps = false;
+    }
+    if (lat != 0.0 || lon != 0.0) {
+        ctx += QString("GPS coordinates: %1, %2%3\n")
+            .arg(lat, 0, 'f', 5).arg(lon, 0, 'f', 5)
+            .arg(fromGps ? "" : " (approximate, from IP geolocation)");
+        if (fromGps && m_gpsSpeed > 0.0) {
             ctx += QString("Speed: %1 km/h (%2 mph)\n")
                 .arg(m_gpsSpeed, 0, 'f', 0)
                 .arg(m_gpsSpeed * 0.621371, 0, 'f', 0);
         }
-        if (m_gpsHeading >= 0.0) {
+        if (fromGps && m_gpsHeading >= 0.0) {
             ctx += QString("Heading: %1°\n").arg(m_gpsHeading, 0, 'f', 0);
         }
     }
@@ -139,6 +202,31 @@ QString ContextAggregator::buildContext() const
             ctx += QString(", %1 faults active").arg(m_vehicle->faultCount());
         }
         ctx += "\n";
+    }
+
+    // Phone status
+    if (m_bluetooth) {
+        int battery = m_bluetooth->phoneBatteryLevel();
+        int signal = m_bluetooth->cellularSignal();
+        QString carrier = m_bluetooth->carrierName();
+        QString roaming = m_bluetooth->roamingStatus();
+
+        if (battery >= 0 || signal > 0 || !carrier.isEmpty()) {
+            ctx += QString("Phone: %1 battery, %2/4 signal bars")
+                .arg(battery >= 0 ? QString("%1%").arg(battery) : "unknown")
+                .arg(signal);
+            if (!carrier.isEmpty()) ctx += QString(", carrier %1").arg(carrier);
+            if (roaming == "roaming") ctx += " (ROAMING)";
+            ctx += "\n";
+        }
+
+        if (m_bluetooth->hasActiveCall()) {
+            QString caller = m_bluetooth->activeCallName().isEmpty()
+                ? m_bluetooth->activeCallNumber() : m_bluetooth->activeCallName();
+            ctx += QString("Active call: %1 (%2), duration %3s\n")
+                .arg(caller, m_bluetooth->activeCallState())
+                .arg(m_bluetooth->activeCallDuration());
+        }
     }
 
     // Active route
@@ -175,6 +263,27 @@ QString ContextAggregator::buildContext() const
     // Border crossing wait times (from BorderWaitManager)
     if (!m_borderWaitSummary.isEmpty()) {
         ctx += "Border crossing wait times:\n" + m_borderWaitSummary + "\n";
+    }
+
+    // Music (playing or paused — track is loaded either way)
+    if (m_tidal && !m_tidal->trackTitle().isEmpty()) {
+        ctx += QString("Music (%1, Tidal): \"%2\" by %3")
+            .arg(m_tidal->isPlaying() ? "playing" : "paused",
+                 m_tidal->trackTitle(), m_tidal->artist());
+        if (!m_tidal->album().isEmpty())
+            ctx += QString(" from %1").arg(m_tidal->album());
+        ctx += "\n";
+    } else if (m_spotify && !m_spotify->trackTitle().isEmpty()) {
+        ctx += QString("Music (%1, Spotify): \"%2\" by %3")
+            .arg(m_spotify->isPlaying() ? "playing" : "paused",
+                 m_spotify->trackTitle(), m_spotify->artist());
+        if (!m_spotify->album().isEmpty())
+            ctx += QString(" from %1").arg(m_spotify->album());
+        ctx += "\n";
+    } else if (m_media && !m_media->trackTitle().isEmpty()) {
+        ctx += QString("Music (%1, Bluetooth): \"%2\" by %3\n")
+            .arg(m_media->isPlaying() ? "playing" : "paused",
+                 m_media->trackTitle(), m_media->artist());
     }
 
     return ctx;

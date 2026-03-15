@@ -12,6 +12,7 @@ class VehicleBusManager;
 class TidalClient;
 class SpotifyClient;
 class MediaController;
+class BluetoothManager;
 
 class ContextAggregator : public QObject
 {
@@ -33,6 +34,7 @@ public:
     void setTidalClient(TidalClient *client);
     void setSpotifyClient(SpotifyClient *client);
     void setMediaController(MediaController *mgr);
+    void setBluetoothManager(BluetoothManager *mgr);
 
     double gpsLatitude() const { return m_gpsLat; }
     double gpsLongitude() const { return m_gpsLon; }
@@ -92,6 +94,7 @@ private:
     TidalClient *m_tidal = nullptr;
     SpotifyClient *m_spotify = nullptr;
     MediaController *m_media = nullptr;
+    BluetoothManager *m_bluetooth = nullptr;
 
     double m_gpsLat = 0.0;
     double m_gpsLon = 0.0;

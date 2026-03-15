@@ -50,7 +50,7 @@ QList<BorderWaitManager::KnownCrossing> BorderWaitManager::knownCrossings()
     return crossings;
 }
 
-void BorderWaitManager::setRouteCoordinates(const QJsonArray &coordinates, double durationSec)
+void BorderWaitManager::setRouteCoordinates(const QJsonArray &coordinates, double durationSec, bool silent)
 {
     Q_UNUSED(durationSec)
 
@@ -59,6 +59,7 @@ void BorderWaitManager::setRouteCoordinates(const QJsonArray &coordinates, doubl
         return;
     }
 
+    m_suppressNextAlert = silent;
     ++m_generation;
     sampleRoutePoints(coordinates);
 
@@ -92,6 +93,9 @@ void BorderWaitManager::clearRoute()
     m_refreshTimer->stop();
     emit activeChanged();
     emit summaryChanged();
+
+    m_lastMaxWaitMinutes = -1;
+    m_suppressNextAlert = false;
 
     if (m_context) {
         m_context->setBorderWaitSummary(QString());
@@ -339,6 +343,27 @@ void BorderWaitManager::processResults()
              << "nearest:" << m_nearestCrossing << "wait:" << m_waitMinutes << "min";
 
     buildSummary();
+
+    // --- Change detection: only emit alertDetected when max wait changes ---
+    int maxWait = -1;
+    for (const auto &wd : nearRoute) {
+        if (wd.commercialMinutes > maxWait)
+            maxWait = wd.commercialMinutes;
+    }
+
+    if (m_suppressNextAlert) {
+        m_suppressNextAlert = false;
+        m_lastMaxWaitMinutes = maxWait;
+        qDebug() << "BorderWaitManager: Alert suppressed (silent mode)";
+        return;
+    }
+
+    if (maxWait == m_lastMaxWaitMinutes) {
+        qDebug() << "BorderWaitManager: No change in wait times, skipping alert";
+        return;
+    }
+
+    m_lastMaxWaitMinutes = maxWait;
 
     // Emit alerts for long commercial waits
     for (const auto &wd : nearRoute) {

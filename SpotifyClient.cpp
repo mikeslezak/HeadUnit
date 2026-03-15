@@ -124,6 +124,8 @@ void SpotifyClient::startService()
             qDebug() << "SpotifyClient: Service already running";
             return;
         }
+        // Disconnect all signals before deleting to prevent accumulation
+        m_serviceProcess->disconnect(this);
         m_serviceProcess->deleteLater();
     }
 
@@ -175,6 +177,7 @@ void SpotifyClient::disconnectFromService()
     m_playbackPollTimer->stop();
     m_positionTimer->stop();
     m_reconnectAttempts = 0;
+    m_readBuffer.clear();
 
     if (m_socket->state() != QLocalSocket::UnconnectedState) {
         m_socket->disconnectFromServer();
@@ -310,6 +313,11 @@ void SpotifyClient::play()
 
 void SpotifyClient::pause()
 {
+    if (m_socket->state() != QLocalSocket::ConnectedState) {
+        emit error("Not connected to Spotify service");
+        return;
+    }
+
     QJsonObject cmd;
     cmd["cmd"] = "pause";
     sendCommand(cmd);
@@ -321,6 +329,11 @@ void SpotifyClient::pause()
 
 void SpotifyClient::resume()
 {
+    if (m_socket->state() != QLocalSocket::ConnectedState) {
+        emit error("Not connected to Spotify service");
+        return;
+    }
+
     QJsonObject cmd;
     cmd["cmd"] = "resume";
     sendCommand(cmd);
@@ -341,6 +354,11 @@ void SpotifyClient::stop()
 
 void SpotifyClient::next()
 {
+    if (m_socket->state() != QLocalSocket::ConnectedState) {
+        emit error("Not connected to Spotify service");
+        return;
+    }
+
     QJsonObject cmd;
     cmd["cmd"] = "next";
     sendCommand(cmd);
@@ -361,6 +379,11 @@ void SpotifyClient::next()
 
 void SpotifyClient::previous()
 {
+    if (m_socket->state() != QLocalSocket::ConnectedState) {
+        emit error("Not connected to Spotify service");
+        return;
+    }
+
     // If more than 3 seconds in, restart current track
     if (m_position > 3000) {
         seekTo(0);
@@ -386,6 +409,10 @@ void SpotifyClient::previous()
 
 void SpotifyClient::seekTo(qint64 positionMs)
 {
+    // Clamp to valid range [0, duration]
+    positionMs = qMax(0LL, positionMs);
+    if (m_duration > 0) positionMs = qMin(positionMs, m_duration);
+
     QJsonObject cmd;
     cmd["cmd"] = "seek";
     cmd["position_ms"] = positionMs;
@@ -599,13 +626,22 @@ void SpotifyClient::onSocketDisconnected()
     qDebug() << "SpotifyClient: Disconnected from service";
     m_isConnected = false;
     m_isLoggedIn = false;
+    m_readBuffer.clear();
+    m_authCheckTimer->stop();
     m_playbackPollTimer->stop();
     m_positionTimer->stop();
+    setLoading(false);
+
+    if (m_isPlaying) {
+        m_isPlaying = false;
+        emit playStateChanged();
+    }
+
     emit connectionChanged();
     emit authStatusChanged();
     setStatusMessage("Disconnected");
 
-    if (m_reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+    if (m_reconnectAttempts < MAX_RECONNECT_ATTEMPTS && !m_reconnectTimer->isActive()) {
         m_reconnectTimer->start();
     }
 }
@@ -634,6 +670,18 @@ void SpotifyClient::onSocketReadyRead()
 {
     m_readBuffer.append(m_socket->readAll());
 
+    // Guard against unbounded buffer growth (e.g., malformed service output without newlines)
+    static constexpr int MAX_BUFFER_SIZE = 1024 * 1024; // 1 MB
+    if (m_readBuffer.size() > MAX_BUFFER_SIZE) {
+        qCritical() << "SpotifyClient: Read buffer exceeded" << MAX_BUFFER_SIZE << "bytes, discarding";
+        m_readBuffer.clear();
+        return;
+    }
+
+    // Extract all complete messages first, then process them.
+    // This prevents re-entrancy issues if handleResponse() emits signals
+    // that synchronously trigger slots which modify socket state.
+    QList<QJsonObject> messages;
     while (true) {
         int newlineIdx = m_readBuffer.indexOf('\n');
         if (newlineIdx < 0) break;
@@ -650,7 +698,11 @@ void SpotifyClient::onSocketReadyRead()
             continue;
         }
 
-        handleResponse(doc.object());
+        messages.append(doc.object());
+    }
+
+    for (const QJsonObject &msg : messages) {
+        handleResponse(msg);
     }
 }
 
@@ -689,6 +741,7 @@ void SpotifyClient::sendCommand(const QJsonObject &cmd)
 {
     if (m_socket->state() != QLocalSocket::ConnectedState) {
         qWarning() << "SpotifyClient: Not connected, can't send:" << cmd["cmd"].toString();
+        setLoading(false);
         emit error("Not connected to Spotify service");
         return;
     }

@@ -24,13 +24,14 @@ RouteWeatherManager::RouteWeatherManager(QObject *parent)
 
 void RouteWeatherManager::setContextAggregator(ContextAggregator *ctx) { m_context = ctx; }
 
-void RouteWeatherManager::setRouteCoordinates(const QJsonArray &coordinates, double durationSec)
+void RouteWeatherManager::setRouteCoordinates(const QJsonArray &coordinates, double durationSec, bool silent)
 {
     if (coordinates.size() < 2) {
         clearRoute();
         return;
     }
 
+    m_suppressNextAlert = silent;
     ++m_generation;
     m_routeCoordinates = coordinates;
     m_totalDurationSec = durationSec;
@@ -56,6 +57,10 @@ void RouteWeatherManager::clearRoute()
     m_refreshTimer->stop();
     emit activeChanged();
     emit summaryChanged();
+
+    m_lastSevereWeatherCodes.clear();
+    m_lastHadHighWind = false;
+    m_suppressNextAlert = false;
 
     if (m_context) {
         m_context->setRouteWeatherSummary(QString());
@@ -167,6 +172,7 @@ void RouteWeatherManager::fetchWeather()
 
     QNetworkRequest req(requestUrl);
     req.setAttribute(QNetworkRequest::UserMax, m_generation);
+    req.setTransferTimeout(15000);
 
     qDebug() << "RouteWeatherManager: Fetching weather for" << m_points.size() << "points";
     m_network->get(req);
@@ -183,10 +189,25 @@ void RouteWeatherManager::onWeatherReply(QNetworkReply *reply)
 
     if (reply->error() != QNetworkReply::NoError) {
         qWarning() << "RouteWeatherManager: Fetch failed:" << reply->errorString();
+        // Retry once after 30 seconds
+        if (m_active && !m_points.isEmpty()) {
+            QTimer::singleShot(30000, this, [this, gen = m_generation]() {
+                if (m_active && m_generation == gen) {
+                    qDebug() << "RouteWeatherManager: Retrying weather fetch...";
+                    fetchWeather();
+                }
+            });
+        }
         return;
     }
 
-    QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+    QByteArray responseData = reply->readAll();
+    QJsonParseError parseError;
+    QJsonDocument doc = QJsonDocument::fromJson(responseData, &parseError);
+    if (parseError.error != QJsonParseError::NoError) {
+        qWarning() << "RouteWeatherManager: JSON parse error:" << parseError.errorString();
+        return;
+    }
 
     // Multi-coordinate response is an array; single coordinate is an object
     QJsonArray results;
@@ -271,16 +292,41 @@ void RouteWeatherManager::buildSummary()
     m_summary = summary;
     emit summaryChanged();
 
+    // Always update ContextAggregator — keeps context current for user questions
     if (m_context) {
         m_context->setRouteWeatherSummary(summary);
     }
 
-    // Always emit a weather alert so Jarvis includes weather in the route briefing.
-    // If there are severe conditions, lead with those. Otherwise just summarize.
+    // --- Change detection: only emit alertDetected when conditions differ ---
+    QSet<int> currentSevereCodes;
+    bool currentHighWind = false;
+    for (const auto &pt : m_points) {
+        if (isSevereWeather(pt.weatherCode))
+            currentSevereCodes.insert(pt.weatherCode);
+        if (pt.windSpeed > 80.0)
+            currentHighWind = true;
+    }
+
+    if (m_suppressNextAlert) {
+        m_suppressNextAlert = false;
+        m_lastSevereWeatherCodes = currentSevereCodes;
+        m_lastHadHighWind = currentHighWind;
+        qDebug() << "RouteWeatherManager: Alert suppressed (silent mode)";
+        return;
+    }
+
+    if (currentSevereCodes == m_lastSevereWeatherCodes && currentHighWind == m_lastHadHighWind) {
+        qDebug() << "RouteWeatherManager: No meaningful weather change, skipping alert";
+        return;
+    }
+
+    m_lastSevereWeatherCodes = currentSevereCodes;
+    m_lastHadHighWind = currentHighWind;
+
+    // Emit alert with current conditions
     if (!alertParts.isEmpty()) {
         emit alertDetected("Route weather: " + alertParts.join(". ") + ". Full conditions: " + summary.simplified());
     } else {
-        // Build a brief all-clear summary from the sampled points
         emit alertDetected("Route weather along the next 2 hours: " + summary.simplified());
     }
 

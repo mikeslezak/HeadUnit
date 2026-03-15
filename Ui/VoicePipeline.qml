@@ -43,6 +43,7 @@ Item {
     signal notificationRequested(string message, string type)
     signal navigateToDestination(string destination)
     signal addRouteStop(string destination)
+    signal cancelNavigation()
 
     // =====================================================================
     // INDICATOR HELPERS
@@ -335,6 +336,13 @@ Item {
         function onRouteStopRequested(destination) {
             console.log("Route stop requested:", destination)
             root.addRouteStop(destination)
+        }
+
+        function onRouteCancelled() {
+            console.log("Route cancelled by voice command")
+            root.navDest = ""
+            root.navActive = false
+            root.cancelNavigation()
         }
 
         function onFollowUpExpected() {

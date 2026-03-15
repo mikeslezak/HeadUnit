@@ -434,7 +434,8 @@ QString ClaudeClient::buildSystemPrompt() const
     prompt += "- send_message: Text a contact. System shows confirmation before sending.\n";
     prompt += "- read_messages: Read recent messages from a contact.\n";
     prompt += "- set_follow_up: Keep mic open 12 seconds for reply without wake word. Use after asking a question.\n";
-    prompt += "- quiet_mode: Toggle proactive alerts on/off.\n\n";
+    prompt += "- quiet_mode: Toggle proactive alerts on/off.\n";
+    prompt += "- cancel_route: Cancel/stop/end navigation. Use when user says 'cancel navigation', 'stop navigating', 'cancel the route', 'end navigation', etc.\n\n";
 
     prompt += "FOLLOW-UP AFTER SEARCH:\n";
     prompt += "When user says 'yes', 'yeah', 'sure', 'let\\'s go', etc. after you present a place: if there is an active route, use add_stop (keeps the route and adds the place as a stop along the way). If there is NO active route, use navigate. When they say 'no', 'next', 'nah', 'what else', present the next result from the search. You remember all the results from the search.\n\n";

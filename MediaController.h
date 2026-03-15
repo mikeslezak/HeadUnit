@@ -204,6 +204,7 @@ private:
     QDBusInterface *m_mediaPlayerInterface;
     QDBusInterface *m_mediaControlInterface;
     QString m_mediaPlayerPath;
+    QString m_monitoredPath;  // Track which path we're monitoring to prevent signal accumulation
     int m_pulseLoopbackModule;
 #endif
 

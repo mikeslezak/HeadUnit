@@ -8,7 +8,6 @@ Item {
     property var bluetoothManager: null
     property var messageManager: null
 
-
     Rectangle {
         anchors.fill: parent
         color: ThemeValues.bgCol
@@ -52,7 +51,7 @@ Item {
                                 font.weight: Font.Bold
                             }
 
-                            Item { Layout.fillWidth: true; width: parent.width - 200 }
+                            Item { width: parent.width - 200; height: 1 }
 
                             // Unread count badge
                             Rectangle {

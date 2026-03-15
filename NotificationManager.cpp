@@ -21,7 +21,7 @@ const QBluetoothUuid NotificationManager::ANCS_NOTIFICATION_SOURCE_UUID(
 const QBluetoothUuid NotificationManager::ANCS_CONTROL_POINT_UUID(
     QString("{69D1D8F3-45E1-49A8-9821-9BBDFDAAD9D9}"));
 const QBluetoothUuid NotificationManager::ANCS_DATA_SOURCE_UUID(
-    QString("{22EAC6E9-24D6-4BB5-BE44-B36ACE7C7BFF}"));
+    QString("{22EAC6E9-24D6-4BB5-BE44-B36ACE7C7BFB}"));
 #endif
 
 /**
@@ -968,6 +968,19 @@ void NotificationManager::onServiceStateChanged(QLowEnergyService::ServiceState 
         m_controlPoint = m_ancsService->characteristic(ANCS_CONTROL_POINT_UUID);
         m_dataSource = m_ancsService->characteristic(ANCS_DATA_SOURCE_UUID);
 
+        // Enable notifications on Data Source FIRST (must be subscribed before requesting attributes)
+        if (m_dataSource.isValid()) {
+            QLowEnergyDescriptor dataSourceDesc = m_dataSource.descriptor(
+                QBluetoothUuid::DescriptorType::ClientCharacteristicConfiguration);
+
+            if (dataSourceDesc.isValid()) {
+                m_ancsService->writeDescriptor(dataSourceDesc, QByteArray::fromHex("0100"));
+                qDebug() << "ANCS Data Source notifications enabled";
+            }
+        } else {
+            qWarning() << "ANCS Data Source characteristic not found";
+        }
+
         // Enable notifications on Notification Source
         if (m_notificationSource.isValid()) {
             QLowEnergyDescriptor notificationDesc = m_notificationSource.descriptor(
@@ -977,7 +990,7 @@ void NotificationManager::onServiceStateChanged(QLowEnergyService::ServiceState 
                 m_ancsService->writeDescriptor(notificationDesc, QByteArray::fromHex("0100"));
                 m_isConnected = true;
                 emit connectionChanged();
-                qDebug() << "ANCS notifications enabled";
+                qDebug() << "ANCS Notification Source notifications enabled";
             }
         }
     }
@@ -987,11 +1000,24 @@ void NotificationManager::onCharacteristicChanged(const QLowEnergyCharacteristic
                                                   const QByteArray &value)
 {
     if (characteristic.uuid() == ANCS_NOTIFICATION_SOURCE_UUID) {
-        // Parse ANCS notification
+        // Parse ANCS notification header (8 bytes)
         QVariantMap notification = parseAncsNotification(value);
         if (!notification.isEmpty()) {
-            addNotification(notification);
+            quint8 eventId = static_cast<quint8>(value[0]);
+            if (eventId == 2) {
+                // EventID 2 = Removed — just remove the notification
+                removeNotification(notification["id"].toString());
+                return;
+            }
+
+            // Store pending notification and request full details via Data Source
+            quint32 uid = notification["id"].toString().mid(5).toUInt();
+            m_pendingNotifications[uid] = notification;
+            requestNotificationAttributes(uid);
         }
+    } else if (characteristic.uuid() == ANCS_DATA_SOURCE_UUID) {
+        // Data Source response — may arrive in multiple BLE packets
+        handleDataSourceResponse(value);
     }
 }
 
@@ -1032,6 +1058,147 @@ QVariantMap NotificationManager::parseAncsNotification(const QByteArray &data)
     notification["message"] = "Tap for details";
 
     return notification;
+}
+
+void NotificationManager::requestNotificationAttributes(quint32 uid)
+{
+    if (!m_controlPoint.isValid()) {
+        qWarning() << "ANCS Control Point not available for attribute request";
+        // Fall back to showing the notification without details
+        if (m_pendingNotifications.contains(uid)) {
+            addNotification(m_pendingNotifications.take(uid));
+        }
+        return;
+    }
+
+    // Build GetNotificationAttributes command
+    // Format: CommandID(0) + NotificationUID(4) + AttributeID + MaxLen(2) ...
+    QByteArray cmd;
+    cmd.append(char(0)); // CommandID = 0 (GetNotificationAttributes)
+
+    // UID in little-endian
+    cmd.append(reinterpret_cast<const char*>(&uid), 4);
+
+    // Request AppIdentifier (ID=0) — no max length needed (null-terminated)
+    cmd.append(char(0));
+
+    // Request Title (ID=1) with max length 64
+    cmd.append(char(1));
+    quint16 maxLen = 64;
+    cmd.append(reinterpret_cast<const char*>(&maxLen), 2);
+
+    // Request Message (ID=3) with max length 256
+    cmd.append(char(3));
+    maxLen = 256;
+    cmd.append(reinterpret_cast<const char*>(&maxLen), 2);
+
+    m_ancsService->writeCharacteristic(m_controlPoint, cmd);
+    qDebug() << "ANCS: Requested attributes for UID:" << uid;
+}
+
+void NotificationManager::handleDataSourceResponse(const QByteArray &data)
+{
+    // Accumulate data — responses may span multiple BLE packets
+    m_dataSourceBuffer.append(data);
+
+    // Minimum: CommandID(1) + UID(4) + at least one attribute header
+    if (m_dataSourceBuffer.size() < 5) return;
+
+    quint8 cmdId = static_cast<quint8>(m_dataSourceBuffer[0]);
+    if (cmdId != 0) {
+        // Not a GetNotificationAttributes response, clear buffer
+        m_dataSourceBuffer.clear();
+        return;
+    }
+
+    quint32 uid;
+    memcpy(&uid, m_dataSourceBuffer.constData() + 1, 4);
+
+    // Try to parse attributes from position 5 onward
+    // Each attribute: AttributeID(1) + Length(2) + Data(Length)
+    int pos = 5;
+    QString appId, title, message;
+
+    // We need to parse 3 attributes (appId, title, message)
+    int attrsFound = 0;
+    while (pos < m_dataSourceBuffer.size() && attrsFound < 3) {
+        if (pos + 3 > m_dataSourceBuffer.size()) {
+            // Need more data — wait for next packet
+            return;
+        }
+
+        quint8 attrId = static_cast<quint8>(m_dataSourceBuffer[pos]);
+        quint16 attrLen;
+        memcpy(&attrLen, m_dataSourceBuffer.constData() + pos + 1, 2);
+        pos += 3;
+
+        if (pos + attrLen > m_dataSourceBuffer.size()) {
+            // Incomplete attribute data — wait for next packet
+            return;
+        }
+
+        QString attrValue = QString::fromUtf8(m_dataSourceBuffer.mid(pos, attrLen));
+        pos += attrLen;
+        attrsFound++;
+
+        switch (attrId) {
+            case 0: appId = attrValue; break;
+            case 1: title = attrValue; break;
+            case 3: message = attrValue; break;
+        }
+    }
+
+    // All attributes parsed — update and emit the notification
+    m_dataSourceBuffer.clear();
+
+    if (m_pendingNotifications.contains(uid)) {
+        QVariantMap notification = m_pendingNotifications.take(uid);
+
+        if (!appId.isEmpty()) notification["appId"] = appId;
+        if (!title.isEmpty()) notification["title"] = title;
+        if (!message.isEmpty()) notification["message"] = message;
+
+        // Resolve app display name from bundle ID
+        notification["appName"] = resolveAppName(appId);
+
+        qDebug() << "ANCS notification:" << notification["appName"].toString()
+                 << "-" << title << ":" << message;
+
+        addNotification(notification);
+    }
+}
+
+QString NotificationManager::resolveAppName(const QString &bundleId)
+{
+    // Common iOS app bundle ID → display name mapping
+    static const QMap<QString, QString> appNames = {
+        {"com.apple.MobileSMS", "Messages"},
+        {"com.apple.mobilephone", "Phone"},
+        {"com.apple.mobilemail", "Mail"},
+        {"com.apple.facetime", "FaceTime"},
+        {"com.apple.mobilecal", "Calendar"},
+        {"com.apple.reminders", "Reminders"},
+        {"com.apple.weather", "Weather"},
+        {"com.apple.news", "News"},
+        {"com.apple.Maps", "Maps"},
+        {"com.apple.mobiletimer", "Clock"},
+        {"com.whatsapp.WhatsApp", "WhatsApp"},
+        {"com.facebook.Messenger", "Messenger"},
+        {"com.atebits.Tweetie2", "Twitter"},
+        {"com.burbn.instagram", "Instagram"},
+        {"ph.telegra.Telegraph", "Telegram"},
+        {"com.toyopagroup.picaboo", "Snapchat"},
+        {"com.google.Gmail", "Gmail"},
+        {"com.spotify.client", "Spotify"},
+        {"com.slack.Slack", "Slack"},
+        {"com.microsoft.teams", "Teams"},
+    };
+
+    if (appNames.contains(bundleId)) return appNames[bundleId];
+
+    // Extract last component of bundle ID as fallback
+    QStringList parts = bundleId.split('.');
+    return parts.isEmpty() ? bundleId : parts.last();
 }
 
 void NotificationManager::sendAncsCommand(quint8 command, const QString &notificationId)

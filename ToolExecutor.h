@@ -80,6 +80,9 @@ signals:
     /** Add a stop along the active route (waypoint) */
     void routeStopRequested(const QString &destination);
 
+    /** Route cancelled by voice command */
+    void routeCancelled();
+
     /** Claude wants the mic to stay open for a follow-up reply */
     void followUpExpected();
 
@@ -102,6 +105,7 @@ private:
     QJsonObject handleAddFavorite(const QString &toolUseId, const QJsonObject &input);
     QJsonObject handleHangupCall(const QString &toolUseId, const QJsonObject &input);
     QJsonObject handleAnswerCall(const QString &toolUseId, const QJsonObject &input);
+    QJsonObject handleCancelRoute(const QString &toolUseId, const QJsonObject &input);
 
     // Helpers
     QString findContactPhoneNumber(const QString &contactName);

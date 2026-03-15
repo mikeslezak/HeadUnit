@@ -1,5 +1,6 @@
 #include "TidalClient.h"
 #include <QDebug>
+#include <QPointer>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
@@ -100,8 +101,12 @@ void TidalClient::initGStreamer()
 
     // Set up bus watch for EOS, errors, state changes
     GstBus *bus = gst_element_get_bus(m_pipeline);
-    m_busWatchId = gst_bus_add_watch(bus, onBusMessage, this);
-    gst_object_unref(bus);
+    if (bus) {
+        m_busWatchId = gst_bus_add_watch(bus, onBusMessage, this);
+        gst_object_unref(bus);
+    } else {
+        qWarning() << "TidalClient: Failed to get GStreamer bus";
+    }
 
     qDebug() << "TidalClient: GStreamer playbin initialized";
 }
@@ -135,7 +140,8 @@ void TidalClient::playUrl(const QString &url)
     QByteArray urlBytes = url.toUtf8();
     g_object_set(m_pipeline, "uri", urlBytes.constData(), nullptr);
 
-    // Start playback
+    // Start playback — STATE_CHANGED bus callback will set m_isPlaying when
+    // GStreamer actually transitions to PLAYING (avoids UI/state desync on failure)
     GstStateChangeReturn ret = gst_element_set_state(m_pipeline, GST_STATE_PLAYING);
     if (ret == GST_STATE_CHANGE_FAILURE) {
         qWarning() << "TidalClient: Failed to start playback";
@@ -144,8 +150,6 @@ void TidalClient::playUrl(const QString &url)
         return;
     }
 
-    m_isPlaying = true;
-    emit playStateChanged();
     m_positionTimer->start();
 }
 
@@ -155,27 +159,64 @@ gboolean TidalClient::onBusMessage(GstBus *bus, GstMessage *msg, gpointer data)
     TidalClient *self = static_cast<TidalClient*>(data);
 
     switch (GST_MESSAGE_TYPE(msg)) {
-    case GST_MESSAGE_EOS:
+    case GST_MESSAGE_EOS: {
         qDebug() << "TidalClient: End of stream";
-        // Auto-advance to next track
-        QMetaObject::invokeMethod(self, "next", Qt::QueuedConnection);
+        // Ref pipeline so it survives until the lambda runs on the Qt thread
+        GstElement *pipeline = self->m_pipeline;
+        if (pipeline) gst_object_ref(pipeline);
+        // Auto-advance to next track — marshal to Qt thread
+        // Use QPointer guard: if TidalClient is destroyed before the lambda
+        // runs, the QPointer goes null and we skip the call safely.
+        QPointer<TidalClient> guard(self);
+        QMetaObject::invokeMethod(self, [guard, pipeline]() {
+            if (guard && pipeline && pipeline == guard->m_pipeline) {
+                guard->next();
+            }
+            if (pipeline) gst_object_unref(pipeline);
+        }, Qt::QueuedConnection);
         break;
+    }
 
     case GST_MESSAGE_ERROR: {
         GError *err = nullptr;
         gchar *debug = nullptr;
         gst_message_parse_error(msg, &err, &debug);
-        qWarning() << "TidalClient: GStreamer error:" << err->message;
+        QString errorMsg = QString::fromUtf8(err->message);
+        qWarning() << "TidalClient: GStreamer error:" << errorMsg;
         if (debug) {
             qDebug() << "  Debug:" << debug;
             g_free(debug);
         }
         g_error_free(err);
 
-        self->m_isPlaying = false;
-        emit self->playStateChanged();
-        self->m_positionTimer->stop();
-        self->setStatusMessage("Playback error");
+        // Ref pipeline so it survives until the lambda runs on the Qt thread
+        GstElement *pipeline = self->m_pipeline;
+        if (pipeline) gst_object_ref(pipeline);
+
+        // Marshal all Qt object access to the Qt thread
+        // Use QPointer guard: if TidalClient is destroyed before the lambda
+        // runs, the QPointer goes null and we skip the call safely.
+        QPointer<TidalClient> guard(self);
+        QMetaObject::invokeMethod(self, [guard, errorMsg, pipeline]() {
+            // Only update state if the pipeline hasn't been replaced
+            if (guard && pipeline && pipeline == guard->m_pipeline) {
+                guard->m_isPlaying = false;
+                emit guard->playStateChanged();
+                guard->m_positionTimer->stop();
+
+                // Auto-advance to next track on error (e.g., expired stream URL)
+                // rather than leaving the queue stuck on a broken track
+                if (!guard->m_queue.isEmpty() && guard->m_queuePosition >= 0) {
+                    qDebug() << "TidalClient: Auto-advancing past failed track";
+                    guard->setStatusMessage("Skipping failed track...");
+                    guard->next();
+                } else {
+                    guard->setStatusMessage("Playback error");
+                    emit guard->error("GStreamer: " + errorMsg);
+                }
+            }
+            if (pipeline) gst_object_unref(pipeline);
+        }, Qt::QueuedConnection);
         break;
     }
 
@@ -183,30 +224,48 @@ gboolean TidalClient::onBusMessage(GstBus *bus, GstMessage *msg, gpointer data)
         if (GST_MESSAGE_SRC(msg) == GST_OBJECT(self->m_pipeline)) {
             GstState oldState, newState, pending;
             gst_message_parse_state_changed(msg, &oldState, &newState, &pending);
+            Q_UNUSED(oldState)
+            Q_UNUSED(pending)
 
-            bool wasPlaying = self->m_isPlaying;
-            self->m_isPlaying = (newState == GST_STATE_PLAYING);
+            bool isPlaying = (newState == GST_STATE_PLAYING);
+            // Ref the pipeline so it survives until the lambda runs on the Qt thread
+            GstElement *pipeline = self->m_pipeline;
+            if (pipeline) gst_object_ref(pipeline);
 
-            if (wasPlaying != self->m_isPlaying) {
-                emit self->playStateChanged();
-                if (self->m_isPlaying) {
-                    self->m_positionTimer->start();
-                } else {
-                    self->m_positionTimer->stop();
+            // Marshal all Qt object access to the Qt thread
+            // Use QPointer guard: if TidalClient is destroyed before the lambda
+            // runs, the QPointer goes null and we skip the call safely.
+            QPointer<TidalClient> guard(self);
+            QMetaObject::invokeMethod(self, [guard, isPlaying, pipeline]() {
+                if (!guard) {
+                    if (pipeline) gst_object_unref(pipeline);
+                    return;
                 }
-            }
+                bool wasPlaying = guard->m_isPlaying;
+                guard->m_isPlaying = isPlaying;
 
-            // Get duration when we start playing
-            if (newState == GST_STATE_PLAYING) {
-                gint64 dur = 0;
-                if (gst_element_query_duration(self->m_pipeline, GST_FORMAT_TIME, &dur)) {
-                    qint64 durMs = dur / GST_MSECOND;
-                    if (durMs != self->m_duration) {
-                        self->m_duration = durMs;
-                        emit self->durationChanged();
+                if (wasPlaying != guard->m_isPlaying) {
+                    emit guard->playStateChanged();
+                    if (guard->m_isPlaying) {
+                        guard->m_positionTimer->start();
+                    } else {
+                        guard->m_positionTimer->stop();
                     }
                 }
-            }
+
+                // Get duration when we start playing (verify pipeline is still current)
+                if (isPlaying && pipeline && pipeline == guard->m_pipeline) {
+                    gint64 dur = 0;
+                    if (gst_element_query_duration(pipeline, GST_FORMAT_TIME, &dur)) {
+                        qint64 durMs = dur / GST_MSECOND;
+                        if (durMs != guard->m_duration) {
+                            guard->m_duration = durMs;
+                            emit guard->durationChanged();
+                        }
+                    }
+                }
+                if (pipeline) gst_object_unref(pipeline);
+            }, Qt::QueuedConnection);
         }
         break;
     }
@@ -255,6 +314,8 @@ void TidalClient::startService()
             qDebug() << "TidalClient: Service already running";
             return;
         }
+        // Disconnect all signals before deleting to prevent accumulation
+        m_serviceProcess->disconnect(this);
         m_serviceProcess->deleteLater();
     }
 
@@ -304,6 +365,7 @@ void TidalClient::disconnectFromService()
     m_reconnectTimer->stop();
     m_authCheckTimer->stop();
     m_reconnectAttempts = 0;
+    m_readBuffer.clear();
 
     if (m_socket->state() != QLocalSocket::UnconnectedState) {
         m_socket->disconnectFromServer();
@@ -454,6 +516,14 @@ void TidalClient::next()
     if (m_shuffleEnabled && !m_shuffleOrder.isEmpty()) {
         // Find current position in shuffle order
         int shuffleIdx = m_shuffleOrder.indexOf(m_queuePosition);
+        if (shuffleIdx < 0) {
+            // Current track not in shuffle order — fall back to sequential
+            nextPos = m_queuePosition + 1;
+            if (nextPos >= m_queue.size()) { stop(); return; }
+            m_queuePosition = nextPos;
+            requestStreamForQueueItem(m_queuePosition);
+            return;
+        }
         shuffleIdx++;
         if (shuffleIdx >= m_shuffleOrder.size()) {
             if (m_repeatMode == 1) {
@@ -495,6 +565,11 @@ void TidalClient::previous()
     int prevPos;
     if (m_shuffleEnabled && !m_shuffleOrder.isEmpty()) {
         int shuffleIdx = m_shuffleOrder.indexOf(m_queuePosition);
+        if (shuffleIdx < 0) {
+            // Current track not in shuffle order — restart current track
+            seekTo(0);
+            return;
+        }
         shuffleIdx--;
         if (shuffleIdx < 0) {
             if (m_repeatMode == 1) {
@@ -526,6 +601,10 @@ void TidalClient::previous()
 void TidalClient::seekTo(qint64 positionMs)
 {
     if (!m_pipeline) return;
+
+    // Clamp to valid range [0, duration]
+    positionMs = qMax(0LL, positionMs);
+    if (m_duration > 0) positionMs = qMin(positionMs, m_duration);
 
     gint64 pos = positionMs * GST_MSECOND;
     gst_element_seek_simple(m_pipeline, GST_FORMAT_TIME,
@@ -742,11 +821,26 @@ void TidalClient::onSocketDisconnected()
     qDebug() << "TidalClient: Disconnected from service";
     m_isConnected = false;
     m_isLoggedIn = false;
+    m_readBuffer.clear();
+    m_pendingTrackId = -1;
+    m_authCheckTimer->stop();
+    setLoading(false);
+
+    // Stop GStreamer pipeline — stream URL is likely stale/expired
+    if (m_pipeline) {
+        gst_element_set_state(m_pipeline, GST_STATE_NULL);
+    }
+    if (m_isPlaying) {
+        m_isPlaying = false;
+        m_positionTimer->stop();
+        emit playStateChanged();
+    }
+
     emit connectionChanged();
     emit authStatusChanged();
     setStatusMessage("Disconnected");
 
-    if (m_reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+    if (m_reconnectAttempts < MAX_RECONNECT_ATTEMPTS && !m_reconnectTimer->isActive()) {
         m_reconnectTimer->start();
     }
 }
@@ -775,6 +869,18 @@ void TidalClient::onSocketReadyRead()
 {
     m_readBuffer.append(m_socket->readAll());
 
+    // Guard against unbounded buffer growth (e.g., malformed service output without newlines)
+    static constexpr int MAX_BUFFER_SIZE = 1024 * 1024; // 1 MB
+    if (m_readBuffer.size() > MAX_BUFFER_SIZE) {
+        qCritical() << "TidalClient: Read buffer exceeded" << MAX_BUFFER_SIZE << "bytes, discarding";
+        m_readBuffer.clear();
+        return;
+    }
+
+    // Extract all complete messages first, then process them.
+    // This prevents re-entrancy issues if handleResponse() emits signals
+    // that synchronously trigger slots which modify socket state.
+    QList<QJsonObject> messages;
     while (true) {
         int newlineIdx = m_readBuffer.indexOf('\n');
         if (newlineIdx < 0) break;
@@ -791,7 +897,11 @@ void TidalClient::onSocketReadyRead()
             continue;
         }
 
-        handleResponse(doc.object());
+        messages.append(doc.object());
+    }
+
+    for (const QJsonObject &msg : messages) {
+        handleResponse(msg);
     }
 }
 
@@ -830,6 +940,7 @@ void TidalClient::sendCommand(const QJsonObject &cmd)
 {
     if (m_socket->state() != QLocalSocket::ConnectedState) {
         qWarning() << "TidalClient: Not connected, can't send:" << cmd["cmd"].toString();
+        setLoading(false);
         emit error("Not connected to Tidal service");
         return;
     }
@@ -945,6 +1056,14 @@ void TidalClient::handleResponse(const QJsonObject &response)
             emit trackChanged();
             emit positionChanged();
             qDebug() << "TidalClient: Track metadata from stream:" << m_trackTitle << "-" << m_artist;
+        }
+
+        if (m_streamUrl.isEmpty()) {
+            qWarning() << "TidalClient: Empty stream URL from service";
+            setLoading(false);
+            setStatusMessage("Error: No stream URL");
+            emit error("No stream URL received");
+            return;
         }
 
         emit streamReady(m_streamUrl, codec, quality);

@@ -27,7 +27,7 @@ RoadConditionManager::RoadConditionManager(QObject *parent)
 
 void RoadConditionManager::setContextAggregator(ContextAggregator *ctx) { m_context = ctx; }
 
-void RoadConditionManager::setRouteCoordinates(const QJsonArray &coordinates, double durationSec)
+void RoadConditionManager::setRouteCoordinates(const QJsonArray &coordinates, double durationSec, bool silent)
 {
     Q_UNUSED(durationSec)
 
@@ -36,6 +36,7 @@ void RoadConditionManager::setRouteCoordinates(const QJsonArray &coordinates, do
         return;
     }
 
+    m_suppressNextAlert = silent;
     ++m_generation;
     m_routeCoordinates = coordinates;
     sampleRoutePoints(coordinates);
@@ -61,6 +62,9 @@ void RoadConditionManager::clearRoute()
     m_refreshTimer->stop();
     emit activeChanged();
     emit summaryChanged();
+
+    m_lastEventIds.clear();
+    m_suppressNextAlert = false;
 
     if (m_context) {
         m_context->setRoadConditionsSummary(QString());
@@ -258,19 +262,41 @@ void RoadConditionManager::processEvents()
 
     buildSummary();
 
-    // Emit a single comprehensive alert with ALL on-route events.
-    // This gets sent to Claude who delivers it conversationally.
-    if (!m_routeEvents.isEmpty()) {
-        QString alert;
-        for (const auto &ev : m_routeEvents) {
-            QString road = ev.roadName.isEmpty() ? "unknown road" : ev.roadName;
-            alert += QString("%1 on %2: %3").arg(ev.eventType, road, shortenDescription(ev.description));
-            if (!ev.severity.isEmpty() && ev.severity != "None")
-                alert += QString(" (severity: %1)").arg(ev.severity);
-            if (ev.fullClosure)
-                alert += " (FULL CLOSURE)";
-            alert += ". ";
-        }
+    // --- Change detection: only emit alertDetected for NEW events ---
+    QSet<QString> currentEventIds;
+    for (const auto &ev : m_routeEvents) {
+        currentEventIds.insert(ev.id);
+    }
+
+    if (m_suppressNextAlert) {
+        m_suppressNextAlert = false;
+        m_lastEventIds = currentEventIds;
+        qDebug() << "RoadConditionManager: Alert suppressed (silent mode)";
+        return;
+    }
+
+    QSet<QString> newEventIds = currentEventIds - m_lastEventIds;
+    if (newEventIds.isEmpty()) {
+        qDebug() << "RoadConditionManager: No change in road events, skipping alert";
+        m_lastEventIds = currentEventIds;
+        return;
+    }
+
+    m_lastEventIds = currentEventIds;
+
+    // Emit alert only for NEW events
+    QString alert;
+    for (const auto &ev : m_routeEvents) {
+        if (!newEventIds.contains(ev.id)) continue;
+        QString road = ev.roadName.isEmpty() ? "unknown road" : ev.roadName;
+        alert += QString("%1 on %2: %3").arg(ev.eventType, road, shortenDescription(ev.description));
+        if (!ev.severity.isEmpty() && ev.severity != "None")
+            alert += QString(" (severity: %1)").arg(ev.severity);
+        if (ev.fullClosure)
+            alert += " (FULL CLOSURE)";
+        alert += ". ";
+    }
+    if (!alert.isEmpty()) {
         emit alertDetected(alert.trimmed());
     }
 }

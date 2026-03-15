@@ -12,6 +12,7 @@
 #ifndef Q_OS_WIN
 #include <QDBusConnection>
 #include <QDBusInterface>
+#include <QDBusMessage>
 #include <QDBusObjectPath>
 #endif
 
@@ -44,6 +45,8 @@ class BluetoothManager : public QObject
     Q_PROPERTY(QString activeCallState READ activeCallState NOTIFY activeCallChanged)
     Q_PROPERTY(int activeCallDuration READ activeCallDuration NOTIFY activeCallChanged)
     Q_PROPERTY(bool isCallMuted READ isCallMuted NOTIFY callMutedChanged)
+    Q_PROPERTY(int phoneBatteryLevel READ phoneBatteryLevel NOTIFY phoneBatteryLevelChanged)
+    Q_PROPERTY(QString roamingStatus READ roamingStatus NOTIFY roamingStatusChanged)
 
 public:
     explicit BluetoothManager(QObject *parent = nullptr);
@@ -66,6 +69,8 @@ public:
     QString activeCallState() const { return m_telephonyManager->activeCallState(); }
     int activeCallDuration() const { return m_telephonyManager->activeCallDuration(); }
     bool isCallMuted() const { return m_telephonyManager->isCallMuted(); }
+    int phoneBatteryLevel() const { return m_telephonyManager->phoneBatteryLevel(); }
+    QString roamingStatus() const { return m_telephonyManager->roamingStatus(); }
 
     // Access to sub-managers
     TelephonyManager* telephonyManager() { return m_telephonyManager; }
@@ -104,6 +109,7 @@ public slots:
     Q_INVOKABLE void hangupCall() { m_telephonyManager->hangupCall(); }
     Q_INVOKABLE void sendDTMF(const QString &tones) { m_telephonyManager->sendDTMF(tones); }
     Q_INVOKABLE void toggleMute() { m_telephonyManager->toggleMute(); }
+    Q_INVOKABLE void triggerSiri() { m_telephonyManager->triggerSiri(); }
 
 signals:
     // BT core signals
@@ -125,6 +131,8 @@ signals:
     void callMutedChanged();
     void cellularSignalChanged();
     void carrierNameChanged();
+    void phoneBatteryLevelChanged();
+    void roamingStatusChanged();
 
 private slots:
     void onScanTimeout();
@@ -134,7 +142,8 @@ private slots:
     void onInterfacesRemoved(const QDBusObjectPath &path, const QStringList &interfaces);
     void onPropertiesChanged(const QString &interface,
                             const QVariantMap &changedProperties,
-                            const QStringList &invalidatedProperties);
+                            const QStringList &invalidatedProperties,
+                            const QDBusMessage &message);
 #endif
 
 private:

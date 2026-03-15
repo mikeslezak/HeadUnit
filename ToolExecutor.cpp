@@ -257,6 +257,19 @@ QJsonArray ToolExecutor::toolDefinitions()
         tools.append(tool);
     }
 
+    // --- cancel_route ---
+    {
+        QJsonObject tool;
+        tool["name"] = "cancel_route";
+        tool["description"] = "Cancel the active navigation route. Use when the user says 'cancel navigation', 'stop navigating', 'cancel the route', 'end navigation', etc.";
+        QJsonObject schema;
+        schema["type"] = "object";
+        QJsonObject props;
+        schema["properties"] = props;
+        tool["input_schema"] = schema;
+        tools.append(tool);
+    }
+
     return tools;
 }
 
@@ -512,6 +525,7 @@ QJsonObject ToolExecutor::executeTool(const QString &toolUseId, const QString &t
     if (toolName == "answer_call")       return handleAnswerCall(toolUseId, input);
     if (toolName == "quiet_mode")        return handleQuietMode(toolUseId, input);
     if (toolName == "set_follow_up")     return handleSetFollowUp(toolUseId, input);
+    if (toolName == "cancel_route")      return handleCancelRoute(toolUseId, input);
 
     qWarning() << "ToolExecutor: Unknown tool:" << toolName;
     QJsonObject result;
@@ -1057,6 +1071,15 @@ void ToolExecutor::clearPendingTools()
         m_pendingMusicSource.clear();
     }
     m_musicGeneration++;
+}
+
+QJsonObject ToolExecutor::handleCancelRoute(const QString &/*toolUseId*/, const QJsonObject &/*input*/)
+{
+    emit routeCancelled();
+
+    QJsonObject result;
+    result["status"] = "route_cancelled";
+    return result;
 }
 
 QString ToolExecutor::findContactPhoneNumber(const QString &contactName)

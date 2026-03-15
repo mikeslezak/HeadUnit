@@ -40,9 +40,12 @@ GoogleSTT::GoogleSTT(QObject *parent)
 
 GoogleSTT::~GoogleSTT()
 {
+    // In the destructor, the event loop won't run again so we must
+    // delete the reply directly (deleteLater won't execute).
     if (m_currentReply) {
         m_currentReply->abort();
-        m_currentReply->deleteLater();
+        delete m_currentReply;
+        m_currentReply = nullptr;
     }
 }
 
@@ -103,7 +106,8 @@ void GoogleSTT::transcribeRaw(const QByteArray &audioData)
     }
 
     if (m_isProcessing) {
-        qWarning() << "GoogleSTT: Already processing a request";
+        qWarning() << "GoogleSTT: Already processing a request, dropping new one";
+        emit error("STT busy — already processing");
         return;
     }
 
@@ -117,8 +121,9 @@ void GoogleSTT::transcribeRaw(const QByteArray &audioData)
 void GoogleSTT::cancel()
 {
     if (m_currentReply) {
+        // Don't deleteLater here — the QNetworkAccessManager::finished signal will
+        // still fire for the aborted reply, and onNetworkReply handles deletion.
         m_currentReply->abort();
-        m_currentReply->deleteLater();
         m_currentReply = nullptr;
     }
 
@@ -143,6 +148,14 @@ void GoogleSTT::sendToGoogle(const QByteArray &audioData)
     config["languageCode"] = m_languageCode;
     config["enableAutomaticPunctuation"] = true;
     config["model"] = "latest_short";  // Optimized for short voice commands
+    config["useEnhanced"] = true;       // Enhanced model — better noise handling
+
+    // Vehicle-specific metadata for optimized recognition
+    QJsonObject metadata;
+    metadata["interactionType"] = "VOICE_COMMAND";
+    metadata["microphoneDistance"] = "NEARFIELD";
+    metadata["recordingDeviceType"] = "VEHICLE";
+    config["metadata"] = metadata;
 
     // Add speech context hints if available (up to 500 phrases)
     // Google STT expects phrases as an array of strings, not objects
@@ -192,6 +205,7 @@ void GoogleSTT::sendToGoogle(const QByteArray &audioData)
 void GoogleSTT::onNetworkReply(QNetworkReply *reply)
 {
     if (reply != m_currentReply) {
+        reply->deleteLater();
         return;
     }
 
@@ -276,15 +290,10 @@ void GoogleSTT::onNetworkError(QNetworkReply::NetworkError error)
         return;
     }
 
-    QString errorMsg = m_currentReply->errorString();
-    qWarning() << "GoogleSTT: Network error:" << errorMsg;
-
-    m_currentReply = nullptr;
-
-    m_isProcessing = false;
-    emit processingChanged();
-    emit this->error("Connection error: " + errorMsg);
-    setStatusMessage("Error: " + errorMsg);
+    // Log the error here but do NOT delete/null m_currentReply.
+    // The QNetworkAccessManager::finished signal always fires after errorOccurred,
+    // and onNetworkReply handles cleanup. Deleting here causes double-deletion.
+    qWarning() << "GoogleSTT: Network error:" << m_currentReply->errorString();
 }
 
 // ========================================================================

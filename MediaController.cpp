@@ -256,6 +256,15 @@ void MediaController::connectToDevice(const QString &deviceAddress)
     setupPropertyMonitoring(m_mediaPlayerPath);
     
     // Monitor for new MediaPlayer objects (player switching)
+    // Disconnect first to prevent accumulation on repeated connectToDevice() calls
+    QDBusConnection::systemBus().disconnect(
+        "org.bluez",
+        "/",
+        "org.freedesktop.DBus.ObjectManager",
+        "InterfacesAdded",
+        this,
+        SLOT(onInterfacesAdded(QDBusObjectPath,QVariantMap))
+    );
     QDBusConnection::systemBus().connect(
         "org.bluez",
         "/",
@@ -492,11 +501,11 @@ void MediaController::play()
     emit playStateChanged();
     setStatusMessage("Playing: " + m_trackTitle);
 #else
-    if (!m_mediaPlayerInterface) {
-        qWarning() << "MediaController: No media player interface";
+    if (!m_mediaPlayerInterface || !m_mediaPlayerInterface->isValid()) {
+        qWarning() << "MediaController: No valid media player interface";
         return;
     }
-    
+
     qDebug() << "MediaController: Sending Play command";
     QDBusMessage response = m_mediaPlayerInterface->call("Play");
     
@@ -520,11 +529,11 @@ void MediaController::pause()
     emit playStateChanged();
     setStatusMessage("Paused");
 #else
-    if (!m_mediaPlayerInterface) {
-        qWarning() << "MediaController: No media player interface";
+    if (!m_mediaPlayerInterface || !m_mediaPlayerInterface->isValid()) {
+        qWarning() << "MediaController: No valid media player interface";
         return;
     }
-    
+
     qDebug() << "MediaController: Sending Pause command";
     QDBusMessage response = m_mediaPlayerInterface->call("Pause");
     
@@ -547,10 +556,10 @@ void MediaController::stop()
     m_trackPosition = 0;
     emit positionChanged();
 #else
-    if (!m_mediaPlayerInterface) {
+    if (!m_mediaPlayerInterface || !m_mediaPlayerInterface->isValid()) {
         return;
     }
-    
+
     qDebug() << "MediaController: Sending Stop command";
     QDBusMessage response = m_mediaPlayerInterface->call("Stop");
     
@@ -583,11 +592,11 @@ void MediaController::next()
         setStatusMessage("Now playing: " + m_trackTitle);
     }
 #else
-    if (!m_mediaPlayerInterface) {
-        qWarning() << "MediaController: No media player interface";
+    if (!m_mediaPlayerInterface || !m_mediaPlayerInterface->isValid()) {
+        qWarning() << "MediaController: No valid media player interface";
         return;
     }
-    
+
     qDebug() << "MediaController: Sending Next command";
     QDBusMessage response = m_mediaPlayerInterface->call("Next");
     
@@ -611,11 +620,11 @@ void MediaController::previous()
         setStatusMessage("Now playing: " + m_trackTitle);
     }
 #else
-    if (!m_mediaPlayerInterface) {
-        qWarning() << "MediaController: No media player interface";
+    if (!m_mediaPlayerInterface || !m_mediaPlayerInterface->isValid()) {
+        qWarning() << "MediaController: No valid media player interface";
         return;
     }
-    
+
     qDebug() << "MediaController: Sending Previous command";
     QDBusMessage response = m_mediaPlayerInterface->call("Previous");
     
@@ -931,7 +940,20 @@ void MediaController::setupPropertyMonitoring(const QString &path)
     qDebug() << "MediaController: SETTING UP PROPERTY MONITORING";
     qDebug() << "MediaController: Monitoring path:" << path;
     qDebug() << "========================================";
-    
+
+    // Disconnect previous monitoring to prevent accumulation on repeated connectToDevice() calls
+    if (!m_monitoredPath.isEmpty()) {
+        QDBusConnection::systemBus().disconnect(
+            "org.bluez",
+            m_monitoredPath,
+            "org.freedesktop.DBus.Properties",
+            "PropertiesChanged",
+            this,
+            SLOT(onPropertiesChanged(QString,QVariantMap,QStringList))
+        );
+    }
+    m_monitoredPath = path;
+
     // Connect to PropertiesChanged signal
     bool connected = QDBusConnection::systemBus().connect(
         "org.bluez",
@@ -941,7 +963,7 @@ void MediaController::setupPropertyMonitoring(const QString &path)
         this,
         SLOT(onPropertiesChanged(QString,QVariantMap,QStringList))
     );
-    
+
     if (connected) {
         qDebug() << "MediaController: PropertiesChanged signal connected successfully";
     } else {

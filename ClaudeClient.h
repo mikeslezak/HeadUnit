@@ -6,84 +6,36 @@
 #include <QStringList>
 #include <QJsonObject>
 #include <QJsonArray>
+#include <QJsonValue>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QTimer>
+#include <QMap>
+
+class ToolExecutor;
 
 /**
  * ClaudeClient - Claude API Integration for Jarvis Voice Assistant
  *
- * This class handles all communication with Anthropic's Claude API for
- * natural language understanding and intelligent responses.
- *
- * Features:
- * - Async streaming responses from Claude API
- * - Conversation history management
- * - System context injection (vehicle status, navigation, etc.)
- * - Tool/function calling support for actions
- * - Secure API key management
- * - Error handling
- * - Offline mode graceful degradation
- *
- * Usage:
- *   ClaudeClient *client = new ClaudeClient(this);
- *   client->setApiKey("sk-ant-...");
- *   connect(client, &ClaudeClient::responseReceived, ...);
- *   client->sendMessage("Navigate to the nearest gas station");
+ * Handles communication with Anthropic's Claude API including native tool use.
+ * When Claude returns tool_use blocks, ClaudeClient executes them via ToolExecutor,
+ * submits tool_result messages back, and loops until Claude gives a final text response.
  */
 class ClaudeClient : public QObject
 {
     Q_OBJECT
 
-    // ========== PROPERTIES ==========
-
-    /**
-     * Connection Status
-     * True when API is configured and reachable
-     */
     Q_PROPERTY(bool isConnected READ isConnected NOTIFY connectionChanged)
-
-    /**
-     * Processing State
-     * True when waiting for API response
-     */
     Q_PROPERTY(bool isProcessing READ isProcessing NOTIFY processingChanged)
-
-    /**
-     * Model Name
-     * Claude model to use (e.g., "claude-3-5-sonnet-20241022")
-     */
     Q_PROPERTY(QString model READ model WRITE setModel NOTIFY modelChanged)
-
-    /**
-     * Max Tokens
-     * Maximum tokens in response (default: 1024)
-     */
     Q_PROPERTY(int maxTokens READ maxTokens WRITE setMaxTokens NOTIFY maxTokensChanged)
-
-    /**
-     * Temperature
-     * Randomness in responses: 0.0 (deterministic) to 1.0 (creative)
-     */
     Q_PROPERTY(double temperature READ temperature WRITE setTemperature NOTIFY temperatureChanged)
-
-    /**
-     * Status Message
-     * Current status for debugging/display
-     */
     Q_PROPERTY(QString statusMessage READ statusMessage NOTIFY statusMessageChanged)
-
-    /**
-     * Conversation Active
-     * True if there's an active conversation with history
-     */
     Q_PROPERTY(bool conversationActive READ conversationActive NOTIFY conversationActiveChanged)
 
 public:
     explicit ClaudeClient(QObject *parent = nullptr);
     ~ClaudeClient();
-
-    // ========== PROPERTY GETTERS ==========
 
     bool isConnected() const { return m_isConnected; }
     bool isProcessing() const { return m_isProcessing; }
@@ -94,70 +46,20 @@ public:
     bool conversationActive() const { return !m_conversationHistory.isEmpty(); }
 
 public slots:
-    // ========== CONFIGURATION ==========
-
-    /**
-     * Set Claude API key
-     * Get from: https://console.anthropic.com/
-     * @param apiKey: Your API key (sk-ant-...)
-     */
     void setApiKey(const QString &apiKey);
-
-    /**
-     * Set Claude model to use
-     * @param model: Model ID (e.g., "claude-3-5-sonnet-20241022")
-     */
     void setModel(const QString &model);
-
-    /**
-     * Set maximum response tokens
-     * @param tokens: Max tokens (256-4096 recommended)
-     */
     void setMaxTokens(int tokens);
-
-    /**
-     * Set response temperature
-     * @param temp: 0.0 (deterministic) to 1.0 (creative)
-     */
     void setTemperature(double temp);
 
-    // ========== MESSAGING ==========
-
-    /**
-     * Send message to Claude
-     * @param message: User's spoken/typed message
-     * @param systemContext: Optional system context (JSON string with vehicle state, etc.)
-     */
     void sendMessage(const QString &message, const QString &systemContext = QString(), bool ephemeral = false);
-
-    /**
-     * Clear conversation history
-     * Starts a fresh conversation
-     */
     void clearConversation();
-
-    /**
-     * Cancel current request
-     */
     void cancelRequest();
 
-    // ========== SYSTEM CONTEXT ==========
-
-    /**
-     * Set available tools/functions Claude can call
-     * @param tools: JSON array of tool definitions
-     */
     void setAvailableTools(const QJsonArray &tools);
-
-    /**
-     * Set contact names for context (helps Claude understand who user wants to contact)
-     * @param names: List of contact names from phone
-     */
+    void setToolExecutor(ToolExecutor *executor);
     void setContactNames(const QStringList &names);
 
 signals:
-    // ========== SIGNALS ==========
-
     void connectionChanged();
     void processingChanged();
     void modelChanged();
@@ -167,63 +69,43 @@ signals:
     void conversationActiveChanged();
 
     /**
-     * Emitted when Claude responds (complete message)
-     * @param response: Claude's text response
-     * @param toolCalls: Any tool/function calls requested (JSON array)
+     * Emitted when Claude's final text response is ready (after all tools have been executed).
+     * toolCalls is empty — tools are handled internally now.
      */
     void responseReceived(const QString &response, const QJsonArray &toolCalls);
 
-    /**
-     * Emitted on errors
-     * @param message: Error description
-     */
     void error(const QString &message);
 
 private slots:
-    /**
-     * Handle network response
-     */
     void onNetworkReply(QNetworkReply *reply);
-
-    /**
-     * Handle streaming data
-     */
     void onReadyRead();
 
 private:
-    // ========== HELPER METHODS ==========
+    // Build API request from current conversation state
+    QJsonObject buildRequest(const QString &systemPrompt);
 
-    /**
-     * Build API request JSON
-     * @param userMessage: User's message
-     * @param systemPrompt: System prompt with context
-     * @return: Request JSON object
-     */
-    QJsonObject buildRequest(const QString &userMessage, const QString &systemPrompt);
-
-    /**
-     * Build system prompt with context
-     * @return: Complete system prompt string
-     */
+    // Build system prompt
     QString buildSystemPrompt() const;
 
-    /**
-     * Parse API response
-     * @param json: Response JSON object
-     */
+    // Parse API response — may trigger tool loop or emit final response
     void parseResponse(const QJsonObject &json);
 
-    /**
-     * Set status message and emit signal
-     */
+    // Execute tool_use blocks from Claude's response, then submit results
+    void executeToolsAndContinue(const QJsonArray &contentArray);
+
+    // Submit tool results back to Claude (another API call)
+    void submitToolResults();
+
+    // Fire an API request from current m_conversationHistory
+    void fireApiRequest();
+
     void setStatusMessage(const QString &msg);
 
-    /**
-     * Add message to conversation history
-     */
-    void addToHistory(const QString &role, const QString &content);
+    // Remove incomplete tool exchanges from history (trailing tool_use/tool_result pairs)
+    void sanitizeHistory();
 
-    // ========== MEMBER VARIABLES ==========
+    // Add structured message to history (supports content arrays for tool use)
+    void addToHistory(const QString &role, const QJsonValue &content);
 
     // Network
     QNetworkAccessManager *m_networkManager;
@@ -252,6 +134,16 @@ private:
     // Pending user message (added to history only on successful response)
     QString m_pendingUserMessage;
     bool m_ephemeralRequest = false;
+
+    // Tool use loop
+    ToolExecutor *m_toolExecutor = nullptr;
+    QJsonArray m_pendingAssistantContent; // Assistant's content array with tool_use blocks
+    QMap<QString, QJsonObject> m_pendingToolResults; // tool_use_id -> result
+    int m_pendingToolCount = 0; // Outstanding async tools
+    int m_toolGeneration = 0;  // Incremented on cancel/new request — stale singleShots check this
+    int m_activeToolGeneration = 0; // Snapshot of m_toolGeneration when current tools were dispatched
+    QString m_currentSystemPrompt; // Cached for tool loop re-requests
+    QString m_accumulatedText; // Text from intermediate tool_use turns (spoken after final response)
 
     // Conversation inactivity timeout
     QTimer *m_conversationTimer;

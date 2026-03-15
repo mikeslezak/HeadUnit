@@ -72,6 +72,17 @@ if [ -f "$SPOTIFY_SERVICE" ] && command -v python3 &>/dev/null; then
     echo "Spotify service started (PID: $SPOTIFY_PID)"
 fi
 
+# Boost USB mic gain via PulseAudio (hardware max is 0dB, need software boost)
+# Wait briefly for PulseAudio to be ready
+sleep 0.5
+USB_MIC_SOURCE=$(pactl list sources short 2>/dev/null | grep -i usb | awk '{print $2}')
+if [ -n "$USB_MIC_SOURCE" ]; then
+    pactl set-source-volume "$USB_MIC_SOURCE" 200%
+    echo "USB mic boosted to 200%: $USB_MIC_SOURCE"
+else
+    echo "WARNING: USB mic source not found in PulseAudio"
+fi
+
 # Launch HeadUnit (auto-restart on clean exit for OTA updates)
 if [ ! -f "$SCRIPT_DIR/build/appHeadUnit" ]; then
     echo "ERROR: $SCRIPT_DIR/build/appHeadUnit not found - run cmake build first"

@@ -38,6 +38,8 @@ class TelephonyManager : public QObject
     Q_PROPERTY(bool isCallMuted READ isCallMuted NOTIFY callMutedChanged)
     Q_PROPERTY(int cellularSignal READ cellularSignal NOTIFY cellularSignalChanged)
     Q_PROPERTY(QString carrierName READ carrierName NOTIFY carrierNameChanged)
+    Q_PROPERTY(int phoneBatteryLevel READ phoneBatteryLevel NOTIFY phoneBatteryLevelChanged)
+    Q_PROPERTY(QString roamingStatus READ roamingStatus NOTIFY roamingStatusChanged)
 
 public:
     explicit TelephonyManager(QObject *parent = nullptr);
@@ -51,6 +53,8 @@ public:
     bool isCallMuted() const { return m_isCallMuted; }
     int cellularSignal() const { return m_cellularSignal; }
     QString carrierName() const { return m_carrierName; }
+    int phoneBatteryLevel() const { return m_phoneBatteryLevel; }
+    QString roamingStatus() const { return m_roamingStatus; }
 
     // Dependencies
     void setContactManager(ContactManager* contactManager);
@@ -66,12 +70,16 @@ public slots:
     Q_INVOKABLE void hangupCall();
     Q_INVOKABLE void sendDTMF(const QString &tones);
     Q_INVOKABLE void toggleMute();
+    Q_INVOKABLE void triggerSiri();
+    void handleBluetoothDisconnect();
 
 signals:
     void activeCallChanged();
     void callMutedChanged();
     void cellularSignalChanged();
     void carrierNameChanged();
+    void phoneBatteryLevelChanged();
+    void roamingStatusChanged();
 
 private slots:
     void updateOfonoSignal();
@@ -81,6 +89,8 @@ private slots:
     void onCallPropertyChanged(const QString &propertyName, const QDBusVariant &value);
     void onCallAdded(const QDBusObjectPath &path, const QVariantMap &properties);
     void onCallRemoved(const QDBusObjectPath &path);
+    void onHandsfreePropertyChanged(const QString &propertyName, const QDBusVariant &value);
+    void onNetworkPropertyChanged(const QString &propertyName, const QDBusVariant &value);
 #endif
 
 private:
@@ -97,6 +107,8 @@ private:
     // Cellular info
     int m_cellularSignal;
     QString m_carrierName;
+    int m_phoneBatteryLevel;
+    QString m_roamingStatus;
 
     // Timers
     QTimer *m_ofonoUpdateTimer;

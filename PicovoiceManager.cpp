@@ -44,6 +44,9 @@ PicovoiceManager::PicovoiceManager(QObject *parent)
     , m_lastDetectionTime(0)
     , m_followUpTimer(nullptr)
     , m_readyPromptTimer(nullptr)
+    , m_speechStartTimer(nullptr)
+    , m_transcriptionTimer(nullptr)
+    , m_commandTimer(nullptr)
 {
     qDebug() << "PicovoiceManager: Initializing unified voice pipeline...";
     setStatusMessage("Initializing Picovoice");
@@ -62,6 +65,7 @@ PicovoiceManager::PicovoiceManager(QObject *parent)
     connect(m_followUpTimer, &QTimer::timeout, this, [this]() {
         qDebug() << "PicovoiceManager: Follow-up timeout, returning to listening";
         resetToListening();
+        emit interactionReset();
     });
 
     // Ready prompt safety timer: recovers if TTS fails during ready prompt
@@ -72,6 +76,49 @@ PicovoiceManager::PicovoiceManager(QObject *parent)
         if (m_state == WaitingForReadyPrompt) {
             qWarning() << "PicovoiceManager: Ready prompt timeout — TTS may have failed, resetting";
             cancelAndReset();
+        }
+    });
+
+    // Speech start timeout — if user doesn't start speaking within 6s after ready prompt, reset
+    m_speechStartTimer = new QTimer(this);
+    m_speechStartTimer->setSingleShot(true);
+    m_speechStartTimer->setInterval(8000);
+    connect(m_speechStartTimer, &QTimer::timeout, this, [this]() {
+        if (m_state == WaitingForSpeechStart) {
+            qDebug() << "PicovoiceManager: No speech detected within 8s, resetting to listening";
+            resetToListening();
+            emit interactionReset();
+        }
+    });
+
+    // Rhino command timeout — if Rhino never finalizes within 10s, fall back to STT
+    m_commandTimer = new QTimer(this);
+    m_commandTimer->setSingleShot(true);
+    m_commandTimer->setInterval(10000);
+    connect(m_commandTimer, &QTimer::timeout, this, [this]() {
+        if (m_state == WaitingForCommand) {
+            qWarning() << "PicovoiceManager: Rhino command timeout (10s), falling back to STT";
+            if (m_rhino) pv_rhino_reset(m_rhino);
+            // Use accumulated speech buffer for STT
+            if (!m_speechBuffer.isEmpty()) {
+                finalizeLeopardTranscription();
+            } else {
+                resetToListening();
+                emit interactionReset();
+            }
+        }
+    });
+
+    // Transcription timeout — if Google STT doesn't respond within 15s, reset
+    m_transcriptionTimer = new QTimer(this);
+    m_transcriptionTimer->setSingleShot(true);
+    m_transcriptionTimer->setInterval(15000);
+    connect(m_transcriptionTimer, &QTimer::timeout, this, [this]() {
+        if (m_state == WaitingForTranscription) {
+            qWarning() << "PicovoiceManager: Transcription timeout (15s), resetting";
+            if (m_googleSTT) m_googleSTT->cancel();
+            resetToListening();
+            emit interactionReset();
         }
     });
 }
@@ -149,6 +196,7 @@ void PicovoiceManager::start()
     }
 
     m_audioSource = new QAudioSource(deviceInfo, format, this);
+    m_audioSource->setBufferSize(4096);  // 128ms at 16kHz mono 16-bit — low latency for voice
     m_audioDevice = m_audioSource->start();
 
     if (!m_audioDevice) {
@@ -161,6 +209,39 @@ void PicovoiceManager::start()
 
     // Connect to audio ready signal
     connect(m_audioDevice, &QIODevice::readyRead, this, &PicovoiceManager::onAudioReady);
+
+    // Monitor audio source for errors and auto-recover (with retry limit)
+    connect(m_audioSource, &QAudioSource::stateChanged, this, [this](QAudio::State state) {
+        if (state == QAudio::StoppedState && m_audioSource->error() != QAudio::NoError) {
+            m_audioRecoveryAttempts++;
+            if (m_audioRecoveryAttempts > MAX_AUDIO_RECOVERY_ATTEMPTS) {
+                qCritical() << "PicovoiceManager: Audio recovery failed after"
+                            << MAX_AUDIO_RECOVERY_ATTEMPTS << "attempts, stopping";
+                emit error("Microphone disconnected — restart to retry");
+                return;
+            }
+            qWarning() << "PicovoiceManager: Audio source error:" << m_audioSource->error()
+                       << "— restart attempt" << m_audioRecoveryAttempts;
+            QTimer::singleShot(500, this, [this]() {
+                if (m_audioSource && m_isRunning) {
+                    auto *oldDevice = m_audioDevice;
+                    m_audioDevice = m_audioSource->start();
+                    if (m_audioDevice) {
+                        // Always disconnect old device to prevent duplicate connections
+                        // (Qt may reuse the same QIODevice pointer on restart)
+                        if (oldDevice) {
+                            disconnect(oldDevice, &QIODevice::readyRead, this, &PicovoiceManager::onAudioReady);
+                        }
+                        connect(m_audioDevice, &QIODevice::readyRead, this, &PicovoiceManager::onAudioReady);
+                        m_audioRecoveryAttempts = 0;  // Reset on success
+                        qDebug() << "PicovoiceManager: Audio capture restarted successfully";
+                    } else {
+                        qCritical() << "PicovoiceManager: Failed to restart audio capture";
+                    }
+                }
+            });
+        }
+    });
 
     m_isRunning = true;
     m_isPaused = false;
@@ -181,6 +262,13 @@ void PicovoiceManager::stop()
     if (!m_isRunning) {
         return;
     }
+
+    // Stop all timers before tearing down audio
+    m_followUpTimer->stop();
+    m_readyPromptTimer->stop();
+    m_speechStartTimer->stop();
+    m_transcriptionTimer->stop();
+    m_commandTimer->stop();
 
     // Stop audio input
     if (m_audioSource) {
@@ -206,6 +294,15 @@ void PicovoiceManager::pause()
     }
 
     m_isPaused = true;
+
+    // Stop ALL active state timers — they'll resume when resume() is called if still relevant.
+    // Without this, timers fire during TTS playback and silently reset state.
+    m_speechStartTimer->stop();
+    m_readyPromptTimer->stop();
+    m_commandTimer->stop();
+    m_followUpTimer->stop();
+    m_transcriptionTimer->stop();
+
     setStatusMessage("Voice pipeline paused");
     qDebug() << "PicovoiceManager: Paused";
 }
@@ -217,15 +314,31 @@ void PicovoiceManager::resume()
     }
 
     m_isPaused = false;
+    m_resumeTime = QDateTime::currentMSecsSinceEpoch();
 
     // Discard any microphone audio captured during the pause (contains TTS echo)
+    if (m_audioDevice) m_audioDevice->readAll();  // Flush OS/driver buffer
     m_audioBuffer.clear();
 
-    if (m_state == WaitingForFollowUp) {
+    // Restart the appropriate state timer that was stopped during pause()
+    if (m_state == WaitingForReadyPrompt) {
+        // Resuming while waiting for ready prompt — restart safety timer
+        m_readyPromptTimer->start();
+        setStatusMessage("Playing ready prompt...");
+        qDebug() << "PicovoiceManager: Resumed into ready prompt wait";
+    } else if (m_state == WaitingForFollowUp) {
         // Resuming into follow-up mode — start the timeout now (TTS just finished)
         m_followUpTimer->start();
         setStatusMessage("Listening for follow-up...");
         qDebug() << "PicovoiceManager: Resumed into follow-up mode";
+    } else if (m_state == WaitingForSpeechStart) {
+        m_speechStartTimer->start();
+        setStatusMessage("Listening...");
+        qDebug() << "PicovoiceManager: Resumed into speech start detection";
+    } else if (m_state == WaitingForCommand) {
+        m_commandTimer->start();
+        setStatusMessage("Listening for command...");
+        qDebug() << "PicovoiceManager: Resumed into command detection";
     } else {
         setStatusMessage(QString("Listening for '%1'...").arg(m_wakeWord));
         qDebug() << "PicovoiceManager: Resumed";
@@ -345,12 +458,23 @@ void PicovoiceManager::setSpeechContextHints(const QStringList &hints)
 
 void PicovoiceManager::onAudioReady()
 {
-    if (!m_audioDevice || m_isPaused) {
-        return;
+    if (!m_audioDevice) return;
+
+    // ALWAYS read from device to prevent OS/driver buffer buildup.
+    // Without this, stale audio (including TTS echo) accumulates during pause
+    // and floods the pipeline when we resume.
+    QByteArray data = m_audioDevice->readAll();
+
+    if (m_isPaused) return;  // Discard audio while paused
+
+    // Post-resume deaf period — discard audio for a short window after resume
+    // to avoid TTS echo/reverberation in ALL states (not just WaitingForFollowUp)
+    if (m_resumeTime > 0) {
+        qint64 elapsed = QDateTime::currentMSecsSinceEpoch() - m_resumeTime;
+        if (elapsed < POST_RESUME_DEAF_MS) return;
+        m_resumeTime = 0;  // Clear so we don't check every frame
     }
 
-    // Read available audio data
-    QByteArray data = m_audioDevice->readAll();
     m_audioBuffer.append(data);
 
     // Process Porcupine frames (512 samples per frame)
@@ -388,16 +512,53 @@ void PicovoiceManager::onAudioReady()
 void PicovoiceManager::processAudioFrame(const int16_t *frame, int32_t length)
 {
     switch (m_state) {
-        case Listening:
+        case Listening: {
+            // Track ambient noise floor while idle (for adaptive speech detection)
+            int16_t energy = calculateFrameEnergy(frame, length);
+            m_noiseFloor = m_noiseFloor * (1.0f - NOISE_FLOOR_ALPHA) + energy * NOISE_FLOOR_ALPHA;
+            // Cap noise floor so speech threshold never exceeds ~6000 RMS
+            // (prevents highway wind noise from making speech detection impossible)
+            if (m_noiseFloor > 2000.0f) m_noiseFloor = 2000.0f;
             processWakeWord(frame);
             break;
+        }
 
         case WaitingForReadyPrompt:
-            break; // Ignore audio during TTS prompt
+            // Pre-buffer audio so we capture the user's command even if they start
+            // talking before the ready prompt finishes
+            for (int32_t i = 0; i < length; ++i) {
+                m_speechBuffer.append(frame[i]);
+            }
+            break;
 
         case WaitingForCommand:
             processRhinoIntent(frame);
             break;
+
+        case WaitingForSpeechStart: {
+            // No Rhino: wait for user to start speaking (energy-based detection)
+            // Uses adaptive noise floor — speech must be 3x ambient noise level
+            int16_t energy = calculateFrameEnergy(frame, length);
+            int16_t adaptiveThreshold = (int16_t)(m_noiseFloor * SPEECH_THRESHOLD_RATIO);
+            int16_t threshold = adaptiveThreshold > SILENCE_ENERGY_THRESHOLD ? adaptiveThreshold : SILENCE_ENERGY_THRESHOLD;
+
+            if (energy > threshold) {
+                // Speech detected — transition to ProcessingSpeech
+                m_speechStartTimer->stop();
+                qDebug() << "PicovoiceManager: Speech start detected, recording...";
+                m_state = ProcessingSpeech;
+                m_speechStartTime = QDateTime::currentMSecsSinceEpoch();
+                m_lastVoiceActivityTime = m_speechStartTime;
+                m_speechBuffer.clear();
+                m_speechBuffer.reserve(16000 * 10);
+
+                // Accumulate this frame
+                for (int32_t i = 0; i < length; ++i) {
+                    m_speechBuffer.append(frame[i]);
+                }
+            }
+            break;
+        }
 
         case ProcessingSpeech: {
             // Accumulate audio for Leopard
@@ -408,11 +569,13 @@ void PicovoiceManager::processAudioFrame(const int16_t *frame, int32_t length)
             qint64 now = QDateTime::currentMSecsSinceEpoch();
             qint64 speechDuration = now - m_speechStartTime;
 
-            // Calculate frame energy for VAD
+            // Calculate frame energy for VAD (adaptive threshold)
             int16_t energy = calculateFrameEnergy(frame, length);
+            int16_t adaptiveThreshold = (int16_t)(m_noiseFloor * SPEECH_THRESHOLD_RATIO);
+            int16_t threshold = adaptiveThreshold > SILENCE_ENERGY_THRESHOLD ? adaptiveThreshold : SILENCE_ENERGY_THRESHOLD;
 
             // Track voice activity
-            if (energy > SILENCE_ENERGY_THRESHOLD) {
+            if (energy > threshold) {
                 m_lastVoiceActivityTime = now;
             }
 
@@ -434,11 +597,18 @@ void PicovoiceManager::processAudioFrame(const int16_t *frame, int32_t length)
             break;
         }
 
+        case WaitingForTranscription:
+            // Audio sent to STT — nothing to do, just discard frames until result arrives
+            break;
+
         case WaitingForFollowUp: {
             // In follow-up mode: no wake word needed, detect speech directly
+            // (Post-resume deaf period is handled globally in onAudioReady)
             int16_t energy = calculateFrameEnergy(frame, length);
+            int16_t adaptiveThreshold = (int16_t)(m_noiseFloor * SPEECH_THRESHOLD_RATIO);
+            int16_t threshold = adaptiveThreshold > SILENCE_ENERGY_THRESHOLD ? adaptiveThreshold : SILENCE_ENERGY_THRESHOLD;
 
-            if (energy > SILENCE_ENERGY_THRESHOLD) {
+            if (energy > threshold) {
                 // Speech detected — stop the timeout and start accumulating
                 m_followUpTimer->stop();
                 qDebug() << "PicovoiceManager: Follow-up speech detected, recording...";
@@ -484,8 +654,10 @@ void PicovoiceManager::processWakeWord(const int16_t *frame)
             emit wakeWordDetected(m_wakeWord);
 
             // Transition to WaitingForReadyPrompt state - wait for TTS prompt to finish
-            // This prevents recording the assistant's "ready" voice prompt
+            // Pre-buffer audio so we capture user's command even if they start talking early
             m_state = WaitingForReadyPrompt;
+            m_speechBuffer.clear();
+            m_speechBuffer.reserve(16000 * 10);
             m_readyPromptTimer->start();
             setStatusMessage("Playing ready prompt...");
             qDebug() << "PicovoiceManager: Waiting for ready prompt to finish...";
@@ -510,15 +682,19 @@ void PicovoiceManager::onReadyPromptFinished()
     // Now transition to actual command listening
     if (m_rhino) {
         m_state = WaitingForCommand;
+        m_commandTimer->start();
         setStatusMessage("Listening for command...");
     } else {
-        // No Rhino, go straight to speech accumulation
-        m_state = ProcessingSpeech;
-        m_speechStartTime = now;
-        m_lastVoiceActivityTime = now;
+        // No Rhino, go straight to speech accumulation.
+        // Use WaitingForFollowUp-like approach: wait for the user to actually start
+        // speaking before starting ProcessingSpeech with its silence detection.
+        // Otherwise silence detection fires after ~1.5s even if the user hasn't spoken yet.
+        m_state = WaitingForSpeechStart;
         m_speechBuffer.clear();
         m_speechBuffer.reserve(16000 * 10);
-        setStatusMessage("Processing speech...");
+        m_speechStartTimer->start();
+        qDebug() << "PicovoiceManager: Waiting for user to start speaking (no Rhino)...";
+        setStatusMessage("Listening...");
     }
 }
 
@@ -549,6 +725,7 @@ void PicovoiceManager::processRhinoIntent(const int16_t *frame)
     }
 
     if (isFinalized) {
+        m_commandTimer->stop();
         bool isUnderstood = false;
         pv_rhino_is_understood(m_rhino, &isUnderstood);
 
@@ -583,6 +760,7 @@ void PicovoiceManager::processRhinoIntent(const int16_t *frame)
         } else {
             // Rhino didn't understand, use Leopard for full transcription
             qDebug() << "PicovoiceManager: Rhino didn't understand, using Leopard...";
+            m_commandTimer->stop();
             m_state = ProcessingSpeech;
             qint64 now = QDateTime::currentMSecsSinceEpoch();
             m_speechStartTime = now;
@@ -612,9 +790,12 @@ void PicovoiceManager::finalizeLeopardTranscription()
         qDebug() << "PicovoiceManager: Transcribing with Google STT..." << m_speechBuffer.size() << "samples";
         setStatusMessage("Sending to Google STT...");
 
+        // Transition to WaitingForTranscription — stops silence detection from re-firing
+        m_state = WaitingForTranscription;
+        m_transcriptionTimer->start();
+
         // Send audio to Google STT - callback will handle result
         m_googleSTT->transcribe(m_speechBuffer);
-        // Note: Don't reset to listening yet - wait for callback
         return;
     }
 
@@ -674,6 +855,14 @@ QString PicovoiceManager::transcribeWithLeopard(const QVector<int16_t> &audioBuf
 
 void PicovoiceManager::onGoogleTranscriptionReady(const QString &text, float confidence)
 {
+    m_transcriptionTimer->stop();
+
+    // Guard: only accept transcription results when we're actually waiting for one
+    if (m_state != WaitingForTranscription) {
+        qDebug() << "PicovoiceManager: Ignoring stale Google STT result (state:" << m_state << ")";
+        return;
+    }
+
     qDebug() << "PicovoiceManager: Google STT transcription:" << text << "confidence:" << confidence;
 
     if (text.trimmed().isEmpty()) {
@@ -694,6 +883,14 @@ void PicovoiceManager::onGoogleTranscriptionReady(const QString &text, float con
 
 void PicovoiceManager::onGoogleError(const QString &message)
 {
+    m_transcriptionTimer->stop();
+
+    // Ignore stale errors that arrive after we've moved to a different state
+    if (m_state != WaitingForTranscription) {
+        qDebug() << "PicovoiceManager: Ignoring stale Google STT error (state:" << m_state << "):" << message;
+        return;
+    }
+
     qWarning() << "PicovoiceManager: Google STT error:" << message;
 
     // Fall back to Leopard on Google STT failure
@@ -724,8 +921,23 @@ void PicovoiceManager::manualActivate()
 
     qDebug() << "PicovoiceManager: Manual activation (button press)";
 
+    // Clean up any in-flight state (e.g., pending STT, follow-up mode)
+    // so stale results don't race with this new activation
+    if (m_googleSTT && m_googleSTT->isProcessing()) {
+        m_googleSTT->cancel();
+    }
+    m_followUpTimer->stop();
+    m_speechStartTimer->stop();
+    m_transcriptionTimer->stop();
+    m_commandTimer->stop();
+    m_isPaused = false;
+
     // Simulate wake word detection - go to WaitingForReadyPrompt
     m_lastDetectionTime = QDateTime::currentMSecsSinceEpoch();
+    m_speechBuffer.clear();
+    m_speechBuffer.reserve(16000 * 10);
+    if (m_audioDevice) m_audioDevice->readAll();
+    m_audioBuffer.clear();
     emit wakeWordDetected(m_wakeWord);
 
     m_state = WaitingForReadyPrompt;
@@ -756,14 +968,26 @@ void PicovoiceManager::cancelAndReset()
 {
     qDebug() << "PicovoiceManager: Cancel and reset — returning to wake word listening";
     m_isPaused = false;
+    // Cancel any in-flight Google STT request so stale results don't arrive later
+    if (m_googleSTT && m_googleSTT->isProcessing()) {
+        m_googleSTT->cancel();
+    }
+    m_transcriptionTimer->stop();
     resetToListening();
 }
 
 void PicovoiceManager::resetToListening()
 {
+    // Discard any stale audio that accumulated during STT processing
+    if (m_audioDevice) m_audioDevice->readAll();
+    m_audioBuffer.clear();
     m_speechBuffer.clear();
     m_speechBuffer.reserve(16000 * 10);
+    m_readyPromptTimer->stop();
     m_followUpTimer->stop();
+    m_speechStartTimer->stop();
+    m_transcriptionTimer->stop();
+    m_commandTimer->stop();
     m_state = Listening;
 
     // Reset Rhino if it was used

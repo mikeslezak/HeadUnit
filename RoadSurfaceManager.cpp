@@ -27,7 +27,7 @@ RoadSurfaceManager::RoadSurfaceManager(QObject *parent)
 
 void RoadSurfaceManager::setContextAggregator(ContextAggregator *ctx) { m_context = ctx; }
 
-void RoadSurfaceManager::setRouteCoordinates(const QJsonArray &coordinates, double durationSec)
+void RoadSurfaceManager::setRouteCoordinates(const QJsonArray &coordinates, double durationSec, bool silent)
 {
     Q_UNUSED(durationSec)
 
@@ -36,6 +36,7 @@ void RoadSurfaceManager::setRouteCoordinates(const QJsonArray &coordinates, doub
         return;
     }
 
+    m_suppressNextAlert = silent;
     ++m_generation;
     m_routeCoordinates = coordinates;
 
@@ -59,6 +60,9 @@ void RoadSurfaceManager::clearRoute()
     m_refreshTimer->stop();
     emit activeChanged();
     emit summaryChanged();
+
+    m_lastAlertText.clear();
+    m_suppressNextAlert = false;
 
     if (m_context) {
         m_context->setRoadSurfaceSummary(QString());
@@ -261,7 +265,7 @@ void RoadSurfaceManager::processResults()
 
     buildSummary();
 
-    // Collect all alert strings and emit a single combined alert (same pattern as RoadConditionManager)
+    // Build alert text from dangerous conditions
     QString combinedAlert;
     for (const auto &rpt : m_routeReports) {
         QString road = rpt.roadName.isEmpty() ? "your route" : rpt.roadName;
@@ -281,6 +285,21 @@ void RoadSurfaceManager::processResults()
                 .arg(road);
         }
     }
+
+    // --- Change detection: only emit alertDetected when alert text differs ---
+    if (m_suppressNextAlert) {
+        m_suppressNextAlert = false;
+        m_lastAlertText = combinedAlert;
+        qDebug() << "RoadSurfaceManager: Alert suppressed (silent mode)";
+        return;
+    }
+
+    if (combinedAlert == m_lastAlertText) {
+        qDebug() << "RoadSurfaceManager: No change in surface conditions, skipping alert";
+        return;
+    }
+
+    m_lastAlertText = combinedAlert;
     if (!combinedAlert.isEmpty()) {
         emit alertDetected(combinedAlert.trimmed());
     }

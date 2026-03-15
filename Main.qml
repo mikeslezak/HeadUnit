@@ -424,6 +424,9 @@ Window {
                     showScreen("home")
                     screenContainer.addStopOnRoute(destination)
                 }
+                onCancelNavigation: {
+                    screenContainer.cancelNavigation()
+                }
             }
 
             // Status Bar - occupies top buffer zone

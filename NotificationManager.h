@@ -173,6 +173,9 @@ private:
     bool shouldShowNotification(NotificationPriority priority) const;
     QVariantMap parseAncsNotification(const QByteArray &data);
     void sendAncsCommand(quint8 commandId, const QString &notificationId);
+    void requestNotificationAttributes(quint32 uid);
+    void handleDataSourceResponse(const QByteArray &data);
+    QString resolveAppName(const QString &bundleId);
     void loadSettings();
     void saveSettings();
     void generateMockNotifications();
@@ -217,6 +220,10 @@ private:
     QLowEnergyCharacteristic m_controlPoint;
     QLowEnergyCharacteristic m_dataSource;
     QLowEnergyCharacteristic m_batteryLevelChar;
+
+    // ANCS Data Source response reassembly
+    QByteArray m_dataSourceBuffer;
+    QMap<quint32, QVariantMap> m_pendingNotifications;
 
     void refreshBatteryLevel();
 #endif
