@@ -285,6 +285,19 @@ int main(int argc, char *argv[])
                          emit notificationManager.notificationReceived(n);
                      });
 
+    // Wire incoming SMS (MAP) into the notification system
+    QObject::connect(&messageManager, &MessageManager::newMessageReceived,
+                     &notificationManager, [&notificationManager](const QString &threadId, const QString &sender, const QString &body) {
+                         Q_UNUSED(threadId)
+                         QVariantMap n;
+                         n["title"] = sender;
+                         n["message"] = body;
+                         n["category"] = 1;  // Social/Message
+                         n["priority"] = 2;  // Normal
+                         n["timestamp"] = QDateTime::currentDateTime().toString(Qt::ISODate);
+                         notificationManager.addNotification(n);
+                     });
+
     // When LE bond completes and BR/EDR profiles connect, set up media/voice services
     QObject::connect(&ancsManager, &AncsManager::deviceBondedOverLE,
                      &mediaController, [&mediaController](const QString &address) {

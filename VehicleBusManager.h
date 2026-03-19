@@ -108,15 +108,28 @@ public:
     int faultCount() const { return m_faultCount; }
     int sensorFaults() const { return m_sensorFaults; }
 
-    // Commands to vehicle bus
-    Q_INVOKABLE void setDriveMode(int mode);
-    Q_INVOKABLE void setLaunchControl(bool enable);
-    Q_INVOKABLE void setTractionControl(int mode);
+    // Safe commands — callable from QML directly
     Q_INVOKABLE void sendGps(double lat, double lon, double alt, double speedKph, double heading, int fix, int sats);
 
-    // Tune commands
-    Q_INVOKABLE void sendTuneDelta(int tableId, int rpmIdx, int mapIdx, int delta);
-    Q_INVOKABLE void sendTuneRollback();
+    // Gated commands — require confirmation before CAN transmission
+    // Step 1: QML calls request*() → sets pending state, emits confirmationRequired
+    // Step 2: User confirms on screen → QML calls confirmPendingCommand()
+    // Step 3: Actual CAN frame is sent
+    Q_INVOKABLE void requestDriveMode(int mode);
+    Q_INVOKABLE void requestLaunchControl(bool enable);
+    Q_INVOKABLE void requestTractionControl(int mode);
+    Q_INVOKABLE void requestTuneDelta(int tableId, int rpmIdx, int mapIdx, int delta);
+    Q_INVOKABLE void requestTuneRollback();
+    Q_INVOKABLE void confirmPendingCommand();
+    Q_INVOKABLE void cancelPendingCommand();
+    Q_INVOKABLE QString pendingCommandDescription() const;
+
+    // NOT Q_INVOKABLE — only callable from C++ (confirmation gate or CAN gateway)
+    void setDriveMode(int mode);
+    void setLaunchControl(bool enable);
+    void setTractionControl(int mode);
+    void sendTuneDelta(int tableId, int rpmIdx, int mapIdx, int delta);
+    void sendTuneRollback();
 
     // Connection control
     Q_INVOKABLE void connectBus(const QString &iface = "can0");
@@ -133,11 +146,14 @@ signals:
     void driveModeChanged();
     void faultsUpdated();
     void tuneAckReceived(int tableId, int rpmIdx, int mapIdx, bool accepted);
+    void confirmationRequired(const QString &description);  // QML shows confirmation dialog
+    void pendingCommandCancelled();
 
 private slots:
     void onCanData();
     void onHeartbeatTimer();
     void onModuleTimeoutCheck();
+    void onUiUpdateTimer();  // 30Hz coalescing timer — emits dirty signals to QML
 
 private:
     void processFrame(uint32_t canId, const uint8_t *data, uint8_t len);
@@ -197,4 +213,21 @@ private:
     int m_sensorFaults = 0;
 
     uint16_t m_tuneSeq = 0;
+
+    // UI update coalescing — CAN data stored immediately, signals emitted at 30Hz max
+    QTimer *m_uiUpdateTimer = nullptr;
+    bool m_dirtyTelemetry = false;
+    bool m_dirtyPressures = false;
+    bool m_dirtyFuel = false;
+    bool m_dirtyIgnition = false;
+    bool m_dirtyDriveMode = false;
+    bool m_dirtyFaults = false;
+    bool m_dirtyModuleStatus = false;
+
+    // Pending command gate — stores the command until user confirms
+    enum class PendingCmd { None, DriveMode, LaunchControl, TractionControl, TuneDelta, TuneRollback };
+    PendingCmd m_pendingCmd = PendingCmd::None;
+    int m_pendingInt1 = 0, m_pendingInt2 = 0, m_pendingInt3 = 0, m_pendingInt4 = 0;
+    bool m_pendingBool = false;
+    QString m_pendingDescription;
 };

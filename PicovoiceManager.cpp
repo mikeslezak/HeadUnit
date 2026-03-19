@@ -197,6 +197,7 @@ void PicovoiceManager::start()
 
     m_audioSource = new QAudioSource(deviceInfo, format, this);
     m_audioSource->setBufferSize(4096);  // 128ms at 16kHz mono 16-bit — low latency for voice
+    // Note: media.role=voice_assistant is set via PULSE_PROP in headunit.env for PipeWire/WirePlumber policy
     m_audioDevice = m_audioSource->start();
 
     if (!m_audioDevice) {

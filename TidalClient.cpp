@@ -99,6 +99,13 @@ void TidalClient::initGStreamer()
         return;
     }
 
+    // Tag stream with media.role for WirePlumber audio policy (music = lowest priority, ducks for calls/voice)
+    GstStructure *props = gst_structure_new("stream-properties",
+        "media.role", G_TYPE_STRING, "music",
+        nullptr);
+    g_object_set(m_pipeline, "stream-properties", props, nullptr);
+    gst_structure_free(props);
+
     // Set up bus watch for EOS, errors, state changes
     GstBus *bus = gst_element_get_bus(m_pipeline);
     if (bus) {
@@ -108,7 +115,7 @@ void TidalClient::initGStreamer()
         qWarning() << "TidalClient: Failed to get GStreamer bus";
     }
 
-    qDebug() << "TidalClient: GStreamer playbin initialized";
+    qDebug() << "TidalClient: GStreamer playbin initialized (media.role=music)";
 }
 
 void TidalClient::destroyGStreamer()
