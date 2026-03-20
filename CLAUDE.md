@@ -20,16 +20,33 @@ Qt 6.8 LTS QML/C++ app running on Jetson Orin Nano 8GB via EGLFS (no desktop env
 ## Yocto Build
 - **Build server**: Desktop "NightHawk" WSL2 Ubuntu — `ssh -p 2222 mike@192.168.1.215`
 - **Never build on Jetson** — NVIDIA flash tools are x86_64-only
-- **Layer**: `meta-headunit` in `~/yocto/sources/meta-headunit/`
-- **Phase 1 COMPLETE**: Minimal image (systemd, NetworkManager, BlueZ, CAN, dropbear) built and flashed
-- **Phase 2 NEXT**: Add Qt 6.8, PipeWire 1.6, GStreamer, EGLFS
+- **Layer**: `meta-headunit` in `~/yocto/sources/meta-headunit/` (files exist on both Jetson and desktop, sync via rsync)
+- **meta-qt6 branch**: `6.8` (NOT `lts-6.8` — that uses commercial repos)
+- **Phase 1 COMPLETE** (2026-03-19): Minimal image (systemd, NetworkManager, BlueZ, CAN, dropbear)
+- **Phase 2 COMPLETE** (2026-03-20): Full multimedia/display/nav stack — 9,186 tasks, all succeeded, SD card flashed
+- **Phase 3 NEXT**: Picovoice, Whisper+Piper, RAUC, chrony, librespot, gpsd
+
+### Custom Recipes in meta-headunit (5)
+| Recipe | Version | Key fixes |
+|--------|---------|-----------|
+| pipewire_1.6.2.bb | 1.6.2 | `libsystemd` meson rename, new binaries packaged |
+| wireplumber_0.5.13.bb | 0.5.13 | branch=master, bash-completion FILES |
+| bluez5_5.86.bb | 5.86 | FILESEXTRAPATHS to poky, removed health/sap/ptest |
+| qmaplibre-native-qt_3.0.0.bb | 3.0.0 | gitsm://, install path fix, tests removed, -Werror stripped |
+| valhalla_3.6.3.bb | 3.6.3 | gitsm:// nobranch+nolfs, protoc cross-compile CMake include |
+
+### SD Card Flash Process
+1. `bitbake headunit-image` on desktop
+2. `cp .../headunit-image-*.ext4 ~/yocto/flash/headunit-image.ext4`
+3. `sudo ./make-sdcard -s 32G -b headunit-image signed/flash.xml.tmp headunit-image-phase2.sdcard`
+4. Stream: `ssh desktop "sudo dd if=...sdcard bs=4M" | sudo dd of=/dev/mmcblk0 bs=4M` (NO lz4 — truncates sparse images)
 
 ## Key Technical Decisions
-- Qt 6.8 LTS (supported until 2029)
+- Qt 6.8.4 LTS (supported until 2029)
 - PipeWire 1.6.2 + WirePlumber 0.5.13 (custom recipes, no PulseAudio, no oFono)
 - BlueZ 5.86 (custom recipe) — D-Bus API directly from Qt/C++, no Blueman
-- MapLibre Native Qt for maps (replaces QtWebEngine)
-- Valhalla for offline routing
+- QMapLibre Native Qt 3.0.0 for maps (custom recipe, replaces QtWebEngine)
+- Valhalla 3.6.3 for offline routing (custom recipe)
 - RAUC for OTA with NVIDIA nvbootctrl A/B slot switching
 - All data on NVMe SSD (/data), rootfs on SD card (ext4, UEFI reads ext4 only)
 - Gemini Live API prototyping for voice (hybrid with Claude for complex reasoning)
