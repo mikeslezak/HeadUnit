@@ -23,7 +23,10 @@ Qt 6.8 LTS QML/C++ app running on Jetson Orin Nano 8GB via EGLFS (no desktop env
 - **Layer**: `meta-headunit` in `~/yocto/sources/meta-headunit/` (files exist on both Jetson and desktop, sync via rsync)
 - **meta-qt6 branch**: `6.8` (NOT `lts-6.8` — that uses commercial repos)
 - **Phase 1 COMPLETE** (2026-03-19): Minimal image (systemd, NetworkManager, BlueZ, CAN, dropbear)
-- **Phase 2 COMPLETE** (2026-03-20): Full multimedia/display/nav stack — 9,186 tasks, all succeeded, SD card flashed
+- **Phase 2 COMPLETE** (2026-03-20): Full multimedia/display/nav stack — 9,186 tasks, all succeeded
+- **Phase 2 SD card FLASHED** (2026-03-20): Image streamed from desktop to Jetson SD card via dd (30GB, ~45min)
+- **EGLFS test app** built natively on Jetson (Ubuntu SSD), deployed to SD card rootfs with auto-start systemd service
+- **Awaiting reboot verification** — reboot to SD card to confirm EGLFS display works
 - **Phase 3 NEXT**: Picovoice, Whisper+Piper, RAUC, chrony, librespot, gpsd
 
 ### Custom Recipes in meta-headunit (5)
@@ -36,10 +39,27 @@ Qt 6.8 LTS QML/C++ app running on Jetson Orin Nano 8GB via EGLFS (no desktop env
 | valhalla_3.6.3.bb | 3.6.3 | gitsm:// nobranch+nolfs, protoc cross-compile CMake include |
 
 ### SD Card Flash Process
-1. `bitbake headunit-image` on desktop
+1. `bitbake headunit-image` on desktop (NightHawk WSL2)
 2. `cp .../headunit-image-*.ext4 ~/yocto/flash/headunit-image.ext4`
-3. `sudo ./make-sdcard -s 32G -b headunit-image signed/flash.xml.tmp headunit-image-phase2.sdcard`
-4. Stream: `ssh desktop "sudo dd if=...sdcard bs=4M" | sudo dd of=/dev/mmcblk0 bs=4M` (NO lz4 — truncates sparse images)
+3. `cd ~/yocto/flash && sudo ./make-sdcard -s 32G -b headunit-image signed/flash.xml.tmp headunit-image-phase2.sdcard`
+4. On Jetson (booted from NVMe SSD Ubuntu), insert SD card, unmount all partitions
+5. Stream: `ssh -p 2222 mike@192.168.1.215 "sudo dd if=.../headunit-image-phase2.sdcard bs=4M" | sudo dd of=/dev/mmcblk0 bs=4M status=progress`
+6. NO lz4 piping — truncates at 979MB due to sparse file handling
+7. ~45min for 30GB at ~11.6 MB/s over LAN
+
+### Dual-Boot Setup
+- **SD card inserted**: Jetson boots to SD card (Yocto HeadUnit image)
+- **SD card removed**: Jetson falls back to NVMe SSD (Ubuntu 22.04 dev environment)
+- Use SSD boot to flash/modify SD card contents, build test apps, etc.
+
+### Deploying Apps to SD Card Without Full Rebuild
+1. Boot Jetson from NVMe SSD (remove SD card, boot, reinsert)
+2. Mount SD card rootfs: `sudo mount /dev/mmcblk0p1 /mnt`
+3. Build app natively (Ubuntu has g++, install qt6-base-dev qt6-declarative-dev)
+4. Copy binary: `sudo cp ./build/app /mnt/usr/bin/`
+5. Add systemd service if needed: `sudo cp app.service /mnt/etc/systemd/system/`
+6. Enable: `sudo ln -sf /etc/systemd/system/app.service /mnt/etc/systemd/system/multi-user.target.wants/`
+7. Unmount and reboot to SD card
 
 ## Key Technical Decisions
 - Qt 6.8.4 LTS (supported until 2029)
